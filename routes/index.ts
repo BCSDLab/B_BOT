@@ -1,6 +1,8 @@
-import {  } from "@slack/web-api"
+import { app } from "../src/config/app";
 
-export default eventHandler((e) => {
-  console.debug(e)
-  return { e: "" }
-})
+app.message('똑똑', async ({ event, client, message }) => {
+  await client.chat.postMessage({
+    channel: "C06JWD4UQJW",
+    text: `부르셨나요?`
+  });
+});
