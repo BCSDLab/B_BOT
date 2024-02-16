@@ -1,7 +1,8 @@
 import express from 'express';
 import eventRouter from './routes/event';
+import dotenv from 'dotenv';
 
-
+dotenv.config();  // Load environment variables from .env file 
 // Express 앱 생성
 const expressApp = express();
 expressApp.use(express.json())

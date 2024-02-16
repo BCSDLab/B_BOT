@@ -5,6 +5,7 @@ import { boltApp } from '../../config/boltApp';
 const eventRouter = express.Router();
 
 eventRouter.get('/', (req, res) => {
+  console.log(process.env.SLACK_BOT_SIGNING_SECRET)
   res.send({
     message: 'Hello, World!',
     tokens: {
