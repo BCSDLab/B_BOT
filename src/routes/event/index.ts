@@ -4,6 +4,10 @@ import { boltApp } from '../../config/boltApp';
 
 const eventRouter = express.Router();
 
+eventRouter.get('/', (req, res) => {
+  res.send('Hello, Slack Bolt!');
+});
+
 // 이벤트 구독
 eventRouter.post('/', (req, res) => {
   // 이벤트 구독 확인 요청인 경우
