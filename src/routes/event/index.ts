@@ -31,7 +31,7 @@ boltApp.event('app_mention', async ({ event, say }) => {
 boltApp.message('!회칙', async ({ event, message, body }) => {
   await boltApp.client.chat.postMessage({
     channel: event.channel,
-    text: '회칙은 말이죠... 여기여기 주소로... ',
+    text: 'https://bcsdlab.slack.com/team/UKVPYFYP4',
   });
 });
 
