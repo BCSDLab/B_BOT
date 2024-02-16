@@ -12,5 +12,6 @@ const expressReceiver = new ExpressReceiver({
 // Bolt 앱 생성
 export const boltApp = new App({
   token: process.env.SLACK_BOT_TOKEN!,
+  signingSecret: process.env.SLACK_BOT_SIGNING_SECRET!,
   receiver: expressReceiver,
 });
