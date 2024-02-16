@@ -65,8 +65,8 @@ boltApp.message('!멘션', async ({ event, message }) => {
 
       // 이모지로 상태 표시한 사용자 필터링
       const memberTypeUsers = match(memberType)
-        .with("beginner", () => activeUsers!.filter((user) => user.profile!.status_emoji !== ":green_apple:" && user.profile!.status_emoji !== ":sparkles:"))
-        .with("regular", () => activeUsers!.filter((user) => user.profile!.status_emoji === ":green_apple:"))
+        .with("beginner", () => activeUsers!.filter((user) => user.profile!.status_emoji !== ":green_apple:" && user.profile!.status_emoji !== ":sparkles:" && user.profile!.status_emoji !== ":red_apple:"))
+        .with("regular", () => activeUsers!.filter((user) => user.profile!.status_emoji === ":green_apple:" || user.profile!.status_emoji === ":red_apple:"))
         .with("mentor", () => activeUsers!.filter((user) => user.profile!.status_emoji === ":sparkles:"))
         .otherwise(() => {
           throw new Error("잘못된 멘션 형식입니다.");
