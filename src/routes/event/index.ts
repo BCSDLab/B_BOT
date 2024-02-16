@@ -58,7 +58,10 @@ boltApp.message('@frontend', async ({ event, say, context }) => {
       });
     }
   } catch (error) {
-    console.error(error);
+    boltApp.client.chat.postMessage({
+      channel: event.channel,
+      text: `에러가 발생했습니다: ${error}`,
+    });
   }
 });
 
