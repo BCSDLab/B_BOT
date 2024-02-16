@@ -2,6 +2,10 @@
 import express from 'express';
 import { boltApp } from '../../config/boltApp';
 import { makeEvent } from '../../config/makeEvent';
+import { handleMessageEventError } from '../../utils/handleEventError';
+import { getClientUserList } from '../../api/user';
+import { MEMBER_TYPES_LOWERCASE, TRACKS_LOWERCASE, TRACK_NAME_MAPPER } from '../../const/track';
+import { match } from 'ts-pattern';
 
 const eventRouter = express.Router();
 
@@ -38,32 +42,52 @@ boltApp.message('!회칙', async ({ event, message, body }) => {
   });
 });
 
-boltApp.message('@frontend', async ({ event, say, context }) => {
+boltApp.message('!멘션', async ({ event, message }) => {
   try {
-    // 사용자 목록 가져오기
-    const usersList = await boltApp.client.users.list()!;
-    
-    // '@frontend'가 포함된 메시지의 스레드에 멘션할 사용자 목록 필터링
-    const mentions = usersList.members!
-      .filter(user => user.profile!.display_name && user.profile!.display_name.endsWith('_FrontEnd'))
-      .filter(user => user.profile!.status_emoji !== ':sparkles:')
-      // 비활성화 유저 제거
-      .filter(user => user.deleted === false)
-      .map(user => `<@${user.id}>`);
+    // 메시지 형태 -> !멘션 frontend.beginner
+    if('text' in message){
+      const mentionTarget = message.text!.split(' ')[1];
+
+      const [track, memberType] = mentionTarget.split('.');
+
+      if(
+        (!track && !memberType) || 
+        !TRACKS_LOWERCASE.some(t => t === track) || 
+        !MEMBER_TYPES_LOWERCASE.some(t => t === memberType)
+      ) {
+        throw new Error('잘못된 멘션 형식입니다.');
+      }
+
+      // 사용자 목록 가져오기
+      const usersList = await getClientUserList();
+
+      const activeUsers = usersList.members!.filter(user => user.deleted === false && user.is_bot === false);
+
+      // 이모지로 상태 표시한 사용자 필터링
+      const memberTypeUsers = match(memberType)
+        .with("beginner", () => activeUsers!.filter((user) => user.profile!.status_emoji === undefined))
+        .with("regular", () => activeUsers!.filter((user) => user.profile!.status_emoji === ":green_apple:"))
+        .with("mentor", () => activeUsers!.filter((user) => user.profile!.status_emoji === ":sparkles:"))
+        .otherwise(() => {
+          throw new Error("잘못된 멘션 형식입니다.");
+        });
+
+      const mentions = memberTypeUsers
+        .filter(user => user.profile!.display_name && user.profile!.display_name.endsWith(TRACK_NAME_MAPPER[track as keyof typeof TRACK_NAME_MAPPER]))
+        .map(user => `<@${user.id}>`);
       
-    // 멘션한 사용자가 존재하는 경우, 해당 메시지의 스레드에 멘션
-    if (mentions.length > 0) {
-      await boltApp.client.chat.postMessage({
-        channel: event.channel,
-        text: `프론트엔드 소집!\n${mentions.join(', ')}\n 메시지를 확인해주세요!`,
-        thread_ts: event.ts, // 현재 메시지의 스레드 또는 메시지의 타임스탬프를 사용
-      });
+      
+      // 멘션한 사용자가 존재하는 경우, 해당 메시지의 스레드에 멘션
+      if (mentions.length > 0) {
+        await boltApp.client.chat.postMessage({
+          channel: event.channel,
+          text: `단체멘션! 해당하는 분들은 메시지를 확인해주세요.\n${mentions.join(', ')}\n`,
+          thread_ts: event.ts, // 현재 메시지의 스레드 또는 메시지의 타임스탬프를 사용
+        });
+      }
     }
   } catch (error) {
-    boltApp.client.chat.postMessage({
-      channel: event.channel,
-      text: `에러가 발생했습니다: ${error}`,
-    });
+    handleMessageEventError({ event, error });
   }
 });
 
