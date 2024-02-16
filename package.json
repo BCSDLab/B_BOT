@@ -5,7 +5,7 @@
   "main": "./src/App.ts",
   "scripts": {
     "start": "node .output/src/App.js",
-    "build": "webpack --config webpack.config.js",
+    "build": "npm install && webpack --config webpack.config.js",
     "dev": "nodemon --watch \"src/**/*.ts\" --exec \"ts-node\" ./src/App.ts"
   },
   "devDependencies": {
