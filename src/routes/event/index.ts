@@ -1,6 +1,7 @@
 // eventRouter.js
 import express from 'express';
 import { boltApp } from '../../config/boltApp';
+import { makeEvent } from '../../config/makeEvent';
 
 const eventRouter = express.Router();
 
@@ -8,10 +9,6 @@ const eventRouter = express.Router();
 eventRouter.get('/', (req, res) => {
   res.send({
     message: 'Hello, World!',
-    token: {
-      bot: process.env.SLACK_BOT_TOKEN,
-      signing: process.env.SLACK_BOT_SIGNING_SECRET,
-    }
   });
 });
 
@@ -21,14 +18,14 @@ eventRouter.post('/', (req, res) => {
   if(req.body.challenge && req.body.type === "url_verification") {
     return res.send({ challenge: req.body.challenge});
   }
+  const event = makeEvent(req, res);
   
-  // 요청 본문에서 이벤트 추출 및 처리
-  boltApp.processEvent(req.body);
+  boltApp.processEvent(event);
 });
 
 // 이벤트 핸들러 등록
-boltApp.event('app_mention', async ({ event, say }) => {
-  await say(`안녕하세요 <@${event.user}>!`);
+boltApp.event('app_mention', async ({ event, say}) => {
+  await say(`Hello, <@${event.user}>!`);
 });
 
 export default eventRouter;
