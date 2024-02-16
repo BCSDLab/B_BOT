@@ -6,7 +6,7 @@ dotenv.config();  // Load environment variables from .env file
 
 // Bolt 연결용 ExpressReceiver 생성
 const expressReceiver = new ExpressReceiver({
-  signingSecret: process.env.SLACK_SIGNING_SECRET!,
+  signingSecret: process.env.SLACK_BOT_SIGNING_SECRET!,
   processBeforeResponse: true,
 });
 
