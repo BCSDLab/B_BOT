@@ -8,6 +8,10 @@ const eventRouter = express.Router();
 eventRouter.get('/', (req, res) => {
   res.send({
     message: 'Hello, World!',
+    token: {
+      bot: process.env.SLACK_BOT_TOKEN,
+      signing: process.env.SLACK_BOT_SIGNING_SECRET,
+    }
   });
 });
 

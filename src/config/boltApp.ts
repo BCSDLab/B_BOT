@@ -1,4 +1,3 @@
-import express from 'express';
 import dotenv from 'dotenv'; 
 import { App, ExpressReceiver } from '@slack/bolt'
 
