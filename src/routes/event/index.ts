@@ -46,7 +46,9 @@ boltApp.message('@frontend', async ({ event, say, context }) => {
     // '@frontend'가 포함된 메시지의 스레드에 멘션할 사용자 목록 필터링
     const mentions = usersList.members!
       .filter(user => user.profile!.display_name && user.profile!.display_name.endsWith('_FrontEnd'))
-      .filter(user => user.profile!.status_emoji !== '✨')
+      .filter(user => user.profile!.status_emoji !== ':sparkles:')
+      // 비활성화 유저 제거
+      .filter(user => user.deleted === false)
       .map(user => `<@${user.id}>`);
       
     // 멘션한 사용자가 존재하는 경우, 해당 메시지의 스레드에 멘션
