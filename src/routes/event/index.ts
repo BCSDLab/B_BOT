@@ -4,14 +4,10 @@ import { boltApp } from '../../config/boltApp';
 
 const eventRouter = express.Router();
 
+// 응답 확인용
 eventRouter.get('/', (req, res) => {
-  console.log(process.env.SLACK_BOT_SIGNING_SECRET)
   res.send({
     message: 'Hello, World!',
-    tokens: {
-      signingSecret: process.env.SLACK_BOT_SIGNING_SECRET,
-      botToken: process.env.SLACK_BOT_TOKEN
-    }
   });
 });
 
@@ -23,12 +19,12 @@ eventRouter.post('/', (req, res) => {
   }
   
   // 요청 본문에서 이벤트 추출 및 처리
-  // boltApp.processEvent(req.body);
+  boltApp.processEvent(req.body);
 });
 
 // 이벤트 핸들러 등록
-// boltApp.event('app_mention', async ({ event, say }) => {
-//   await say(`Hello <@${event.user}>!`);
-// });
+boltApp.event('app_mention', async ({ event, say }) => {
+  await say(`안녕하세요 <@${event.user}>!`);
+});
 
 export default eventRouter;
