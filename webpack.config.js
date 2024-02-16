@@ -1,4 +1,5 @@
 const path = require('path');
+const Dotenv = require('dotenv-webpack');
 
 module.exports = {
   mode: 'production', // 빌드 모드: 'production' 또는 'development'
@@ -20,4 +21,9 @@ module.exports = {
       },
     ],
   },
+  plugins: [
+    new Dotenv({
+      path: '.env',
+    }),
+  ],
 };
