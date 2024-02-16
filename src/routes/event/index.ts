@@ -5,7 +5,13 @@ import { boltApp } from '../../config/boltApp';
 const eventRouter = express.Router();
 
 eventRouter.get('/', (req, res) => {
-  res.send('Hello, Slack Bolt!');
+  res.send({
+    message: 'Hello, World!',
+    tokens: {
+      signingSecret: process.env.SLACK_BOT_SIGNING_SECRET,
+      botToken: process.env.SLACK_BOT_TOKEN
+    }
+  });
 });
 
 // 이벤트 구독
@@ -16,12 +22,12 @@ eventRouter.post('/', (req, res) => {
   }
   
   // 요청 본문에서 이벤트 추출 및 처리
-  boltApp.processEvent(req.body);
+  // boltApp.processEvent(req.body);
 });
 
 // 이벤트 핸들러 등록
-boltApp.event('app_mention', async ({ event, say }) => {
-  await say(`Hello <@${event.user}>!`);
-});
+// boltApp.event('app_mention', async ({ event, say }) => {
+//   await say(`Hello <@${event.user}>!`);
+// });
 
 export default eventRouter;
