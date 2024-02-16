@@ -65,7 +65,7 @@ boltApp.message('!멘션', async ({ event, message }) => {
 
       // 이모지로 상태 표시한 사용자 필터링
       const memberTypeUsers = match(memberType)
-        .with("beginner", () => activeUsers!.filter((user) => user.profile!.status_emoji == null))
+        .with("beginner", () => activeUsers!.filter((user) => user.profile!.status_emoji !== ":green_apple:" && user.profile!.status_emoji !== ":sparkles:"))
         .with("regular", () => activeUsers!.filter((user) => user.profile!.status_emoji === ":green_apple:"))
         .with("mentor", () => activeUsers!.filter((user) => user.profile!.status_emoji === ":sparkles:"))
         .otherwise(() => {
@@ -83,6 +83,14 @@ boltApp.message('!멘션', async ({ event, message }) => {
           channel: event.channel,
           text: `단체멘션! 해당하는 분들은 메시지를 확인해주세요.\n${mentions.join(', ')}\n`,
           thread_ts: event.ts, // 현재 메시지의 스레드 또는 메시지의 타임스탬프를 사용
+        });
+      }
+
+      else {
+        await boltApp.client.chat.postMessage({
+          channel: event.channel,
+          text: `해당하는 멘션 대상이 없습니다.`,
+          thread_ts: event.ts,
         });
       }
     }
