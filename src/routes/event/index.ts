@@ -24,8 +24,15 @@ eventRouter.post('/', (req, res) => {
 });
 
 // 이벤트 핸들러 등록
-boltApp.event('app_mention', async ({ event, say}) => {
+boltApp.event('app_mention', async ({ event, say }) => {
   await say(`Hello, <@${event.user}>!`);
+});
+
+boltApp.message('!회칙', async ({ event, message, body }) => {
+  await boltApp.client.chat.postMessage({
+    channel: event.channel,
+    text: '회칙은 말이죠... 여기여기 주소로... ',
+  });
 });
 
 export default eventRouter;
