@@ -5,7 +5,7 @@
   "main": "./src/App.ts",
   "scripts": {
     "start": "node .output/App.js",
-    "build": "tsc -p .",
+    "build": "npm install && tsc -p . && cp -R node_modules .output/",
     "dev": "nodemon --watch \"src/**/*.ts\" --exec \"ts-node\" ./src/App.ts"
   },
   "devDependencies": {
