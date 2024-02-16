@@ -65,7 +65,7 @@ boltApp.message('!멘션', async ({ event, message }) => {
 
       // 이모지로 상태 표시한 사용자 필터링
       const memberTypeUsers = match(memberType)
-        .with("beginner", () => activeUsers!.filter((user) => user.profile!.status_emoji === undefined))
+        .with("beginner", () => activeUsers!.filter((user) => user.profile!.status_emoji == null))
         .with("regular", () => activeUsers!.filter((user) => user.profile!.status_emoji === ":green_apple:"))
         .with("mentor", () => activeUsers!.filter((user) => user.profile!.status_emoji === ":sparkles:"))
         .otherwise(() => {
