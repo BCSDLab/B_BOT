@@ -31,7 +31,7 @@ boltApp.event('app_mention', async ({ event, say }) => {
 boltApp.message('!회칙', async ({ event, message, body }) => {
   await boltApp.client.chat.postMessage({
     channel: event.channel,
-    text: 'https://bcsdlab.slack.com/team/UKVPYFYP4',
+    text: 'https://bcsdlab.slack.com/files/UKVPYFYP4/F06HEH48TT5/bcsd_lab_________________2024.pdf',
   });
 });
 
