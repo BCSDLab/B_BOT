@@ -119,10 +119,10 @@ boltApp.message('!인포메이트B', async ({ event }) => {
   const userList = await getClientUserList();
 
   const informateB= userList.members!.filter(user => 
-    user.profile!.display_name?.startsWith("최정훈") ||
-    user.profile!.display_name?.startsWith("최원빈") ||
-    user.profile!.display_name?.startsWith("김경윤") ||
-    user.profile!.display_name?.startsWith("김도훈")
+    user.profile!.display_name?.startsWith("김소민") ||
+    user.profile!.display_name?.startsWith("김대의") ||
+    user.profile!.display_name?.startsWith("정해성") ||
+    user.profile!.display_name?.startsWith("김민재")
   );
 
   if (informateB) {
