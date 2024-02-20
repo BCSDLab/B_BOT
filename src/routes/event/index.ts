@@ -136,7 +136,7 @@ boltApp.message('!인포메이트B', async ({ event }) => {
   else {
     boltApp.client.chat.postMessage({
       channel: event.channel,
-      text: `최원빈님을 찾을 수 없습니다.`,
+      text: `인포메이트B 멤버들을 찾을 수 없습니다.`,
       thread_ts: event.ts,
     });
   }
