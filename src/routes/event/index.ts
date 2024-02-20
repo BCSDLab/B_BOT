@@ -19,11 +19,11 @@ eventRouter.get('/', (req, res) => {
 // 이벤트 구독
 eventRouter.post('/', (req, res) => {
   // 이벤트 구독 확인 요청인 경우
-  if(req.body.challenge && req.body.type === "url_verification") {
-    return res.send({ challenge: req.body.challenge});
+  if (req.body.challenge && req.body.type === "url_verification") {
+    return res.send({ challenge: req.body.challenge });
   }
   const event = makeEvent(req, res);
-  
+
   boltApp.processEvent(event);
 });
 // ---------설정---------
@@ -48,7 +48,7 @@ boltApp.message("!최원빈", async ({ event }) => {
 
   const 최원빈 = userList.members!.find(user => user.profile!.display_name?.startsWith("최원빈"));
 
-  if(최원빈) {
+  if (최원빈) {
     boltApp.client.chat.postMessage({
       channel: event.channel,
       text: `<@${최원빈.id}>님 확인해주세요!`,
@@ -68,14 +68,14 @@ boltApp.message("!최원빈", async ({ event }) => {
 boltApp.message('!슬랙봇그룹', async ({ event }) => {
   const userList = await getClientUserList();
 
-  const slackBotGroup = userList.members!.filter(user => 
+  const slackBotGroup = userList.members!.filter(user =>
     user.profile!.display_name?.startsWith("최정훈") ||
     user.profile!.display_name?.startsWith("최원빈") ||
     user.profile!.display_name?.startsWith("김경윤") ||
     user.profile!.display_name?.startsWith("김도훈")
   );
 
-  if(slackBotGroup) {
+  if (slackBotGroup) {
     const slackBotGroupMember = slackBotGroup.map(user => `<@${user.id}>`).join(', ');
     boltApp.client.chat.postMessage({
       channel: event.channel,
@@ -91,7 +91,29 @@ boltApp.message('!슬랙봇그룹', async ({ event }) => {
   }
 });
 
-boltApp.message("!리팩토링그룹", async ({ event, message }) => {});
+boltApp.message("!리팩토링그룹", async ({ event, message }) => {
+  const userList = await getClientUserList();
+
+  const refactoringUsers = userList.members!.filter(user => user.profile!.display_name?.startsWith('김대관') ||
+    user.profile!.display_name?.startsWith('김혜준') || user.profile!.display_name?.startsWith('정민구') || user.profile!.display_name?.startsWith('채승윤')
+  )
+
+  if (refactoringUsers) {
+    const refactorMembers = refactoringUsers.map(user => `<@${user.id}>`).join(', ');
+    boltApp.client.chat.postMessage({
+      channel: event.channel,
+      text: `${refactorMembers}님 확인해주세요!`,
+      thread_ts: event.ts,
+    });
+  }
+  else {
+    boltApp.client.chat.postMessage({
+      channel: event.channel,
+      text: `${refactoringUsers.map(member => `${member}`)} 님을 찾을 수 없습니다.`,
+      thread_ts: event.ts,
+    });
+  }
+});
 
 boltApp.message('!인포메이트S', async ({ event, message }) => {
   const 인포메이트S이름 = ["이해루", "김하나", "윤해진", "곽승주"];
@@ -101,7 +123,7 @@ boltApp.message('!인포메이트S', async ({ event, message }) => {
   const 인포메이트S멘션 = 인포메이트S이름.reduce((acc, name) => {
     const user = userList.members!.find(user => user.profile!.display_name?.startsWith(name));
 
-    if(user) {
+    if (user) {
       acc.push(`<@${user.id}>`);
     }
 
@@ -118,7 +140,7 @@ boltApp.message('!인포메이트S', async ({ event, message }) => {
 boltApp.message('!인포메이트B', async ({ event }) => {
   const userList = await getClientUserList();
 
-  const informateB= userList.members!.filter(user => 
+  const informateB = userList.members!.filter(user =>
     user.profile!.display_name?.startsWith("김소민") ||
     user.profile!.display_name?.startsWith("김대의") ||
     user.profile!.display_name?.startsWith("정해성") ||
@@ -145,14 +167,14 @@ boltApp.message('!인포메이트B', async ({ event }) => {
 boltApp.message('!멘션', async ({ event, message }) => {
   try {
     // 메시지 형태 -> !멘션 frontend.beginner
-    if('text' in message){
+    if ('text' in message) {
       const mentionTarget = message.text!.split(' ')[1];
 
       const [track, memberType] = mentionTarget.split('.');
 
-      if(
-        (!track && !memberType) || 
-        !TRACKS_LOWERCASE.some(t => t === track) || 
+      if (
+        (!track && !memberType) ||
+        !TRACKS_LOWERCASE.some(t => t === track) ||
         !MEMBER_TYPES_LOWERCASE.some(t => t === memberType)
       ) {
         throw new Error('잘못된 멘션 형식입니다.');
@@ -175,8 +197,8 @@ boltApp.message('!멘션', async ({ event, message }) => {
       const mentions = memberTypeUsers
         .filter(user => user.profile!.display_name && user.profile!.display_name.endsWith(TRACK_NAME_MAPPER[track as keyof typeof TRACK_NAME_MAPPER]))
         .map(user => `<@${user.id}>`);
-      
-      
+
+
       // 멘션한 사용자가 존재하는 경우, 해당 메시지의 스레드에 멘션
       if (mentions.length > 0) {
         await boltApp.client.chat.postMessage({
