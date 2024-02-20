@@ -102,14 +102,14 @@ boltApp.message("!리팩토링그룹", async ({ event, message }) => {
     const refactorMembers = refactoringUsers.map(user => `<@${user.id}>`).join(', ');
     boltApp.client.chat.postMessage({
       channel: event.channel,
-      text: `${refactorMembers}님 확인해주세요!`,
+      text: `${refactorMembers} 여러분 확인해주세요!`,
       thread_ts: event.ts,
     });
   }
   else {
     boltApp.client.chat.postMessage({
       channel: event.channel,
-      text: `${refactoringUsers.map(member => `${member}`)} 님을 찾을 수 없습니다.`,
+      text: `해당하는 그룹 멤버를 찾을 수 없습니다.`,
       thread_ts: event.ts,
     });
   }
