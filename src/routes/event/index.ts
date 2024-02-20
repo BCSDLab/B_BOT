@@ -75,9 +75,10 @@ boltApp.message("!리팩토링그룹", async ({ event, message }) => {
   )
 
   if (refactoringUsers) {
+    const refactorMembers = refactoringUsers.map(user => `<@${user.id}>`).join(', ');
     boltApp.client.chat.postMessage({
       channel: event.channel,
-      text: `${refactoringUsers.map(member => `<@${member.id}> `)}님 확인해주세요!`,
+      text: `${refactorMembers}님 확인해주세요!`,
       thread_ts: event.ts,
     });
   }
