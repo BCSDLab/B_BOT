@@ -93,7 +93,27 @@ boltApp.message('!슬랙봇그룹', async ({ event }) => {
 
 boltApp.message("!리팩토링그룹", async ({ event, message }) => {});
 
+boltApp.message('!인포메이트S', async ({ event, message }) => {
+  const 인포메이트S이름 = ["이해루", "김하나", "윤해진", "곽승주"];
 
+  const userList = await getClientUserList();
+
+  const 인포메이트S멘션 = 인포메이트S이름.reduce((acc, name) => {
+    const user = userList.members!.find(user => user.profile!.display_name?.startsWith(name));
+
+    if(user) {
+      acc.push(`<@${user.id}>`);
+    }
+
+    return acc;
+  }, [] as string[]);
+
+  boltApp.client.chat.postMessage({
+    channel: event.channel,
+    text: `인포메이트S 멤버들 확인해주세요!\n${인포메이트S멘션.join(', ')}\n`,
+    thread_ts: event.ts,
+  });
+});
 boltApp.message('!멘션', async ({ event, message }) => {
   try {
     // 메시지 형태 -> !멘션 frontend.beginner
