@@ -73,9 +73,15 @@ boltApp.message('!인포메이트S', async ({ event, message }) => {
 
   const userList = await getClientUserList();
 
-  const 인포메이트S목록 = userList.members!.filter(user => 인포메이트S이름.includes(user.profile!.display_name!));
+  const 인포메이트S멘션 = 인포메이트S이름.reduce((acc, name) => {
+    const user = userList.members!.find(user => user.profile!.display_name?.startsWith(name));
 
-  const 인포메이트S멘션 = 인포메이트S목록.map(user => `<@${user.id}>`);
+    if(user) {
+      acc.push(`<@${user.id}>`);
+    }
+
+    return acc;
+  }, [] as string[]);
 
   boltApp.client.chat.postMessage({
     channel: event.channel,
