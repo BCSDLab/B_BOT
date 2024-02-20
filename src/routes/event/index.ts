@@ -65,7 +65,32 @@ boltApp.message("!최원빈", async ({ event }) => {
   }
 });
 
-boltApp.message('!슬랙봇그룹', async ({ event, message }) => {});
+boltApp.message('!슬랙봇그룹', async ({ event }) => {
+  const userList = await getClientUserList();
+
+  const slackBotGroup = userList.members!.filter(user => 
+    user.profile!.display_name?.startsWith("최정훈") ||
+    user.profile!.display_name?.startsWith("최원빈") ||
+    user.profile!.display_name?.startsWith("김경윤") ||
+    user.profile!.display_name?.startsWith("김도훈")
+  );
+
+  if(slackBotGroup) {
+    const slackBotGroupMember = slackBotGroup.map(user => `<@${user.id}>`).join(', ');
+    boltApp.client.chat.postMessage({
+      channel: event.channel,
+      text: `${slackBotGroupMember} 님 확인해주세요!`,
+      thread_ts: event.ts,
+    });
+  } else {
+    boltApp.client.chat.postMessage({
+      channel: event.channel,
+      text: `조건에 맞는 사용자를 찾을 수 없습니다.`,
+      thread_ts: event.ts,
+    });
+  }
+});
+
 boltApp.message("!리팩토링그룹", async ({ event, message }) => {});
 
 
