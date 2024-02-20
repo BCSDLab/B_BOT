@@ -26,6 +26,7 @@ eventRouter.post('/', (req, res) => {
   
   boltApp.processEvent(event);
 });
+// ---------설정---------
 
 // 이벤트 핸들러 등록
 boltApp.event('app_mention', async ({ event, say }) => {
@@ -41,6 +42,32 @@ boltApp.message('!회칙', async ({ event, message, body }) => {
     }],
   });
 });
+
+boltApp.message("!최원빈", async ({ event }) => {
+  const userList = await getClientUserList();
+
+  const 최원빈 = userList.members!.find(user => user.profile!.display_name?.startsWith("최원빈"));
+
+  if(최원빈) {
+    boltApp.client.chat.postMessage({
+      channel: event.channel,
+      text: `<@${최원빈.id}>님 확인해주세요!`,
+      thread_ts: event.ts,
+    });
+  }
+
+  else {
+    boltApp.client.chat.postMessage({
+      channel: event.channel,
+      text: `최원빈님을 찾을 수 없습니다.`,
+      thread_ts: event.ts,
+    });
+  }
+});
+
+boltApp.message('!슬랙봇그룹', async ({ event, message }) => {});
+boltApp.message("!리팩토링그룹", async ({ event, message }) => {});
+
 
 boltApp.message('!멘션', async ({ event, message }) => {
   try {
