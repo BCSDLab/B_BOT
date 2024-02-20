@@ -114,6 +114,34 @@ boltApp.message('!인포메이트S', async ({ event, message }) => {
     thread_ts: event.ts,
   });
 });
+
+boltApp.message('!인포메이트B', async ({ event }) => {
+  const userList = await getClientUserList();
+
+  const informateB= userList.members!.filter(user => 
+    user.profile!.display_name?.startsWith("최정훈") ||
+    user.profile!.display_name?.startsWith("최원빈") ||
+    user.profile!.display_name?.startsWith("김경윤") ||
+    user.profile!.display_name?.startsWith("김도훈")
+  );
+
+  if (informateB) {
+    const informateBMembers = informateB.map(user => `<@${user.id}>`);
+    boltApp.client.chat.postMessage({
+      channel: event.channel,
+      text: `인포메이트B 멤버들 확인해주세요!\n${informateBMembers.join(', ')}\n`,
+      thread_ts: event.ts,
+    });
+  }
+  else {
+    boltApp.client.chat.postMessage({
+      channel: event.channel,
+      text: `최원빈님을 찾을 수 없습니다.`,
+      thread_ts: event.ts,
+    });
+  }
+})
+
 boltApp.message('!멘션', async ({ event, message }) => {
   try {
     // 메시지 형태 -> !멘션 frontend.beginner
