@@ -172,20 +172,19 @@ boltApp.message('!멘션', async ({ event, message }) => {
 
       let [track, memberType] = mentionTarget.split('.');
 
-      if (
-        (!track && !memberType) ||
-        !TRACKS_LOWERCASE.some(t => t === track) ||
-        !MEMBER_TYPES_LOWERCASE.some(t => t === memberType) || 
-        !TRACKS_KOREAN.some(t => t === track) ||
-        !MEMBER_TYPES_KOREAN.some(t => t === memberType)
-      ) {
-        throw new Error('잘못된 멘션 형식입니다.');
-      }
-
       if ( TRACKS_KOREAN.some(t => t === track) && MEMBER_TYPES_KOREAN.some(t => t === memberType)) {
         track = TRACK_NAME_KOREAN_MAPPER[track as keyof typeof TRACK_NAME_KOREAN_MAPPER];
         memberType = MEMBER_TYPES_KOREAN_MAPPER[memberType as keyof typeof MEMBER_TYPES_KOREAN_MAPPER];
       }
+
+      if (
+        (!track && !memberType) ||
+        !TRACKS_LOWERCASE.some(t => t === track) ||
+        !MEMBER_TYPES_LOWERCASE.some(t => t === memberType)
+      ) {
+        throw new Error('잘못된 멘션 형식입니다.');
+      }
+     
       // 사용자 목록 가져오기
       const usersList = await getClientUserList();
 
