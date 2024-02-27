@@ -18,12 +18,15 @@ export const TRACK_NAME_KOREAN_MAPPER = {
   "유아이유엑스": "uiux",
   "아이오에스": "ios",
   "게임": "game",
+  "프엔": "frontend",
+  "벡엔": "backend",
+  "안드": "android",
 } as const;
 
 export const MEMBER_TYPES_KOREAN_MAPPER = {
   "비기너": "beginner",
   "레귤러": "regular",
-  "멘토": "mentor", 
+  "멘토": "mentor" 
 }
 export const MEMBER_TYPES_LOWERCASE = ["beginner", "regular", "mentor"] as const;
 
