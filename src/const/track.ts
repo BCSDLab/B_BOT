@@ -1,6 +1,6 @@
 export const TRACKS_LOWERCASE = ["frontend", "backend", "android", "uiux", "ios", "game"] as const;
 
-export const TRACKS_KOREAN = ["프로트엔드", "벡엔드", "안드로이드", "유아이유엑스", "아이오세스", "게임"] as const;
+export const TRACKS_KOREAN = ["프론트엔드", "벡엔드", "안드로이드", "유아이유엑스", "아이오세스", "게임", "프엔", "벡엔", "안드"] as const;
 
 export const TRACK_NAME_MAPPER = {
   "frontend": "FrontEnd",
