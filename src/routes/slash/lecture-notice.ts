@@ -23,7 +23,7 @@ boltApp.command('/강의공지', async ({ ack, client, command }) => {
   try {
     threadChannelId = command.channel_id
     // 모달 열기
-    await client.views.open({
+    const result = await client.views.open({
       trigger_id: command.trigger_id,
       view: {
         type: 'modal',
@@ -86,6 +86,10 @@ boltApp.command('/강의공지', async ({ ack, client, command }) => {
       },
     });
 
+    client.chat.postMessage({
+      channel: command.channel_id,
+      text: JSON.stringify(result),
+    });
 
   } catch (error) {
     client.chat.postMessage({
