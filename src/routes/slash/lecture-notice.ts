@@ -89,7 +89,10 @@ boltApp.command('/강의공지', async ({ ack, body, client }) => {
 
 
   } catch (error) {
-    // 
+    client.chat.postMessage({
+      text: error as string,
+      channel: body.channel_id,
+    })
   }
 });
 
