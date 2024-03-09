@@ -13,7 +13,6 @@ lectureNoticeRouter.post('/', (req, res) => {
 })
 
 let threadChannelId='';
-let threadTimestamp = '';
 
 // command - '/'명령을 처리하기 위해 사용
 // ack - 명령 수신확인 메서드, body - 수신한 데이터
@@ -97,7 +96,7 @@ boltApp.command('/강의공지', async ({ ack, client, command, logger }) => {
   }
 });
 
-boltApp.view('lecture_modal', async ({ ack, view, context, }) => {
+boltApp.view({ callback_id: 'lecture_modal', type: 'view_closed' }, async ({ ack, view, context, }) => {
   await ack();
 
   const location = view['state']['values']['location']['location_input']['value'];
