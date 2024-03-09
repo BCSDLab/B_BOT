@@ -16,12 +16,10 @@ let threadTimestamp = '';
 
 // command - '/'명령을 처리하기 위해 사용
 // ack - 명령 수신확인 메서드, body - 수신한 데이터
-boltApp.command('/강의공지', async ({ ack, body, client }) => {
-  await ack();
-
+boltApp.command('/강의공지', async ({ body, client }) => {
   try {
-    threadChannelId=body.channel_id;
-    threadTimestamp=body.thread_ts || '';
+    threadChannelId = body.channel_id;
+    threadTimestamp = body.thread_ts || '';
 
     // 모달 열기
     await client.views.open({
