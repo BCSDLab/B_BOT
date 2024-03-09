@@ -7,7 +7,7 @@ const lectureNoticeRouter = express.Router();
 
 lectureNoticeRouter.post('/', (req, res) => {
   const event = makeEvent(req, res);
-  
+    
   boltApp.processEvent(event);
 })
 
@@ -17,6 +17,11 @@ let threadTimestamp = '';
 // command - '/'명령을 처리하기 위해 사용
 // ack - 명령 수신확인 메서드, body - 수신한 데이터
 boltApp.command('/강의공지', async ({ body, client }) => {
+  client.chat.postMessage({
+    text: '강의 공지를 작성해주세요',
+    channel: body.channel_id,
+  });
+  
   try {
     threadChannelId = body.channel_id;
     threadTimestamp = body.thread_ts || '';
