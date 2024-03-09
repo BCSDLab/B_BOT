@@ -96,7 +96,11 @@ boltApp.command('/강의공지', async ({ ack, client, command, logger }) => {
   }
 });
 
-boltApp.view({ callback_id: 'lecture_modal', type: 'view_submission' }, async ({ ack, view, context, }) => {
+boltApp.view({ callback_id: 'lecture_modal', type: 'view_submission' }, async ({ ack, view, context, client }) => {
+  await client.chat.postMessage({
+    channel: threadChannelId,
+    text: `강의 장소 공지 기대하라`,
+  });
   await ack();
 
   const location = view['state']['values']['location']['location_input']['value'];
@@ -105,14 +109,17 @@ boltApp.view({ callback_id: 'lecture_modal', type: 'view_submission' }, async ({
   // 스레드에 멘션
   try {
 
-    await boltApp.client.chat.postMessage({
+    await client.chat.postMessage({
       token: context.botToken,
       channel: threadChannelId,
       text: `새로운 강의 공지\n장소: ${location}\n시간: ${time} 온라인여부 ${online}`,
     });
 
   } catch (error) {
-    //
+      client.chat.postMessage({
+        text: error as string,
+        channel: threadChannelId,
+      })
   }
 });
 
