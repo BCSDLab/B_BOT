@@ -7,7 +7,7 @@ const lectureNoticeRouter = express.Router();
 
 lectureNoticeRouter.post('/', (req, res) => {
   const event = makeEvent(req, res);
-    
+  
   boltApp.processEvent(event);
 })
 
@@ -16,19 +16,14 @@ let threadTimestamp = '';
 
 // command - '/'명령을 처리하기 위해 사용
 // ack - 명령 수신확인 메서드, body - 수신한 데이터
-boltApp.command('/강의공지', async ({ body, client }) => {
-  client.chat.postMessage({
-    text: '강의 공지를 작성해주세요',
-    channel: body.channel_id,
-  });
+boltApp.command('/강의공지', async ({ ack, client, command }) => {
+  await ack()
   
   try {
-    threadChannelId = body.channel_id;
-    threadTimestamp = body.thread_ts || '';
-
+    threadChannelId = command.channel_id
     // 모달 열기
     await client.views.open({
-      trigger_id: body.trigger_id,
+      trigger_id: command.trigger_id,
       view: {
         type: 'modal',
         callback_id: 'lecture_modal',
@@ -94,7 +89,7 @@ boltApp.command('/강의공지', async ({ body, client }) => {
   } catch (error) {
     client.chat.postMessage({
       text: error as string,
-      channel: body.channel_id,
+      channel: command.channel_id,
     })
   }
 });
