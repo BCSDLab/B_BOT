@@ -24,7 +24,6 @@ boltApp.command('/강의공지', async ({ ack, client, command, logger }) => {
     // 모달 열기
     
     const result = await client.views.open({
-      token: command.token,
       trigger_id: command.trigger_id,
       view: {
         type: 'modal',
