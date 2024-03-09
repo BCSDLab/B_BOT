@@ -11,14 +11,25 @@ slashTestRouter.post('/', async (req, res) => {
     text: JSON.stringify(req.body)
   })
 
-  res.status(200).send({ "hi": "hi" });
+  const event = makeEvent(req, res);
+  
+  boltApp.processEvent(event);
+
+  res.status(200).send();
 })
 
-// boltApp.command('/test', async (args) => {
-//   await boltApp.client.chat.postMessage({
-//     channel: 'C06JWD4UQJW',
-//     text: '테스트 서버 멀쩡함' + JSON.stringify(args)
-//   })
-// })
+boltApp.event('test', async (args) => {
+  await boltApp.client.chat.postMessage({
+    channel: 'C06JWD4UQJW',
+    text: '테스트' + JSON.stringify(args)
+  })
+})
+
+boltApp.command('/test', async (args) => {
+  await boltApp.client.chat.postMessage({
+    channel: 'C06JWD4UQJW',
+    text: '테스트 서버 멀쩡함' + JSON.stringify(args)
+  })
+})
 
 export default slashTestRouter;
