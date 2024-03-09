@@ -11,8 +11,8 @@ lectureNoticeRouter.use(express.urlencoded({ extended: true }));
 lectureNoticeRouter.use(express.json());
 
 lectureNoticeRouter.post('/', (req, res) => {
-  res.status(200).send({ req });
-  
+  res.status(200).send({ body: req.body });
+
   const event = makeEvent(req, res);
   
   boltApp.processEvent(event);
