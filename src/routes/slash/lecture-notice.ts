@@ -17,12 +17,13 @@ let threadTimestamp = '';
 
 // command - '/'명령을 처리하기 위해 사용
 // ack - 명령 수신확인 메서드, body - 수신한 데이터
-boltApp.command('/강의공지', async ({ ack, client, command }) => {
+boltApp.command('/강의공지', async ({ ack, client, command, logger }) => {
   await ack()
   
   try {
     threadChannelId = command.channel_id
     // 모달 열기
+    
     const result = await client.views.open({
       trigger_id: command.trigger_id,
       view: {
@@ -86,11 +87,8 @@ boltApp.command('/강의공지', async ({ ack, client, command }) => {
       },
     });
 
-    client.chat.postMessage({
-      channel: command.channel_id,
-      text: JSON.stringify(result),
-    });
-
+    logger.info(result);
+    
   } catch (error) {
     client.chat.postMessage({
       text: error as string,
