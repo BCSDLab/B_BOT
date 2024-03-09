@@ -3,6 +3,7 @@ import { boltApp } from '../../config/boltApp';
 import { makeEvent } from '../../config/makeEvent';
 
 const slashTestRouter = express.Router();
+slashTestRouter.use(express.text());
 
 slashTestRouter.post('/', async (req, res) => {
   try {
