@@ -13,7 +13,7 @@ slashTestRouter.post<any, any, {channel_id: string}>('/', async (req, res) => {
 
 boltApp.command('/test', async ({ client, command }) => {
   client.chat.postMessage({
-    channel: command.channel_id,
+    channel: 'C06JWD4UQJW',
     text: '테스트 서버 멀쩡함'
   })
 })
