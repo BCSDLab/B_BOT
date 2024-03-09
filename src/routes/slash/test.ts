@@ -5,9 +5,10 @@ import { makeEvent } from '../../config/makeEvent';
 const slashTestRouter = express.Router();
 
 slashTestRouter.post('/', (req, res) => {
-  const event = makeEvent(req, res);
-  
-  boltApp.processEvent(event);
+  boltApp.client.chat.postMessage({
+    channel: req.body.channel_id,
+    text: '테스트 서버 멀쩡함'
+  })
 })
 
 boltApp.command('/test', async ({ client, command }) => {
