@@ -4,7 +4,7 @@ import { boltApp } from '../../config/boltApp';
 import { makeEvent } from '../../config/makeEvent';
 
 const lectureNoticeRouter = express.Router();
-lectureNoticeRouter.use(express.urlencoded());
+lectureNoticeRouter.use(express.urlencoded(), express.json());
 
 lectureNoticeRouter.post('/', (req, res) => {
   const event = makeEvent(req, res);
