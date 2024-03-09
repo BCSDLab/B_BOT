@@ -4,7 +4,11 @@ import { boltApp } from '../../config/boltApp';
 import { makeEvent } from '../../config/makeEvent';
 
 const lectureNoticeRouter = express.Router();
-lectureNoticeRouter.use(express.urlencoded(), express.json());
+// application/x-www-form-urlencoded 요청을 처리하는 미들웨어
+lectureNoticeRouter.use(express.urlencoded({ extended: true }));
+
+// application/json 요청을 처리하는 미들웨어
+lectureNoticeRouter.use(express.json());
 
 lectureNoticeRouter.post('/', (req, res) => {
   const event = makeEvent(req, res);
