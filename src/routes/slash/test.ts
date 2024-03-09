@@ -5,17 +5,26 @@ import { makeEvent } from '../../config/makeEvent';
 const slashTestRouter = express.Router();
 
 slashTestRouter.post('/', async (req, res) => {
-  
-  await boltApp.client.chat.postMessage({
-    channel: 'C06JWD4UQJW',
-    text: JSON.stringify(req)
-  })
+  try {
+    await boltApp.client.chat.postMessage({
+      channel: 'C06JWD4UQJW',
+      text: JSON.stringify(req)
+    })
 
-  const event = makeEvent(req, res);
-  
-  boltApp.processEvent(event);
+    const event = makeEvent(req, res);
+    
+    boltApp.processEvent(event);
 
-  res.status(200).send();
+    res.status(200).send();
+  } catch (error) {
+    
+    // await boltApp.client.chat.postMessage({
+    //   channel: 'C06JWD4UQJW',
+    //   text: JSON.stringify(req)
+    // })
+
+    res.status(500).send({error, req});
+  }
 })
 
 boltApp.event('slash', async (args) => {
