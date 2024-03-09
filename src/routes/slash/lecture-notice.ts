@@ -96,7 +96,7 @@ boltApp.command('/강의공지', async ({ ack, client, command, logger }) => {
   }
 });
 
-boltApp.view({ callback_id: 'lecture_modal', type: 'view_closed' }, async ({ ack, view, context, }) => {
+boltApp.view({ callback_id: 'lecture_modal', type: 'view_submission' }, async ({ ack, view, context, }) => {
   await ack();
 
   const location = view['state']['values']['location']['location_input']['value'];
