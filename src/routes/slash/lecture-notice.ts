@@ -96,7 +96,7 @@ boltApp.command('/강의공지', async ({ ack, client, command, logger }) => {
   }
 });
 
-boltApp.view({ callback_id: 'lecture_modal', type: 'view_submission' }, async ({ ack, view, context, client }) => {
+boltApp.view('lecture_modal', async ({ ack, view, context, client }) => {
   await ack({
     response_action: 'clear',
   });
