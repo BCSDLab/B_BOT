@@ -97,11 +97,9 @@ boltApp.command('/강의공지', async ({ ack, client, command, logger }) => {
 });
 
 boltApp.view({ callback_id: 'lecture_modal', type: 'view_submission' }, async ({ ack, view, context, client }) => {
-  await client.chat.postMessage({
-    channel: threadChannelId,
-    text: `강의 장소 공지 기대하라`,
+  await ack({
+    response_action: 'clear',
   });
-  await ack();
 
   const location = view['state']['values']['location']['location_input']['value'];
   const time = view['state']['values']['time']['time_input']['value'];
