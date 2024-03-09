@@ -11,10 +11,10 @@ slashTestRouter.post<any, any, {channel_id: string}>('/', async (req, res) => {
   })
 })
 
-boltApp.command('/test', async ({ client, command }) => {
-  client.chat.postMessage({
+boltApp.command('/test', async (args) => {
+  await boltApp.client.chat.postMessage({
     channel: 'C06JWD4UQJW',
-    text: '테스트 서버 멀쩡함'
+    text: '테스트 서버 멀쩡함' + JSON.stringify(args)
   })
 })
 
