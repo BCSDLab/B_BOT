@@ -24,6 +24,7 @@ boltApp.command('/강의공지', async ({ ack, client, command, logger }) => {
     // 모달 열기
     
     const result = await client.views.open({
+      token: command.token,
       trigger_id: command.trigger_id,
       view: {
         type: 'modal',
@@ -96,10 +97,9 @@ boltApp.command('/강의공지', async ({ ack, client, command, logger }) => {
   }
 });
 
+
 boltApp.view('lecture_modal', async ({ ack, view, context, client }) => {
-  await ack({
-    response_action: 'clear',
-  });
+  await ack();
 
   const location = view['state']['values']['location']['location_input']['value'];
   const time = view['state']['values']['time']['time_input']['value'];
