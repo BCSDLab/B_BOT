@@ -8,7 +8,7 @@ slashTestRouter.post('/', async (req, res) => {
   try {
     await boltApp.client.chat.postMessage({
       channel: 'C06JWD4UQJW',
-      text: JSON.stringify(req)
+      text: JSON.stringify(req.body)
     })
 
     const event = makeEvent(req, res);
