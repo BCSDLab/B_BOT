@@ -31,3 +31,24 @@ export const MEMBER_TYPES_KOREAN_MAPPER = {
 export const MEMBER_TYPES_LOWERCASE = ["beginner", "regular", "mentor"] as const;
 
 export const MEMBER_TYPES_KOREAN = ["비기너", "레귤러", "멘토"] as const;
+
+export const BCSD_ACTIVE_MEMBER_LIST = {
+  "business": {
+    "frontend": ["채승윤", "최정훈", "김대관", "김대의"],
+    "backend" : ["이현수", "최준호","장준영"],
+    "UI/UX" : ["장민지"],
+    "android" : ["고효석", "장나영"],
+  },
+  "campus": {
+    "frontend" : ["정민구", "정해성", "김ㄴ경윤"],
+    "backend" : ["황현식", "송선권", "박성빈", "허준기"],
+    "UI/UX" : ["김채은"],
+    "android" : ["배수민", "이상일"],
+  },
+  "user" : {
+    "frontend" : ["김도훈", "곽승주", "김하나"],
+    "backend" : ["서정빈", "김성재", "박다희", "김원경"],
+    "UI/UX" : ["최민경"],
+    "android" : ["조관희"],
+  }
+}
