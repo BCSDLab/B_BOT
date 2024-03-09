@@ -3,11 +3,12 @@ import { boltApp } from '../../config/boltApp';
 
 const slashMentionRouter = express.Router();
 
-//연결 테스트
-slashMentionRouter.post('/', (req, res) => {
-  res.send({
-    message: 'slash mention test',
-  })
-})
+boltApp.command('/멘션', async ({ command, ack, respond }) => {
+    // Acknowledge command request
+    await ack();
+  
+    await respond(`${command.text}`);
+  });
+
 
 export default slashMentionRouter
