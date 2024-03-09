@@ -11,6 +11,8 @@ lectureNoticeRouter.use(express.urlencoded({ extended: true }));
 lectureNoticeRouter.use(express.json());
 
 lectureNoticeRouter.post('/', (req, res) => {
+  res.status(200).send({ req });
+  
   const event = makeEvent(req, res);
   
   boltApp.processEvent(event);
@@ -102,6 +104,7 @@ boltApp.command('/강의공지', async ({ ack, client, command, logger }) => {
 
 
 boltApp.view('lecture_modal', async ({ ack, view, context, client }) => {
+  console.log("!!!!!!!!")
   await ack();
 
   const location = view['state']['values']['location']['location_input']['value'];
