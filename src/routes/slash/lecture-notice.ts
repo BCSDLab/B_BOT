@@ -101,7 +101,7 @@ boltApp.command('/강의공지', async ({ ack, client, command, logger }) => {
   }
 });
 
-boltApp.shortcut('강의공지', async ({ ack, client, shortcut, logger }) => {
+boltApp.shortcut('lecture-notice', async ({ ack, client, shortcut, logger }) => {
   try {
     await ack();
     threadChannelId = 삐봇요청_채널_ID
@@ -110,7 +110,7 @@ boltApp.shortcut('강의공지', async ({ ack, client, shortcut, logger }) => {
       trigger_id: shortcut.trigger_id,
       view: {
         type: 'modal',
-        callback_id: 'lecture_modal',
+        callback_id: shortcut.callback_id,
         title: {
           type: 'plain_text',
           text: '강의 공지',
