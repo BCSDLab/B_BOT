@@ -25,8 +25,9 @@ boltApp.shortcut('group_mention', async ({ ack, client, context, respond, shortc
 });
 
 boltApp.command('/멘션', async ({ ack, client, respond, command }) => {
-  await ack();
   try {
+    await ack();
+    
     await client.views.open({
       trigger_id: command.trigger_id,
       view: {
