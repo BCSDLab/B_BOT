@@ -4,10 +4,12 @@ import dotenv from 'dotenv';
 import lectureNoticeRouter from './routes/slash/lecture-notice';
 import slashTestRouter from './routes/slash/test';
 import slashMention from './routes/slash/slashMention'
-import { expressApp } from './config/boltApp';
+import { boltApp, expressApp } from './config/boltApp';
 
 dotenv.config();  // Load environment variables from .env file 
 // Express 앱 생성
+
+boltApp.start();
 
 expressApp.use('/slash/test', slashTestRouter);
 
