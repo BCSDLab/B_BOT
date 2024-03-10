@@ -2,6 +2,7 @@
 import express from 'express';
 import { boltApp } from '../../config/boltApp';
 import { makeEvent } from '../../config/makeEvent';
+import { 삐봇요청_채널_ID } from '../../const/test';
 
 const lectureNoticeRouter = express.Router();
 // application/x-www-form-urlencoded 요청을 처리하는 미들웨어
@@ -106,9 +107,13 @@ boltApp.command('/강의공지', async ({ ack, client, command, logger }) => {
 });
 
 
-boltApp.view('lecture_modal', async ({ ack, view, context, client }) => {
-  console.log("!!!!!!!!")
+boltApp.view({ callback_id: 'lecture_modal', type: 'view_submission' }, async ({ ack, view, context, client, body }) => {
   await ack();
+
+  await client.chat.postMessage({
+    channel: 삐봇요청_채널_ID,
+    text: '강의 공지가 등록되었습니다. 곧 공지 올라옵니다.',
+  });
 
   const location = view['state']['values']['location']['location_input']['value'];
   const time = view['state']['values']['time']['time_input']['value'];
@@ -117,7 +122,6 @@ boltApp.view('lecture_modal', async ({ ack, view, context, client }) => {
   try {
 
     await client.chat.postMessage({
-      token: context.botToken,
       channel: threadChannelId,
       text: `새로운 강의 공지\n장소: ${location}\n시간: ${time} 온라인여부 ${online}`,
     });
