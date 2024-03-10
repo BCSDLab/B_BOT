@@ -12,11 +12,6 @@ lectureNoticeRouter.use(express.urlencoded({ extended: true }));
 lectureNoticeRouter.use(express.json());
 
 lectureNoticeRouter.post('/', (req, res) => {
-  boltApp.client.chat.postMessage({
-    channel: 'C06JWD4UQJW',
-    text: JSON.stringify(req.body)
-  })
-
   const event = makeEvent(req, res);
   
   boltApp.processEvent(event);
