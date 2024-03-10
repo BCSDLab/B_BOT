@@ -12,10 +12,10 @@ lectureNoticeRouter.use(express.urlencoded({ extended: true }));
 lectureNoticeRouter.use(express.json());
 
 lectureNoticeRouter.post('/', (req, res) => {
-  boltApp.client.chat.postMessage({
-    channel: 삐봇요청_채널_ID,
-    text: JSON.stringify(req.body),
-  })
+  // boltApp.client.chat.postMessage({
+  //   channel: 삐봇요청_채널_ID,
+  //   text: JSON.stringify(req.body),
+  // })
 
   const event = makeEvent(req, res);
   
@@ -37,7 +37,7 @@ boltApp.command('/강의공지', async ({ ack, client, command, logger }) => {
       trigger_id: command.trigger_id,
       view: {
         type: 'modal',
-        callback_id: 'lecture_modal',
+        callback_id: 'lecture_notice',
         title: {
           type: 'plain_text',
           text: '강의 공지',
@@ -106,7 +106,7 @@ boltApp.command('/강의공지', async ({ ack, client, command, logger }) => {
   }
 });
 
-boltApp.shortcut('lecture-notice', async ({ ack, client, shortcut, logger }) => {
+boltApp.shortcut('lecture_notice', async ({ ack, client, shortcut, logger }) => {
   try {
     await ack();
     threadChannelId = 삐봇요청_채널_ID
@@ -184,7 +184,7 @@ boltApp.shortcut('lecture-notice', async ({ ack, client, shortcut, logger }) => 
 });
 
 
-boltApp.view({ callback_id: 'lecture_modal', type: 'view_submission' }, async ({ ack, view, context, client, body }) => {
+boltApp.view({ callback_id: 'lecture_notice', type: 'view_submission' }, async ({ ack, view, context, client, body }) => {
   await ack();
 
   await client.chat.postMessage({
