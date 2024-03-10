@@ -229,7 +229,7 @@ boltApp.view({ callback_id: 그룹맨션_callback_id , type: 'view_submission' }
     client.chat.postMessage({
       channel: channel_id,
       text: `멘션할 트랙: ${track}\n멘션할 팀: ${team}\n멘션할 멤버: ${member_type}`,
-      ts,
+      thread_ts: ts,
     });
   } catch (error) {
     respond(`에러 발생: ${error}`);
