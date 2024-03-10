@@ -1,5 +1,6 @@
 import express from 'express';
 import { boltApp } from '../../config/boltApp';
+import { MemberType, Team, Track } from '../../models/mention';
 
 const slashMentionRouter = express.Router();
 
@@ -27,7 +28,7 @@ boltApp.shortcut('group_mention', async ({ ack, client, context, respond, shortc
 boltApp.command('/멘션', async ({ ack, client, respond, command }) => {
   try {
     await ack();
-    
+
     await client.views.open({
       trigger_id: command.trigger_id,
       view: {
@@ -43,9 +44,9 @@ boltApp.command('/멘션', async ({ ack, client, respond, command }) => {
 boltApp.view({ callback_id: 그룹맨션_callback_id , type: 'view_submission' }, async ({ ack, view, client, respond }) => {
   try {
     await ack();
-    const track = view['state']['values']['track']['track_select']['selected_option']?.value;
-    const team = view['state']['values']['team']['team_select']['selected_option']?.value;
-    const member_type = view['state']['values']['member_type']['member_type_select']['selected_option']?.value;
+    const track = view['state']['values']['track']['track_select']['selected_option']?.value as Track | 'all';
+    const team = view['state']['values']['team']['team_select']['selected_option']?.value as Team | 'all';
+    const member_type = view['state']['values']['member_type']['member_type_select']['selected_option']?.value as MemberType | 'all';
     
     const { channel_id, ts } = JSON.parse(view['private_metadata']);
     
