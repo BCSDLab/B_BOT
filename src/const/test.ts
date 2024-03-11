@@ -1,1 +1,0 @@
-export const 삐봇요청_채널_ID = 'C06JWD4UQJW';

@@ -2,7 +2,7 @@
 import express from 'express';
 import { boltApp } from '../../config/boltApp';
 import { makeEvent } from '../../config/makeEvent';
-import { 삐봇요청_채널_ID } from '../../const/test';
+import { channels } from '../../const/channel';
 
 const lectureNoticeRouter = express.Router();
 // application/x-www-form-urlencoded 요청을 처리하는 미들웨어
@@ -107,7 +107,7 @@ boltApp.view({ callback_id: 'lecture_notice', type: 'view_submission' }, async (
     await ack();
     
     await client.chat.postMessage({
-      channel: 삐봇요청_채널_ID,
+      channel: channels.삐봇요청_채널_ID,
       text: '강의 공지가 등록되었습니다. 곧 공지 올라옵니다.',
     });
     
