@@ -28,6 +28,7 @@ frontendReviewMenotionRouter.post<any, any, any, RequestBody>('/', async (req, r
     boltApp.client.chat.postMessage({
       channel: channels.FE_깃헙_채널_ID,
       text: '리뷰어가 할당되었습니다! :blob-wave:',
+      unfurl_links: true,
       blocks: [
         {
           type: 'section',
