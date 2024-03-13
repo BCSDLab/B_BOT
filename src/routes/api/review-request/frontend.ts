@@ -34,8 +34,9 @@ frontendReviewMenotionRouter.post<any, any, any, RequestBody>('/', async (req, r
           text: {
             type: 'mrkdwn',
             text: `
-- 리뷰하러 가기 >> [click](${pullRequestLink})\n
-- 담당자 : ${writerMentionString}\n
+*리뷰어가 할당되었습니다! :blob-wave:*
+- 리뷰하러 가기 >> <${pullRequestLink}|click>
+- 담당자 : ${writerMentionString}
 - 리뷰어 : ${mentionString}`,
           },
         },
