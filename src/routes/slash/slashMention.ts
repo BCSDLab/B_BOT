@@ -1,6 +1,9 @@
 import express from 'express';
 import { boltApp } from '../../config/boltApp';
 import { MemberType, Team, Track } from '../../models/mention';
+import { BCSD_ACTIVE_MEMBER_LIST } from '../../const/track';
+import { getClientUserList } from '../../api/user';
+import { match } from 'ts-pattern';
 
 const slashMentionRouter = express.Router();
 
@@ -49,10 +52,12 @@ boltApp.view({ callback_id: 그룹맨션_callback_id , type: 'view_submission' }
     const member_type = view['state']['values']['member_type']['member_type_select']['selected_option']?.value as MemberType | 'all';
     
     const { channel_id, ts } = JSON.parse(view['private_metadata']);
-    
+    const userList = await getClientUserList();
+
+    const selectedMember = selectMember(userList, track, team, member_type);
     client.chat.postMessage({
       channel: channel_id,
-      text: `멘션할 트랙: ${track}\n멘션할 팀: ${team}\n멘션할 멤버: ${member_type}`,
+      text: `${selectedMember}확인 해주세요.`,
       thread_ts: ts,
     });
   } catch (error) {
@@ -60,6 +65,33 @@ boltApp.view({ callback_id: 그룹맨션_callback_id , type: 'view_submission' }
   }
 });
 
+const selectMember = (userList: any ,track: Track | 'all', team: Team | 'all', memberType: MemberType | 'all'): string[] => {
+  let selectedMembers: string[] = [];
+  const activeUsers = userList.members!.filter((user: any) => user.deleted === false && user.is_bot === false);
+  const memberTypeUsers = match(memberType)
+        .with("beginner", () => activeUsers!.filter((user: any) => user.profile!.status_emoji !== ":green_apple:" && user.profile!.status_emoji !== ":sparkles:" && user.profile!.status_emoji !== ":apple:" && user.profile!.status_emoji !== ":tangerine:"))
+        .with("regular", () => activeUsers!.filter((user: any) => user.profile!.status_emoji === ":green_apple:" || user.profile!.status_emoji === ":apple:" || user.profile!.status_emoji === ":tangerine:"))
+        .with("mentor", () => activeUsers!.filter((user: any) => user.profile!.status_emoji === ":sparkles:"))
+        .otherwise(() => {
+          throw new Error("잘못된 멘션 형식입니다.");
+        });
+  if (track === 'all' && team === 'all' && memberType === 'all') {
+    // 모든 사용자의 ID 반환
+    selectedMembers = userList.members.map((user: any) => user.id);
+  } else {
+    // 조건에 맞는 사용자의 ID 찾기 (실제 구현에서는 조건에 맞게 로직을 추가해야 합니다)
+    const membersByTrackAndTeam = team !== 'all' && track !== 'all' ? BCSD_ACTIVE_MEMBER_LIST[team]?.[track] : undefined;
+    if (membersByTrackAndTeam) {
+      selectedMembers = membersByTrackAndTeam.flatMap((memberName: string) => 
+        userList.members
+          .filter((user: any) => user.profile.display_name === memberName)
+          .map((user: any) => user.id)
+      );
+    }
+  }
+  
+  return selectedMembers;
+}
 const 그룹맨션_모달_뷰 = {
   type: 'modal',
   callback_id: 그룹맨션_callback_id,
