@@ -52,7 +52,7 @@ boltApp.view({ callback_id: 그룹맨션_callback_id , type: 'view_submission' }
     const track = view['state']['values']['track']['track_select']['selected_option']?.value as Track | 'all';
     const team = view['state']['values']['team']['team_select']['selected_option']?.value as Team | 'all';
     const member_type = view['state']['values']['member_type']['member_type_select']['selected_option']?.value as MemberType | 'all';
-    const trackMessage = (track : string) => {
+    const trackMessage = () => {
       if(track === 'all') {
         return '모든 트랙'
       }
