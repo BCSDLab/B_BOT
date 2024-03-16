@@ -5,7 +5,7 @@ import { BCSD_ACTIVE_MEMBER_LIST } from '../../const/track';
 import { getClientUserList } from '../../api/user';
 import { match } from 'ts-pattern';
 import { MEMBER_TYPES_LOWERCASE, TRACKS_LOWERCASE, TRACK_NAME_MAPPER} from '../../const/track';
-
+import findMentionMessage from '../../utils/\bfindMentionMessage';
 
 const slashMentionRouter = express.Router();
 
@@ -128,22 +128,7 @@ boltApp.view({ callback_id: 그룹맨션_callback_id , type: 'view_submission' }
     respond(`에러 발생: ${error}`);
   }
 });
-const findMentionMessage = (track: string, member_type: string) => {
-  if(track === 'all') {
-    if (member_type === 'all') return `모든 동아리원`
-    else if (member_type === 'beginner') return '모든 비기너'
-    else if (member_type === 'regular')  return '모든 레귤러'
-    else return '모든 멘토'
-  }
-  else if (track === 'frontend') return '모든 프론트엔드'
-  else if (track === 'backend') return '모든 벡엔드'
-  else if (track === 'uiux') return '모든 UI/UX'
-  else if (track === 'android') return '모든 안드로이드'
-  else if (track === 'ios') return '모든 IOS'
-  else if (track === 'pm') return '모든 PM'
-  else if (track === 'da') return '모든 DA'
-  else if (track === 'game') return '모든 게임'
-};
+
 async function mentionUsersByTeamAndTrack(team : Team, track: Track | 'all') {
   // 팀과 트랙으로 이름 목록 가져오기
   const names = getNamesByTeamAndTrack(team, track);
