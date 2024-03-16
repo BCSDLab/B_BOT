@@ -72,32 +72,47 @@ boltApp.view({ callback_id: 그룹맨션_callback_id , type: 'view_submission' }
       }
     }
     else {
-      //팀이 아닌 인원 호출
-      // if (
-      //   (!track && !memberType) ||
-      //   !TRACKS_LOWERCASE.some(t => t === track) ||
-      //   !MEMBER_TYPES_LOWERCASE.some(t => t === memberType)
-      // ) {
-      //   throw new Error('잘못된 멘션 형식입니다.');
-      // }
+      //팀이 전체인 경우
+      if (
+        (!track && !member_type) ||
+        !TRACKS_LOWERCASE.some(t => t === track) ||
+        !MEMBER_TYPES_LOWERCASE.some(t => t === member_type)
+      ) {
+        throw new Error('잘못된 멘션 형식입니다.');
+      }
      
-      // // 사용자 목록 가져오기
-      // const usersList = await getClientUserList();
+      // 사용자 목록 가져오기
+      const usersList = await getClientUserList();
 
-      // const activeUsers = usersList.members!.filter(user => user.deleted === false && user.is_bot === false);
+      const activeUsers = usersList.members!.filter(user => user.deleted === false && user.is_bot === false);
 
-      // // 이모지로 상태 표시한 사용자 필터링
-      // const memberTypeUsers = match(memberType)
-      //   .with("beginner", () => activeUsers!.filter((user) => user.profile!.status_emoji !== ":green_apple:" && user.profile!.status_emoji !== ":sparkles:" && user.profile!.status_emoji !== ":apple:" && user.profile!.status_emoji !== ":tangerine:"))
-      //   .with("regular", () => activeUsers!.filter((user) => user.profile!.status_emoji === ":green_apple:" || user.profile!.status_emoji === ":apple:" || user.profile!.status_emoji === ":tangerine:"))
-      //   .with("mentor", () => activeUsers!.filter((user) => user.profile!.status_emoji === ":sparkles:"))
-      //   .otherwise(() => {
-      //     throw new Error("잘못된 멘션 형식입니다.");
-      //   });
+      // 이모지로 상태 표시한 사용자 필터링
+      const memberTypeUsers = match(member_type)
+        .with("beginner", () => activeUsers!.filter((user) => user.profile!.status_emoji !== ":green_apple:" && user.profile!.status_emoji !== ":sparkles:" && user.profile!.status_emoji !== ":apple:" && user.profile!.status_emoji !== ":tangerine:"))
+        .with("regular", () => activeUsers!.filter((user) => user.profile!.status_emoji === ":green_apple:" || user.profile!.status_emoji === ":apple:" || user.profile!.status_emoji === ":tangerine:"))
+        .with("mentor", () => activeUsers!.filter((user) => user.profile!.status_emoji === ":sparkles:"))
+        .otherwise(() => {
+          throw new Error("잘못된 멘션 형식입니다.");
+        });
 
-      // const mentions = memberTypeUsers
-      //   .filter(user => user.profile!.display_name && user.profile!.display_name.endsWith(TRACK_NAME_MAPPER[track as keyof typeof TRACK_NAME_MAPPER]))
-      //   .map(user => `<@${user.id}>`);
+      const mentions = memberTypeUsers
+        .filter(user => user.profile!.display_name && user.profile!.display_name.endsWith(TRACK_NAME_MAPPER[track as keyof typeof TRACK_NAME_MAPPER]))
+        .map(user => `<@${user.id}>`);
+      
+      if(mentions.length > 0) {
+        client.chat.postMessage({
+          channel: channel_id,
+          text: `${mentions.join(', ')}확인 해주세요.`,
+          thread_ts: ts,
+        });
+      }
+      else {
+        client.chat.postMessage({
+          channel: channel_id,
+          text: '해당하는 인원이 없습니다.',
+          thread_ts: ts,
+        });
+      }
     }
    
   } catch (error) {
