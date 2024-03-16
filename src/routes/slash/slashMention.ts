@@ -52,14 +52,21 @@ boltApp.view({ callback_id: 그룹맨션_callback_id , type: 'view_submission' }
     const track = view['state']['values']['track']['track_select']['selected_option']?.value as Track | 'all';
     const team = view['state']['values']['team']['team_select']['selected_option']?.value as Team | 'all';
     const member_type = view['state']['values']['member_type']['member_type_select']['selected_option']?.value as MemberType | 'all';
-    
+    const trackMessage = (track : string) => {
+      if(track === 'all') {
+        return '모든 트랙'
+      }
+      else {
+        return `${track}트랙`
+      }
+    }
     const { channel_id, ts } = JSON.parse(view['private_metadata']);
     if(team !== "all") {
       const selectedMember  = await mentionUsersByTeamAndTrack(team, track);
       if(selectedMember.length > 0) {
         client.chat.postMessage({
           channel: channel_id,
-          text: `${selectedMember.join(', ')}확인 해주세요.`,
+          text: `${team}팀 ${trackMessage} \n ${selectedMember.join(', ')}확인 해주세요.`,
           thread_ts: ts,
         });
       }
@@ -95,14 +102,16 @@ boltApp.view({ callback_id: 그룹맨션_callback_id , type: 'view_submission' }
           throw new Error("잘못된 멘션 형식입니다.");
         });
 
-      const mentions = memberTypeUsers
+        const mentionMessage = findMentionMessage(track,member_type);
+      
+      const selectedMember = memberTypeUsers
         .filter(user => user.profile!.display_name && user.profile!.display_name.endsWith(TRACK_NAME_MAPPER[track as keyof typeof TRACK_NAME_MAPPER]))
         .map(user => `<@${user.id}>`);
       
-      if(mentions.length > 0) {
+      if(selectedMember.length > 0) {
         client.chat.postMessage({
           channel: channel_id,
-          text: `${mentions.join(', ')}확인 해주세요.`,
+          text: `${mentionMessage} 인원 \n${selectedMember.join(', ')}확인 해주세요.`,
           thread_ts: ts,
         });
       }
@@ -119,26 +128,22 @@ boltApp.view({ callback_id: 그룹맨션_callback_id , type: 'view_submission' }
     respond(`에러 발생: ${error}`);
   }
 });
-
-// const selectMember = (userList: any ,track: Track | 'all', team: Team | 'all', memberType: MemberType | 'all'): string[] => {
-//   let selectedMembers: string[] = [];
-//   const activeUsers = userList.members!.filter((user: any) => user.deleted === false && user.is_bot === false);
-//   const memberTypeUsers = match(memberType)
-//         .with("beginner", () => activeUsers!.filter((user: any) => user.profile!.status_emoji !== ":green_apple:" && user.profile!.status_emoji !== ":sparkles:" && user.profile!.status_emoji !== ":apple:" && user.profile!.status_emoji !== ":tangerine:"))
-//         .with("regular", () => activeUsers!.filter((user: any) => user.profile!.status_emoji === ":green_apple:" || user.profile!.status_emoji === ":apple:" || user.profile!.status_emoji === ":tangerine:"))
-//         .with("mentor", () => activeUsers!.filter((user: any) => user.profile!.status_emoji === ":sparkles:"))
-//         .otherwise(() => {
-//           throw new Error("잘못된 멘션 형식입니다.");
-//         });
-//   if (team !== 'all') { //팀별 멘션
-
-//   } else {
-    
-//   }
-  
-//   return selectedMembers;
-// }
-
+const findMentionMessage = (track: string, member_type: string) => {
+  if(track === 'all') {
+    if (member_type === 'all') return `모든 동아리원`
+    else if (member_type === 'beginner') return '모든 비기너'
+    else if (member_type === 'regular')  return '모든 레귤러'
+    else return '모든 멘토'
+  }
+  else if (track === 'frontend') return '모든 프론트엔드'
+  else if (track === 'backend') return '모든 벡엔드'
+  else if (track === 'uiux') return '모든 UI/UX'
+  else if (track === 'android') return '모든 안드로이드'
+  else if (track === 'ios') return '모든 IOS'
+  else if (track === 'pm') return '모든 PM'
+  else if (track === 'da') return '모든 DA'
+  else if (track === 'game') return '모든 게임'
+};
 async function mentionUsersByTeamAndTrack(team : Team, track: Track | 'all') {
   // 팀과 트랙으로 이름 목록 가져오기
   const names = getNamesByTeamAndTrack(team, track);
