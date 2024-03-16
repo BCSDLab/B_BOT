@@ -66,7 +66,7 @@ boltApp.view({ callback_id: 그룹맨션_callback_id , type: 'view_submission' }
       if(selectedMember.length > 0) {
         client.chat.postMessage({
           channel: channel_id,
-          text: `${team}팀 ${trackMessage} \n ${selectedMember.join(', ')}확인 해주세요.`,
+          text: `${team}팀 ${track === 'all' ? '모든 트랙' : `${track}트랙`} \n ${selectedMember.join(', ')}확인 해주세요.`,
           thread_ts: ts,
         });
       }
