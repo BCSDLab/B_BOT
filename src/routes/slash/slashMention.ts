@@ -1,6 +1,11 @@
 import express from 'express';
 import { boltApp } from '../../config/boltApp';
 import { MemberType, Team, Track } from '../../models/mention';
+import { BCSD_ACTIVE_MEMBER_LIST } from '../../const/track';
+import { getClientUserList } from '../../api/user';
+import { match } from 'ts-pattern';
+import { MEMBER_TYPES_LOWERCASE, TRACKS_LOWERCASE, TRACK_NAME_MAPPER} from '../../const/track';
+
 
 const slashMentionRouter = express.Router();
 
@@ -49,16 +54,114 @@ boltApp.view({ callback_id: 그룹맨션_callback_id , type: 'view_submission' }
     const member_type = view['state']['values']['member_type']['member_type_select']['selected_option']?.value as MemberType | 'all';
     
     const { channel_id, ts } = JSON.parse(view['private_metadata']);
-    
-    client.chat.postMessage({
-      channel: channel_id,
-      text: `멘션할 트랙: ${track}\n멘션할 팀: ${team}\n멘션할 멤버: ${member_type}`,
-      thread_ts: ts,
-    });
+    if(team !== "all") {
+      const selectedMember  = await mentionUsersByTeamAndTrack(team, track);
+      if(selectedMember.length > 0) {
+        client.chat.postMessage({
+          channel: channel_id,
+          text: `${selectedMember.join(', ')}확인 해주세요.`,
+          thread_ts: ts,
+        });
+      }
+      else {
+        client.chat.postMessage({
+          channel: channel_id,
+          text: '해당하는 인원이 없습니다.',
+          thread_ts: ts,
+        });
+      }
+    }
+    else {
+      //팀이 아닌 인원 호출
+      // if (
+      //   (!track && !memberType) ||
+      //   !TRACKS_LOWERCASE.some(t => t === track) ||
+      //   !MEMBER_TYPES_LOWERCASE.some(t => t === memberType)
+      // ) {
+      //   throw new Error('잘못된 멘션 형식입니다.');
+      // }
+     
+      // // 사용자 목록 가져오기
+      // const usersList = await getClientUserList();
+
+      // const activeUsers = usersList.members!.filter(user => user.deleted === false && user.is_bot === false);
+
+      // // 이모지로 상태 표시한 사용자 필터링
+      // const memberTypeUsers = match(memberType)
+      //   .with("beginner", () => activeUsers!.filter((user) => user.profile!.status_emoji !== ":green_apple:" && user.profile!.status_emoji !== ":sparkles:" && user.profile!.status_emoji !== ":apple:" && user.profile!.status_emoji !== ":tangerine:"))
+      //   .with("regular", () => activeUsers!.filter((user) => user.profile!.status_emoji === ":green_apple:" || user.profile!.status_emoji === ":apple:" || user.profile!.status_emoji === ":tangerine:"))
+      //   .with("mentor", () => activeUsers!.filter((user) => user.profile!.status_emoji === ":sparkles:"))
+      //   .otherwise(() => {
+      //     throw new Error("잘못된 멘션 형식입니다.");
+      //   });
+
+      // const mentions = memberTypeUsers
+      //   .filter(user => user.profile!.display_name && user.profile!.display_name.endsWith(TRACK_NAME_MAPPER[track as keyof typeof TRACK_NAME_MAPPER]))
+      //   .map(user => `<@${user.id}>`);
+    }
+   
   } catch (error) {
     respond(`에러 발생: ${error}`);
   }
 });
+
+// const selectMember = (userList: any ,track: Track | 'all', team: Team | 'all', memberType: MemberType | 'all'): string[] => {
+//   let selectedMembers: string[] = [];
+//   const activeUsers = userList.members!.filter((user: any) => user.deleted === false && user.is_bot === false);
+//   const memberTypeUsers = match(memberType)
+//         .with("beginner", () => activeUsers!.filter((user: any) => user.profile!.status_emoji !== ":green_apple:" && user.profile!.status_emoji !== ":sparkles:" && user.profile!.status_emoji !== ":apple:" && user.profile!.status_emoji !== ":tangerine:"))
+//         .with("regular", () => activeUsers!.filter((user: any) => user.profile!.status_emoji === ":green_apple:" || user.profile!.status_emoji === ":apple:" || user.profile!.status_emoji === ":tangerine:"))
+//         .with("mentor", () => activeUsers!.filter((user: any) => user.profile!.status_emoji === ":sparkles:"))
+//         .otherwise(() => {
+//           throw new Error("잘못된 멘션 형식입니다.");
+//         });
+//   if (team !== 'all') { //팀별 멘션
+
+//   } else {
+    
+//   }
+  
+//   return selectedMembers;
+// }
+
+async function mentionUsersByTeamAndTrack(team : Team, track: Track | 'all') {
+  // 팀과 트랙으로 이름 목록 가져오기
+  const names = getNamesByTeamAndTrack(team, track);
+  
+  // 사용자 목록 가져오기
+  const usersList = await getClientUserList();
+
+  const activeUsers = usersList.members!.filter(user => !user.deleted && !user.is_bot);
+
+  // 이름 목록에 있는 각 이름으로 시작하는 사용자의 ID 찾기
+  const mentions = names.flatMap((name : string) => 
+    activeUsers
+      .filter(user => user.profile!.display_name && user.profile!.display_name.startsWith(name))
+      .map(user => `<@${user.id}>`)
+  );
+
+  return mentions;
+}
+
+// 팀과 트랙 정보로부터 이름 목록 가져오기
+function getNamesByTeamAndTrack(team : Team, track: Track | 'all') {
+  if (!['all', 'business', 'campus', 'user'].includes(team)) {
+    throw new Error('잘못된 팀 이름입니다.');
+  }
+  
+  // 트랙 이름 유효성 확인
+  if (!['all', 'frontend', 'backend', 'android', 'ios', 'uiux', 'pm', 'da', 'game'].includes(track)) {
+    throw new Error('잘못된 트랙 이름입니다.');
+  }
+    // 트랙이 'all'일 경우, 해당 팀의 모든 트랙에 대한 사람들의 이름 반환
+  if (track === 'all') {
+    return Object.values(BCSD_ACTIVE_MEMBER_LIST[team]).flat();
+  }
+
+  // 특정 팀과 트랙에 해당하는 사람 이름 반환
+  return BCSD_ACTIVE_MEMBER_LIST[team][track] || [];
+}
+
 
 const 그룹맨션_모달_뷰 = {
   type: 'modal',
