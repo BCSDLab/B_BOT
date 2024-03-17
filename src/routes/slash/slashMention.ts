@@ -132,9 +132,23 @@ async function mentionUsersByTeamAndTrack(team : Team, track: Track | 'all') {
 
   const activeUsers = usersList.members!.filter(user => !user.deleted && !user.is_bot);
 
+  // 빈 배열을 가진 트랙 식별
+  const emptyTracks = Object.values(BCSD_ACTIVE_MEMBER_LIST).flatMap(group =>
+    Object.entries(group).filter(([, members]) => members.length === 0).map(([track]) => track)
+  );
+
+
+  const emptyTrackDisplayNames = emptyTracks.map(track => TRACK_NAME_MAPPER[track as keyof typeof TRACK_NAME_MAPPER]);
+
+  // 변경된 트랙 이름으로 끝나는 사용자 제외
+  const filteredUsers = activeUsers.filter(user => {
+    const displayName = user.profile?.display_name;
+    return !emptyTrackDisplayNames.some(emptyTrackDisplayName => displayName?.endsWith(emptyTrackDisplayName));
+  });
+
   // 이름 목록에 있는 각 이름으로 시작하는 사용자의 ID 찾기
   const mentions = names.flatMap((name : string) => 
-    activeUsers
+    filteredUsers
       .filter(user => user.profile!.display_name && user.profile!.display_name.startsWith(name))
       .map(user => `<@${user.id}>`)
   );
