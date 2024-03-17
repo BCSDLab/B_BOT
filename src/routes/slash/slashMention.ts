@@ -52,14 +52,7 @@ boltApp.view({ callback_id: 그룹맨션_callback_id , type: 'view_submission' }
     const track = view['state']['values']['track']['track_select']['selected_option']?.value as Track | 'all';
     const team = view['state']['values']['team']['team_select']['selected_option']?.value as Team | 'all';
     const member_type = view['state']['values']['member_type']['member_type_select']['selected_option']?.value as MemberType | 'all';
-    const trackMessage = () => {
-      if(track === 'all') {
-        return '모든 트랙'
-      }
-      else {
-        return `${track}트랙`
-      }
-    }
+
     const { channel_id, ts, userId } = JSON.parse(view['private_metadata']);
 
     if(team !== "all") {
@@ -67,7 +60,7 @@ boltApp.view({ callback_id: 그룹맨션_callback_id , type: 'view_submission' }
       if(selectedMember.length > 0) {
         client.chat.postMessage({
           channel: channel_id,
-          text: `${team}팀 ${track === 'all' ? '모든 트랙' : `${track}트랙`} \n ${selectedMember.join(', ')}확인 해주세요.`,
+          text: `<@${userId}>님의 ${team}팀 ${track === 'all' ? '모든 트랙' : `${track}트랙`} 단체멘션!\n${selectedMember.join(', ')}\n확인 부탁드립니다 :dancing_toad:`,
           thread_ts: ts,
         });
       }
