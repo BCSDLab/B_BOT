@@ -38,7 +38,7 @@ boltApp.command('/멘션', async ({ ack, client, respond, command }) => {
       trigger_id: command.trigger_id,
       view: {
         ...그룹맨션_모달_뷰,
-        private_metadata: JSON.stringify({ channel_id: command.channel_id, ts: command.message_ts, userId: command.user.id }),
+        private_metadata: JSON.stringify({ channel_id: command.channel_id, ts: command.message_ts, userId: command.user_id }),
       },
     });
   } catch (error) {
