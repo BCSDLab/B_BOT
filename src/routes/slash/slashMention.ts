@@ -21,7 +21,7 @@ boltApp.shortcut('group_mention', async ({ ack, client, context, respond, shortc
       trigger_id: body.trigger_id,
       view: { 
         ...그룹맨션_모달_뷰, 
-        private_metadata: JSON.stringify({ channel_id: shortcut.channel.id, ts: shortcut.message.ts }) 
+        private_metadata: JSON.stringify({ channel_id: shortcut.channel.id, ts: shortcut.message.ts, userId: shortcut.user.id }) 
       },
     });
   }
@@ -38,7 +38,7 @@ boltApp.command('/멘션', async ({ ack, client, respond, command }) => {
       trigger_id: command.trigger_id,
       view: {
         ...그룹맨션_모달_뷰,
-        private_metadata: JSON.stringify({ channel_id: command.channel_id, ts: command.message_ts }),
+        private_metadata: JSON.stringify({ channel_id: command.channel_id, ts: command.message_ts, userId: command.user.id }),
       },
     });
   } catch (error) {
@@ -60,7 +60,8 @@ boltApp.view({ callback_id: 그룹맨션_callback_id , type: 'view_submission' }
         return `${track}트랙`
       }
     }
-    const { channel_id, ts } = JSON.parse(view['private_metadata']);
+    const { channel_id, ts, userId } = JSON.parse(view['private_metadata']);
+
     if(team !== "all") {
       const selectedMember  = await mentionUsersByTeamAndTrack(team, track);
       if(selectedMember.length > 0) {
@@ -102,7 +103,7 @@ boltApp.view({ callback_id: 그룹맨션_callback_id , type: 'view_submission' }
           throw new Error("잘못된 멘션 형식입니다.");
         });
 
-        const mentionMessage = findMentionMessage(track,member_type);
+      const mentionMessage = findMentionMessage(track,member_type);
       
       const selectedMember = memberTypeUsers
         .filter(user => user.profile!.display_name && user.profile!.display_name.endsWith(TRACK_NAME_MAPPER[track as keyof typeof TRACK_NAME_MAPPER]))
@@ -111,7 +112,7 @@ boltApp.view({ callback_id: 그룹맨션_callback_id , type: 'view_submission' }
       if(selectedMember.length > 0) {
         client.chat.postMessage({
           channel: channel_id,
-          text: `${mentionMessage} 인원 \n${selectedMember.join(', ')}확인 해주세요.`,
+          text: `<@${userId}>님의 ${mentionMessage} 단체멘션!\n${selectedMember.join(', ')}\n확인 부탁드립니다 :dancing_toad:`,
           thread_ts: ts,
         });
       }

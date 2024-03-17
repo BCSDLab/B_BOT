@@ -9,6 +9,8 @@ export const TRACK_NAME_MAPPER = {
   "uiux": "UI/UX",
   "ios": "iOS",
   "game": "Game",
+  "pm": "Product Manager",
+  "da": "Data Analyst",
 } as const;
 
 export const TRACK_NAME_KOREAN_MAPPER = {
