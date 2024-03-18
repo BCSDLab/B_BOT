@@ -104,6 +104,7 @@ async function createSpace(authClient: OAuth2Client): Promise<void> {
     await boltApp.client.chat.postMessage({
       channel: event.channel,
       text: `회의를 생성하였습니다. ${response[0].meetingUri} 확인해주세요!`,
+      thread_ts: event.ts,
     })
   })
   boltApp.command('/회의생성', async ({ack, client, command, logger }) => {
