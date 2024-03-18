@@ -8,6 +8,17 @@ import { OAuth2Client, auth } from 'google-auth-library';
 // If not, you'd need to provide appropriate types or declarations.
 import { SpacesServiceClient } from '@google-apps/meet';
 import { boltApp } from '../../config/boltApp';
+import express from 'express';
+import { makeEvent } from '../../config/makeEvent';
+
+const meetingRouter = express.Router();
+meetingRouter.use(express.urlencoded({ extended: true }));
+meetingRouter.use(express.json());
+
+meetingRouter.post('/', (req, res) => {
+  const event = makeEvent(req, res);
+  boltApp.processEvent(event);
+})
 
 // If modifying these scopes, delete token.json.
 const SCOPES: string[] = ['https://www.googleapis.com/auth/meetings.space.created'];
@@ -113,3 +124,6 @@ async function createSpace(authClient: OAuth2Client): Promise<void> {
 }
 
 authorize().then(createSpace).catch(console.error);
+
+
+export default meetingRouter;
