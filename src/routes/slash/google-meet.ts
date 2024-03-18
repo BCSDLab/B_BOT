@@ -94,7 +94,7 @@ boltApp.message('!회의생성', async ({event}) => {
  * Creates a new meeting space.
  * @param {OAuth2Client} authClient An authorized OAuth2 client.
  */
-async function createSpace(authClient: OAuth2Client): Promise<void> {
+async function createSpace(authClient: OAuth2Client) {
   const meetClient = new SpacesServiceClient({ 
     auth: authClient as any,
   });
@@ -105,32 +105,24 @@ async function createSpace(authClient: OAuth2Client): Promise<void> {
 
   // Run request
   const response = await meetClient.createSpace(request);
-  console.log(`Meet URL: ${response[0].meetingUri}`);
-  boltApp.message('!회의생성', async ({event}) => {
-    await boltApp.client.chat.postMessage({
-      channel: event.channel,
-      text: `회의를 생성하였습니다. ${response[0].meetingUri} 확인해주세요!`,
-      thread_ts: event.ts,
-    })
-  })
-  boltApp.command('/회의생성', async ({ack, client, command, logger }) => {
-    await ack();
-    try {
-      await boltApp.client.chat.postMessage({
-        channel: command.channel_id,
-        text: `회의를 생성하였습니다. ${response[0].meetingUri} 확인해주세요!`,
-      })
-      logger.info(response[0].meetingUri)
-    } catch (error) {
-      client.chat.postMessage({
-        text: error as string,
-        channel: command.channel_id,
-      })
-    }
-  })
+  return response;
 }
 
-authorize().then(createSpace).catch(console.error);
-
+boltApp.command('/회의생성', async ({ack, client, command, logger }) => {
+  try {
+    await ack();
+    const response = await authorize().then(createSpace);
+    await boltApp.client.chat.postMessage({
+      channel: command.channel_id,
+      text: `회의를 생성하였습니다. ${response[0].meetingUri} 확인해주세요!`,
+    })
+    logger.info(response[0].meetingUri)
+  } catch (error) {
+    client.chat.postMessage({
+      text: error as string,
+      channel: command.channel_id,
+    })
+  }
+});
 
 export default meetingRouter;
