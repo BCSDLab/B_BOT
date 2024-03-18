@@ -8,7 +8,7 @@ slashTestRouter.use(express.urlencoded());
 slashTestRouter.post('/', async (req, res) => {
   try {
     await boltApp.client.chat.postMessage({
-      channel: 'C06JWD4UQJW',
+      channel: 'C06PJ76SAM7',
       text: JSON.stringify(req.body)
     })
 
@@ -24,7 +24,7 @@ slashTestRouter.post('/', async (req, res) => {
 
 boltApp.command('/test', async (args) => {
   await boltApp.client.chat.postMessage({
-    channel: 'C06JWD4UQJW',
+    channel: 'C06PJ76SAM7',
     text: '테스트 서버 멀쩡함',
   })
 })
