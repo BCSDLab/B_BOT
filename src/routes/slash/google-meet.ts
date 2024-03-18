@@ -15,7 +15,7 @@ const meetingRouter = express.Router();
 meetingRouter.use(express.urlencoded({ extended: true }));
 meetingRouter.use(express.json());
 
-meetingRouter.post('/', (req, res) => {
+meetingRouter.post('/', async (req, res) => {
   const event = makeEvent(req, res);
   boltApp.processEvent(event);
 })
