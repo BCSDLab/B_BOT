@@ -9,16 +9,8 @@ import { OAuth2Client, auth } from 'google-auth-library';
 import { SpacesServiceClient } from '@google-apps/meet';
 import { boltApp } from '../../config/boltApp';
 import express from 'express';
-import { makeEvent } from '../../config/makeEvent';
 
 const meetingRouter = express.Router();
-meetingRouter.use(express.urlencoded({ extended: true }));
-meetingRouter.use(express.json());
-
-meetingRouter.post('/', async (req, res) => {
-  const event = makeEvent(req, res);
-  boltApp.processEvent(event);
-})
 
 // If modifying these scopes, delete token.json.
 const SCOPES: string[] = ['https://www.googleapis.com/auth/meetings.space.created'];
@@ -113,7 +105,7 @@ boltApp.command('/회의생성', async ({ack, client, command, logger }) => {
   } catch (error) {
     client.chat.postMessage({
       text: error as string,
-      channel: command.channel_id,
+      channel: command.user_id,
     })
   }
 });
