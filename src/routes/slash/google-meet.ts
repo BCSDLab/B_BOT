@@ -1,14 +1,14 @@
 // Assuming the necessary type definitions exist or you are willing to create them.
-import fs from 'fs/promises';
-import path from 'path';
+import * as fs from 'fs/promises';
+import * as path from 'path';
 import process from 'process';
+import express from 'express';
 import { authenticate } from '@google-cloud/local-auth';
 import { OAuth2Client, auth } from 'google-auth-library';
 // This import assumes @google-apps/meet exists and has TypeScript definitions.
 // If not, you'd need to provide appropriate types or declarations.
 import { SpacesServiceClient } from '@google-apps/meet';
 import { boltApp } from '../../config/boltApp';
-import express from 'express';
 
 const meetingRouter = express.Router();
 
