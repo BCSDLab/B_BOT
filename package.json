@@ -3,7 +3,6 @@
   "version": "1.0.0",
   "description": "Slack Bot server for BCSD Lab",
   "main": "./src/App.ts",
-  "type": "module",
   "scripts": {
     "start": "node .output/src/App.js",
     "build": "npm install && webpack --config webpack.config.js",
