@@ -103,8 +103,10 @@ boltApp.command('/회의생성', async ({ack, client, command, logger }) => {
     })
     logger.info(response[0].meetingUri)
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : '';
+    const errorStack = error instanceof Error ? error.stack : '';
     client.chat.postMessage({
-      text: error as string,
+      text: `Error: ${errorMessage}\n${errorStack}`,
       channel: command.user_id,
     })
   }
