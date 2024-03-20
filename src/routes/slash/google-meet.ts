@@ -77,7 +77,7 @@ async function authorize(): Promise<OAuth2Client> {
   client = await authenticate({
     scopes: SCOPES,
     keyfilePath: CREDENTIALS_PATH,
-  }) as OAuth2Client;
+  }) as unknown as OAuth2Client;
   if (client.credentials) {
     await saveCredentials(client);
   }
