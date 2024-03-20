@@ -21,6 +21,8 @@
     "webpack-cli": "^5.1.4"
   },
   "dependencies": {
+    "@google-apps/meet": "^0.1.1",
+    "@google-cloud/local-auth": "^3.0.1",
     "@slack/bolt": "^3.17.1",
     "@slack/web-api": "^7.0.2",
     "dotenv": "^16.4.4",
