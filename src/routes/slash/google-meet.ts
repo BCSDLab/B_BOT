@@ -83,20 +83,13 @@ async function authorize(): Promise<OAuth2Client> {
   }
   return client;
 }
-boltApp.message('!회의생성', async ({event}) => {
-  await boltApp.client.chat.postMessage({
-    channel: event.channel,
-    text: `회의를 생성하였습니다.확인해주세요!`,
-    thread_ts: event.ts,
-  })
-})
 /**
  * Creates a new meeting space.
  * @param {OAuth2Client} authClient An authorized OAuth2 client.
  */
 async function createSpace(authClient: OAuth2Client) {
   const meetClient = new SpacesServiceClient({ 
-    auth: authClient as any,
+    authClient: authClient as any, // TODO: Remove the need for the cast.
   });
   // Construct request
   const request = {
