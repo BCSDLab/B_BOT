@@ -19,7 +19,7 @@ const SCOPES: string[] = ['https://www.googleapis.com/auth/meetings.space.create
 // created automatically when the authorization flow completes for the first
 // time.
 const TOKEN_PATH: string = path.join(process.cwd(), 'token.json');
-const CREDENTIALS_PATH: string = path.join(__dirname, '../../../credentials.config.js');
+const CREDENTIALS_PATH: string = path.join(process.cwd(), 'credentials.json');
 
 /**
  * Reads previously authorized credentials from the save file.
