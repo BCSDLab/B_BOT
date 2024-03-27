@@ -39,30 +39,39 @@ boltApp.command('/강의공지', async ({ ack, client, command, logger }) => {
 					text: '강의 공지내용',
 				},
 				blocks: [
+						{
+						type: 'input',
+						block_id: 'content',
+						label: {
+							type: 'plain_text',
+							text: '강의 공지 내용',
+						},
+						element: {
+							type: 'plain_text_input',
+							action_id: 'content_input',
+							placeholder: {
+								type: 'plain_text',
+								text: '강의 공지에 대한 내용을 작성해주세요!',
+							},
+							multiline:true,
+						},
+					},
 					{
 						type: 'input',
 						block_id: 'location',
 						label: {
 							type: 'plain_text',
-							text: '강의 장소는 어디인가요?',
+							text: '강의 장소',
 						},
 						element: {
 							type: 'plain_text_input',
 							action_id: 'location_input',
+							placeholder: {
+								type: 'plain_text',
+								text: '강의 장소는 어디인가요?',
+							},
 						},
 					},
-					// {
-					// 	type: 'input',
-					// 	block_id: 'time',
-					// 	label: {
-					// 		type: 'plain_text',
-					// 		text: '강의 시간은 몇시인가요?',
-					// 	},
-					// 	element: {
-					// 		type: 'plain_text_input',
-					// 		action_id: 'time_input',
-					// 	},
-					// },
 					{
 						type: 'input',
 						block_id: 'time',
@@ -158,7 +167,7 @@ boltApp.view(
 				channel: channels.삐봇요청_채널_ID,
 				text: '강의 공지가 등록되었습니다. 곧 공지 올라옵니다.',
 			});
-
+			const content=view['state']['values']['content']['content_input']['value'];
 			const location =
 				view['state']['values']['location']['location_input']['value'];
 			const day = view['state']['values']['day']['day_dropdown']['selected_option'];
@@ -169,7 +178,7 @@ boltApp.view(
 			// 스레드에 멘션
 			await client.chat.postMessage({
 				channel: threadChannelId,
-				text: `*비기너 강의 공지*\n*장소*: ${location}\n*요일*: ${day}\n*시간*: ${time}\n *온라인여부*: ${online?'온라인':'오프라인'}\n`,
+				text: `*:확성기:비기너 강의 공지*\n${content}\n>*장소*: ${location}\n>*요일*: ${day?.text}\n>*시간*: ${time?.text}\n*>온라인여부*: ${online?'온라인':'오프라인'}\n`,
 			});
 		} catch (error) {
 			client.chat.postMessage({
