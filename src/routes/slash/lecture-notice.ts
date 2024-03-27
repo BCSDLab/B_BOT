@@ -3,6 +3,8 @@ import { boltApp } from '../../config/boltApp';
 import { makeEvent } from '../../config/makeEvent';
 import { channels } from '../../const/channel';
 
+const DAY_OF_THE_WEEK=['월요일','화요일','수요일','목요일','금요일','토요일','일요일']
+
 const lectureNoticeRouter = express.Router();
 // application/x-www-form-urlencoded 요청을 처리하는 미들웨어
 lectureNoticeRouter.use(express.urlencoded({ extended: true }));
@@ -49,58 +51,64 @@ boltApp.command('/강의공지', async ({ ack, client, command, logger }) => {
 							action_id: 'location_input',
 						},
 					},
+					// {
+					// 	type: 'input',
+					// 	block_id: 'time',
+					// 	label: {
+					// 		type: 'plain_text',
+					// 		text: '강의 시간은 몇시인가요?',
+					// 	},
+					// 	element: {
+					// 		type: 'plain_text_input',
+					// 		action_id: 'time_input',
+					// 	},
+					// },
 					{
 						type: 'input',
 						block_id: 'time',
 						label: {
 							type: 'plain_text',
-							text: '강의 시간은 몇시인가요?',
+							text: '강의 시간',
 						},
 						element: {
-							type: 'plain_text_input',
-							action_id: 'time_input',
+							type: 'static_select',
+							action_id: 'time_dropdown',
+							placeholder: {
+								type: 'plain_text',
+								text: '강의 시간은 몇시인가요?',
+							},
+							options: Array.from({ length: 24 }).map((_, index) => ({
+								text: {
+									type: 'plain_text',
+									text: `${index}시`,
+								},
+								value: `${index}시`,
+							})),
 						},
 					},
 					{
 						type: 'input',
-						block_id: 'dropdown_block',
+						block_id: 'day',
 						label: {
 							type: 'plain_text',
-							text: 'Select an option',
+							text: '강의 요일',
 						},
 						element: {
 							type: 'static_select',
-							action_id: 'dropdown_action',
+							action_id: 'day_dropdown',
 							placeholder: {
 								type: 'plain_text',
-								text: 'Select an option',
+								text: '강의 요일은 언제인가요?',
 							},
-							options: [
-								{
-									text: {
-										type: 'plain_text',
-										text: 'Option 1',
-									},
-									value: 'option_1',
+							options: DAY_OF_THE_WEEK.map((element,) => ({
+								text: {
+									type: 'plain_text',
+									text: element,
 								},
-								{
-									text: {
-										type: 'plain_text',
-										text: 'Option 2',
-									},
-									value: 'option_2',
-								},
-								{
-									text: {
-										type: 'plain_text',
-										text: 'Option 3',
-									},
-									value: 'option_3',
-								},
-							],
+								value: element,
+							})),
 						},
 					},
-
 					{
 						type: 'input',
 						block_id: 'checkbox_block',
@@ -153,14 +161,15 @@ boltApp.view(
 
 			const location =
 				view['state']['values']['location']['location_input']['value'];
-			const time = view['state']['values']['time']['time_input']['value'];
+			const day = view['state']['values']['day']['day_dropdown']['value'];
+			const time = view['state']['values']['time']['time_dropdown']['value'];
 			const online =
 				view['state']['values']['checkbox_block']['checkbox_input'];
 
 			// 스레드에 멘션
 			await client.chat.postMessage({
 				channel: threadChannelId,
-				text: `비기너 강의 공지\n장소: ${location}\n시간: ${time} 온라인여부 ${online}`,
+				text: `*비기너 강의 공지*\n*장소*: ${location}\n*요일*: ${day}\n*시간*: ${time}\n *온라인여부*: ${online}\n`,
 			});
 		} catch (error) {
 			client.chat.postMessage({
