@@ -161,15 +161,15 @@ boltApp.view(
 
 			const location =
 				view['state']['values']['location']['location_input']['value'];
-			const day = view['state']['values']['day']['day_dropdown']['value'];
-			const time = view['state']['values']['time']['time_dropdown']['value'];
+			const day = view['state']['values']['day']['day_dropdown']['selected_option'];
+			const time = view['state']['values']['time']['time_dropdown']['selected_option'];
 			const online =
 				view['state']['values']['checkbox_block']['checkbox_input'];
 
 			// 스레드에 멘션
 			await client.chat.postMessage({
 				channel: threadChannelId,
-				text: `*비기너 강의 공지*\n*장소*: ${location}\n*요일*: ${day}\n*시간*: ${time}\n *온라인여부*: ${online}\n`,
+				text: `*비기너 강의 공지*\n*장소*: ${location}\n*요일*: ${day}\n*시간*: ${time}\n *온라인여부*: ${online?'온라인':'오프라인'}\n`,
 			});
 		} catch (error) {
 			client.chat.postMessage({
