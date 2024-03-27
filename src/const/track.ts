@@ -50,7 +50,7 @@ export const BCSD_ACTIVE_MEMBER_LIST = {
     "backend" : ["황현식", "송선권", "박성빈", "허준기"],
     "uiux" : ["김채은"],
     "android" : ["배수민", "이상일"],
-    "ios" : [],
+    "ios" : ["김나훈"],
     "pm" : [],
     "da" : [],
     "game" : [],
