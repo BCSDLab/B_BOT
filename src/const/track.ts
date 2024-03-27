@@ -7,7 +7,7 @@ export const TRACK_NAME_MAPPER = {
   "backend": "BackEnd",
   "android": "Android",
   "uiux": "UI/UX",
-  "ios": "iOS",
+  "ios": "IOS",
   "game": "Game",
   "pm": "Product Manager",
   "da": "Data Analyst",
