@@ -140,7 +140,7 @@ async function mentionUsersByTeamAndTrack(team : Team, track: Track | 'all') {
 
   const emptyTrackDisplayNames = emptyTracks.map(track => TRACK_NAME_MAPPER[track as keyof typeof TRACK_NAME_MAPPER]);
 
-  // 변경된 트랙 이름으로 끝나는 사용자 제외
+  // 비어있는 트랙 이름으로 끝나는 사용자 제외
   const filteredUsers = activeUsers.filter(user => {
     const displayName = user.profile?.display_name;
     return !emptyTrackDisplayNames.some(emptyTrackDisplayName => displayName?.endsWith(emptyTrackDisplayName));
