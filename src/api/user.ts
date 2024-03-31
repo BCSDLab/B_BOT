@@ -5,7 +5,7 @@ export const getClientUserList = async () => {
   return usersList;
 }
 
-export const getChannelList=async()=>{
-  const channelList=await boltApp.client.conversations.list()!;
+export const getChannelList = async () => {
+  const channelList = await boltApp.client.conversations.list()!;
   return channelList;
 }
