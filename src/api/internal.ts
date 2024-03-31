@@ -8,11 +8,11 @@ interface PRThreadInfo {
 }
 
 export const getPRThreadInfo = ({ pullRequestLink }: { pullRequestLink: string }) => {
-  return apiClient.get<Omit<PRThreadInfo, 'pullRequestLink'>>(`/admin/b-bot/pull-request/thread?pullRequestLink=${pullRequestLink}`);
+  return apiClient.get<Omit<PRThreadInfo, 'pullRequestLink'>>(`/b-bot/pull-request/thread?pullRequestLink=${pullRequestLink}`);
 }
 
 export const postPRThreadInfo = ({ pullRequestLink, reviewers, writer, ts }: PRThreadInfo) => {
-  return apiClient.post<void>('/admin/b-bot/pull-request/thread', {
+  return apiClient.post<void>('/b-bot/pull-request/thread', {
     pullRequestLink,
     reviewers,
     writer,
