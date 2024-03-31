@@ -6,14 +6,21 @@ import { handleMessageEventError } from '../../utils/handleEventError';
 import { getClientUserList } from '../../api/user';
 import { MEMBER_TYPES_KOREAN, MEMBER_TYPES_LOWERCASE, TRACKS_KOREAN, TRACKS_LOWERCASE, TRACK_NAME_MAPPER, TRACK_NAME_KOREAN_MAPPER, MEMBER_TYPES_KOREAN_MAPPER} from '../../const/track';
 import { match } from 'ts-pattern';
+import { getPRThreadInfo } from '../../api/internal';
 
 const eventRouter = express.Router();
 
 // 응답 확인용
-eventRouter.get('/', (req, res) => {
-  res.send({
-    message: 'Hello, World!',
-  });
+eventRouter.get('/', async (req, res) => {
+  try {
+    const data = await getPRThreadInfo({ pullRequestLink: 'https://github.com/BCSDLab/KOIN_WEB_RECODE/pull/122'});
+    
+    res.send({
+      message: JSON.stringify(data.data),
+    });
+  } catch (error) {
+    res.send({ message: JSON.stringify(error) });
+  }
 });
 
 // 이벤트 구독
