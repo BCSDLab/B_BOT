@@ -32,16 +32,30 @@ frontendUpdatePackageRouter.post<any, any, any, RequestBody>('/', async (req, re
       unfurl_links: true,
       blocks: [
         {
+          type: "section",
+          text: {
+            type: "plain_text",
+            text: `${packageName} 패키지가 업데이트됐어요!`,
+            emoji: true
+          }
+        },
+        {
           type: 'section',
           text: {
             type: 'mrkdwn',
             text: `
-\`${packageName}\` 패키지가 업데이트됐어요!
 각 서비스 확인해서 업데이트 부탁드려요 :meow_cookie:
-\`\`\`yarn add ${packageName}\`\`\`
  • <${pullRequestLink}|${pullRequestTitle}>`
           },
         },
+        {
+          type: "section",
+          text: {
+            type: "plain_text",
+            text: `yarn add ${packageName}`,
+            emoji: true
+          }
+        }
       ]
     });
 
