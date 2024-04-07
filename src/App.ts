@@ -8,6 +8,7 @@ import { boltApp, expressApp } from './config/boltApp';
 import frontendReviewMenotionRouter from './routes/api/review-request/frontend';
 import meetingRouter from './routes/slash/google-meet';
 import frontendPRMergedRouter from './routes/api/pr-merged/frontend';
+import frontendUpdatePackageRouter from './routes/api/update-package/frontend';
 
 dotenv.config();  // Load environment variables from .env file 
 // Express 앱 생성
@@ -24,6 +25,7 @@ expressApp.use('/slash/test', slashTestRouter);
 expressApp.use('/slash/slash-mention', slashMention);
 expressApp.use('/api/review-request/frontend', frontendReviewMenotionRouter);
 expressApp.use('/api/pr-merged/frontend', frontendPRMergedRouter);
+expressApp.use('/api/update-package/frontend', frontendUpdatePackageRouter);
 
 // 서버 시작
 const port = process.env.PORT || 3000;

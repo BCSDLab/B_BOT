@@ -26,7 +26,7 @@ frontendReviewMenotionRouter.post<any, any, any, RequestBody>('/', async (req, r
     const mentionString = mentionList.map((member) => `<@${member.id}>`).join(', ');
 
     const result = await boltApp.client.chat.postMessage({
-      channel: channels.FE_깃헙_채널_ID,
+      channel: channels.frontend_github,
       text: '리뷰어가 할당되었습니다! :blob-wave:',
       unfurl_links: true,
       blocks: [

@@ -25,7 +25,7 @@ frontendPRMergedRouter.post<any, any, any, RequestBody>('/', async (req, res) =>
 
     boltApp.client.chat.update({
       ts,
-      channel: channels.FE_깃헙_채널_ID,
+      channel: channels.frontend_github,
       text: '리뷰어가 할당되었습니다! :blob-wave:',
       unfurl_links: true,
       blocks: [
