@@ -28,7 +28,7 @@ frontendUpdatePackageRouter.post<any, any, any, RequestBody>('/', async (req, re
 
     boltApp.client.chat.postMessage({
       channel: channels.삐봇요청_test,
-      text: `\`${패키지명}\` 패키지가 업데이트됐어요!`,
+      text: `\`${packageName}\` 패키지가 업데이트됐어요!`,
       unfurl_links: true,
       blocks: [
         {
@@ -36,7 +36,7 @@ frontendUpdatePackageRouter.post<any, any, any, RequestBody>('/', async (req, re
           text: {
             type: 'mrkdwn',
             text: `
-\`${패키지명}\` 패키지가 업데이트됐어요!
+\`${packageName}\` 패키지가 업데이트됐어요!
 각 서비스 확인해서 업데이트 부탁드려요 :meow_cookie:
  • <${pullRequestLink}|${pullRequestTitle}>`
           },
