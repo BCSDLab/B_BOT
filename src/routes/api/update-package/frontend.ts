@@ -1,8 +1,7 @@
 import express from 'express';
 import { boltApp } from '../../../config/boltApp';
 import { channels } from '../../../const/channel';
-import { getPRThreadInfo } from '../../../api/internal';
-import { getClientUserList } from '../../../api/user';
+import { 패키지명 } from '../../../const/repository';
 
 const frontendUpdatePackageRouter = express.Router();
 
@@ -11,6 +10,7 @@ interface RequestBody {
   pullRequestTitle: string,
   repositoryName: keyof typeof 패키지명;
 }
+
 
 frontendUpdatePackageRouter.post<any, any, any, RequestBody>('/', async (req, res) => {
   try {
