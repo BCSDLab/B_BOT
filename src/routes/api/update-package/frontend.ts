@@ -9,21 +9,22 @@ interface RequestBody {
   pullRequestLink: string, 
   pullRequestTitle: string,
   repositoryName: keyof typeof 패키지명;
+  version: string;
 }
 
 frontendUpdatePackageRouter.post<any, any, any, RequestBody>('/', async (req, res) => {
   try {
-    const { pullRequestLink, pullRequestTitle, repositoryName } = req.body;
+    const { pullRequestLink, pullRequestTitle, repositoryName, version } = req.body;
     const packageName = 패키지명[repositoryName];
 
     if(!packageName) {
       boltApp.client.chat.postMessage({
         channel: channels.트랙_front_end,
-        text: `패키지가 배포되었지만, 패키지 이름을 찾을 수 없어요., ${repositoryName}, ${packageName}, ${pullRequestLink}, ${pullRequestTitle}`,
+        text: `패키지가 배포되었지만, 패키지 이름을 찾을 수 없어요., ${repositoryName}, ${packageName}, ${pullRequestLink}, ${pullRequestTitle}, ${version}`,
         unfurl_links: true,
       });
 
-      res.status(500).send(`패키지가 배포되었지만, 패키지 이름을 찾을 수 없어요., ${repositoryName}, ${packageName}, ${pullRequestLink}, ${pullRequestTitle}`);
+      res.status(500).send(`패키지가 배포되었지만, 패키지 이름을 찾을 수 없어요., ${repositoryName}, ${packageName}, ${pullRequestLink}, ${pullRequestTitle}, ${version}`);
     }
 
     boltApp.client.chat.postMessage({
@@ -44,7 +45,7 @@ frontendUpdatePackageRouter.post<any, any, any, RequestBody>('/', async (req, re
           text: {
             type: 'mrkdwn',
             text: `
-각 서비스 확인해서 업데이트 부탁드려요 :meow_cookie:
+서비스별 확인 후 업데이트 부탁드려요 :meow_cookie:
  • <${pullRequestLink}|${pullRequestTitle}>`
           },
         },
@@ -52,7 +53,7 @@ frontendUpdatePackageRouter.post<any, any, any, RequestBody>('/', async (req, re
           type: "section",
           text: {
             type: "plain_text",
-            text: `yarn add ${packageName}`,
+            text: `yarn add ${packageName}@^${version}`,
             emoji: true
           }
         }
