@@ -23,7 +23,7 @@ frontendErrorNoticeRouter.post<any, any, any, RequestBody>('/', async (req, res)
 
     boltApp.client.chat.postMessage({
       channel,
-      text: ':경광등: 클라이언트 에러가 발생했어요 :경광등:',
+      text: ':siren: 클라이언트 에러가 발생했어요 :siren:',
       unfurl_links: true,
       blocks: [
         {
@@ -31,9 +31,9 @@ frontendErrorNoticeRouter.post<any, any, any, RequestBody>('/', async (req, res)
           text: {
             type: 'mrkdwn',
             text: `
-:경광등: 클라이언트 에러가 발생했어요 :경광등:
+:rotating_light: 클라이언트 에러가 발생했어요 :rotating_light:
 
-url: ${url}
+url: \`${url}\`
 error: ${JSON.stringify(error)}
  `,
           },
