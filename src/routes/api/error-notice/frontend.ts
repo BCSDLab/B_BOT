@@ -1,0 +1,51 @@
+import express from 'express';
+import { boltApp } from '../../../config/boltApp';
+import { channels } from '../../../const/channel';
+import { getPRThreadInfo } from '../../../api/internal';
+import { getClientUserList } from '../../../api/user';
+
+const frontendErrorNoticeRouter = express.Router();
+
+interface RequestBody { 
+  url: string,
+  error: unknown,
+}
+
+frontendErrorNoticeRouter.post<any, any, any, RequestBody>('/', async (req, res) => {
+  try {
+    const { url, error } = req.body;
+
+    let channel = channels.코인_오류_front_end;
+
+    if(url.includes('stage.') || url.includes('localhost')) {
+      channel = channels.코인_오류_front_end_stage;
+    }
+
+    boltApp.client.chat.postMessage({
+      channel,
+      text: ':경광등: 클라이언트 에러가 발생했어요 :경광등:',
+      unfurl_links: true,
+      blocks: [
+        {
+          type: 'section',
+          text: {
+            type: 'mrkdwn',
+            text: `
+:경광등: 클라이언트 에러가 발생했어요 :경광등:
+
+url: ${url}
+error: ${JSON.stringify(error)}
+ `,
+          },
+        },
+      ]
+    });
+
+    res.status(200).send('OK');
+  } catch (error) {
+
+    res.status(500).send(`Error: ${error}`);
+  }
+});
+
+export default frontendErrorNoticeRouter;
