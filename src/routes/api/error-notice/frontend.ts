@@ -34,7 +34,8 @@ frontendErrorNoticeRouter.post<any, any, any, RequestBody>('/', async (req, res)
 :rotating_light: 클라이언트 에러가 발생했어요 :rotating_light:
 
 url: \`${url}\`
-error: ${JSON.stringify(error)}
+error: 
+\`\`\`${JSON.stringify(error)}\`\`\`
  `,
           },
         },
