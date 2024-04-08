@@ -5,7 +5,7 @@ import { BCSD_ACTIVE_MEMBER_LIST } from '../../const/track';
 import { getClientUserList } from '../../api/user';
 import { match } from 'ts-pattern';
 import { MEMBER_TYPES_LOWERCASE, TRACKS_LOWERCASE, TRACK_NAME_MAPPER} from '../../const/track';
-import findMentionMessage from '../../utils/\bfindMentionMessage';
+import findMentionMessage from '../../utils/findMentionMessage';
 
 const slashMentionRouter = express.Router();
 
