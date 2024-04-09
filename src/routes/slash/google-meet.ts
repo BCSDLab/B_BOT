@@ -18,8 +18,9 @@ const SCOPES: string[] = ['https://www.googleapis.com/auth/meetings.space.create
 // The file token.json stores the user's access and refresh tokens, and is
 // created automatically when the authorization flow completes for the first
 // time.
-const TOKEN_PATH: string = path.join(process.cwd(), 'token.json');
-const CREDENTIALS_PATH: string = path.join(process.cwd(), 'credentials.json');
+// TODO: TOKEN 심어주기
+const TOKEN_PATH: string = process.env.TOKEN_PATH as string;
+const CREDENTIALS_PATH: string = process.env.CREDENTIALS_PATH as string;
 
 /**
  * Reads previously authorized credentials from the save file.
@@ -84,8 +85,12 @@ async function createSpace(authClient: OAuth2Client) {
     authClient: authClient as any, // TODO: Remove the need for the cast.
   });
   // Construct request
-  const request = {
-    // Details of the request
+  const request: any = {
+    space: {
+      config: {
+        accesType: 'OPEN',
+      }
+    }
   };
 
   // Run request
