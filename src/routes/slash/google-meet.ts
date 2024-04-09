@@ -19,8 +19,8 @@ const SCOPES: string[] = ['https://www.googleapis.com/auth/meetings.space.create
 // The file token.json stores the user's access and refresh tokens, and is
 // created automatically when the authorization flow completes for the first
 // time.
-const TOKEN_PATH: string = process.env.TOKEN_PATH as string;
-const CREDENTIALS_PATH: string = process.env.CREDENTIALS_PATH as string;
+const TOKEN_PATH: string = "/home/ubuntu/secret/token.json";
+const CREDENTIALS_PATH: string = "/home/ubuntu/secret/credentials.json";
 
 /**
  * Reads previously authorized credentials from the save file.
