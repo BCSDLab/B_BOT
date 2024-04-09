@@ -20,7 +20,7 @@ const SCOPES: string[] = ['https://www.googleapis.com/auth/meetings.space.create
 // TODO: TOKEN 심어주기
 const TOKEN_PATH: string = process.env.TOKEN_PATH as string;
 const CREDENTIALS_PATH: string = process.env.CREDENTIALS_PATH as string;
-const keyfilePath = process.env.GOOGLE_APPLICATION_CREDENTIALS as string;
+const keyfilePath: string = process.env.GOOGLE_APPLICATION_CREDENTIALS as string;
 
 /**
  * Reads previously authorized credentials from the save file.
@@ -69,7 +69,7 @@ async function authorize(): Promise<OAuth2Client> {
   }
   client = await authenticate({
     scopes: SCOPES,
-    keyfilePath: keyfilePath,
+    keyfilePath: CREDENTIALS_PATH,
   }) as unknown as OAuth2Client;
   if (client.credentials) {
     await saveCredentials(client);
@@ -88,7 +88,7 @@ async function createSpace(authClient: OAuth2Client) {
   const request: any = {
     space: {
       config: {
-        accesType: 'OPEN',
+        accessType: 'OPEN',
       }
     }
   };
@@ -102,11 +102,12 @@ boltApp.command('/회의생성', async ({ack, client, command, logger }) => {
   try {
     await ack();
     const response = await authorize().then(createSpace);
+    const authorization = await authorize();
     await boltApp.client.chat.postMessage({
       channel: command.channel_id,
       text: `회의를 생성하였습니다. ${response[0].meetingUri} 확인해주세요!`,
     })
-    logger.info(response[0].meetingUri)
+    logger.info(response[0].meetingUri, authorization.credentials, TOKEN_PATH, CREDENTIALS_PATH, keyfilePath);
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : '';
     const errorStack = error instanceof Error ? error.stack : '';
