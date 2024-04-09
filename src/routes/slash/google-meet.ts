@@ -1,6 +1,5 @@
 // Assuming the necessary type definitions exist or you are willing to create them.
 import * as fs from 'fs/promises';
-import * as path from 'path';
 import process from 'process';
 import express from 'express';
 import { authenticate } from '@google-cloud/local-auth';
@@ -21,6 +20,7 @@ const SCOPES: string[] = ['https://www.googleapis.com/auth/meetings.space.create
 // TODO: TOKEN 심어주기
 const TOKEN_PATH: string = process.env.TOKEN_PATH as string;
 const CREDENTIALS_PATH: string = process.env.CREDENTIALS_PATH as string;
+const keyfilePath = process.env.GOOGLE_APPLICATION_CREDENTIALS as string;
 
 /**
  * Reads previously authorized credentials from the save file.
@@ -69,7 +69,7 @@ async function authorize(): Promise<OAuth2Client> {
   }
   client = await authenticate({
     scopes: SCOPES,
-    keyfilePath: CREDENTIALS_PATH,
+    keyfilePath: keyfilePath,
   }) as unknown as OAuth2Client;
   if (client.credentials) {
     await saveCredentials(client);
