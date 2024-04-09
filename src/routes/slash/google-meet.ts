@@ -110,6 +110,8 @@ boltApp.command('/회의생성', async ({ack, client, command, logger }) => {
       text: `회의를 생성하였습니다. ${response[0].meetingUri} 확인해주세요!`,
     })
   } catch (error) {
+    logger.info(error, '에러입니다!!!');
+    logger.info(TOKEN_PATH, "토큰패스", CREDENTIALS_PATH, '로그입니다!!!')
     const errorMessage = error instanceof Error ? error.message : '';
     const errorStack = error instanceof Error ? error.stack : '';
     client.chat.postMessage({
