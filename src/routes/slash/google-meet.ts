@@ -102,12 +102,13 @@ boltApp.command('/회의생성', async ({ack, client, command, logger }) => {
   try {
     await ack();
     const response = await authorize().then(createSpace);
+    logger.info(response[0].meetingUri, '로그입니다!!!', TOKEN_PATH, '크라단셜', CREDENTIALS_PATH,'키파일패애스', keyfilePath);
     const authorization = await authorize();
+    logger.info(authorization.credentials, '토큰입니다~!!');
     await boltApp.client.chat.postMessage({
       channel: command.channel_id,
       text: `회의를 생성하였습니다. ${response[0].meetingUri} 확인해주세요!`,
     })
-    logger.info(response[0].meetingUri, '로그입니다!!!',authorization.credentials, '토큰입니다~!!', TOKEN_PATH, '크라단셜', CREDENTIALS_PATH,'키파일패애스', keyfilePath);
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : '';
     const errorStack = error instanceof Error ? error.stack : '';
