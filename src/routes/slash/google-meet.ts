@@ -121,4 +121,29 @@ boltApp.command('/회의생성', async ({ack, client, command, logger }) => {
   }
 });
 
+boltApp.message('회의생성!', async ({ message, client, logger }) => {
+  try {
+    const response = await authorize().then(createSpace);
+    logger.info(response[0].meetingUri, '로그입니다!!!', TOKEN_PATH, '크라단셜', CREDENTIALS_PATH);
+    const authorization = await authorize();
+    logger.info(authorization.credentials, '토큰입니다~!!');
+    await boltApp.client.chat.postMessage({
+      ts: message.ts,
+      channel: message.channel,
+      text: `회의를 생성하였습니다. ${response[0].meetingUri} 확인해주세요!`,
+      unfurl_links: true,
+    })
+  } catch (error) {
+    logger.info(error, '에러입니다!!!', "process.cwd", process.cwd());
+    logger.info(TOKEN_PATH, "토큰패스", CREDENTIALS_PATH, '로그입니다!!!')
+    const errorMessage = error instanceof Error ? error.message : '';
+    const errorStack = error instanceof Error ? error.stack : '';
+    client.chat.postMessage({
+      text: `Error: ${errorMessage}\n${errorStack}`,
+      channel: message.channel,
+      ts: message.channel
+    })
+  }
+})
+
 export default meetingRouter;
