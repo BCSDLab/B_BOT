@@ -98,9 +98,20 @@ boltApp.view({ callback_id: 그룹맨션_callback_id , type: 'view_submission' }
 
       const mentionMessage = findMentionMessage(track,member_type);
       
-      const selectedMember = memberTypeUsers
+      let selectedMember : string [] =[]
+      if (track === 'client') {
+        const clientTracks = ['frontend', 'android', 'ios'];
+        selectedMember = memberTypeUsers
+        .filter(user => user.profile!.display_name &&
+          clientTracks.some(clienttrack => user.profile!.display_name!.endsWith(TRACK_NAME_MAPPER[clienttrack as keyof typeof TRACK_NAME_MAPPER]))
+        )
+        .map(user => `<@${user.id}>`);
+      }
+      else {
+        selectedMember = memberTypeUsers
         .filter(user => user.profile!.display_name && user.profile!.display_name.endsWith(TRACK_NAME_MAPPER[track as keyof typeof TRACK_NAME_MAPPER]))
         .map(user => `<@${user.id}>`);
+      }
       
       if(selectedMember.length > 0) {
         client.chat.postMessage({
@@ -157,26 +168,32 @@ async function mentionUsersByTeamAndTrack(team : Team, track: Track | 'all' | 'c
 }
 
 // 팀과 트랙 정보로부터 이름 목록 가져오기
-function getNamesByTeamAndTrack(team : Team, track: Track | 'all' | 'client') {
+function getNamesByTeamAndTrack(team: Team, track: Track | 'all' | 'client') {
+  // 팀 이름 유효성 확인
   if (!['all', 'business', 'campus', 'user'].includes(team)) {
     throw new Error('잘못된 팀 이름입니다.');
   }
   
   // 트랙 이름 유효성 확인
-  if (!['all', 'frontend', 'backend', 'android', 'ios', 'uiux', 'pm', 'da', 'game'].includes(track)) {
+  if (!['all', 'frontend', 'backend', 'android', 'ios', 'uiux', 'pm', 'da', 'game', 'client'].includes(track)) {
     throw new Error('잘못된 트랙 이름입니다.');
   }
-    // 트랙이 'all'일 경우, 해당 팀의 모든 트랙에 대한 사람들의 이름 반환
+  
+  // 트랙이 'all'일 경우, 해당 팀의 모든 트랙에 대한 사람들의 이름 반환
   if (track === 'all') {
     return Object.values(BCSD_ACTIVE_MEMBER_LIST[team]).flat();
   }
-  if(track === 'client') {
+
+  // 트랙이 'client'일 경우, 'frontend', 'android', 'ios' 트랙의 사람들의 이름 반환
+  if (track === 'client') {
     const clientTracks = ['frontend', 'android', 'ios'];
-    return clientTracks.flatMap(track => TRACK_NAME_MAPPER[track as keyof typeof TRACK_NAME_MAPPER]);
+    return clientTracks.flatMap(trk => BCSD_ACTIVE_MEMBER_LIST[team][trk as keyof typeof BCSD_ACTIVE_MEMBER_LIST[typeof team]] || []);
   }
+
   // 특정 팀과 트랙에 해당하는 사람 이름 반환
   return BCSD_ACTIVE_MEMBER_LIST[team][track] || [];
 }
+
 
 
 const 그룹맨션_모달_뷰 = {
