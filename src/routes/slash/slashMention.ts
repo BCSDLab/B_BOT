@@ -215,6 +215,13 @@ const 그룹맨션_모달_뷰 = {
           {
             text: {
               type: "plain_text",
+              text: "클라이언트"
+            },
+            value: "client"
+          },
+          {
+            text: {
+              type: "plain_text",
               text: "FrontEnd"
             },
             value: "frontend"
