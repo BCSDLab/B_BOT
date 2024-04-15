@@ -59,7 +59,7 @@ export const BCSD_ACTIVE_MEMBER_LIST = {
     "frontend" : ["김도훈", "곽승주", "김하나"],
     "backend" : ["서정빈", "김성재", "박다희", "김원경"],
     "uiux" : ["최민경"],
-    "android" : ["조관희"],
+    "android" : ["조관희", "김도혁"],
     "ios" : [],
     "pm" : [],
     "da" : [],
