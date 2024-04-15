@@ -49,7 +49,7 @@ boltApp.command('/멘션', async ({ ack, client, respond, command }) => {
 boltApp.view({ callback_id: 그룹맨션_callback_id , type: 'view_submission' }, async ({ ack, view, client, respond }) => {
   try {
     await ack();
-    const track = view['state']['values']['track']['track_select']['selected_option']?.value as Track | 'all';
+    const track = view['state']['values']['track']['track_select']['selected_option']?.value as Track | 'all' | 'client';
     const team = view['state']['values']['team']['team_select']['selected_option']?.value as Team | 'all';
     const member_type = view['state']['values']['member_type']['member_type_select']['selected_option']?.value as MemberType | 'all';
 
@@ -123,7 +123,7 @@ boltApp.view({ callback_id: 그룹맨션_callback_id , type: 'view_submission' }
   }
 });
 
-async function mentionUsersByTeamAndTrack(team : Team, track: Track | 'all') {
+async function mentionUsersByTeamAndTrack(team : Team, track: Track | 'all' | 'client') {
   // 팀과 트랙으로 이름 목록 가져오기
   const names = getNamesByTeamAndTrack(team, track);
   
@@ -157,7 +157,7 @@ async function mentionUsersByTeamAndTrack(team : Team, track: Track | 'all') {
 }
 
 // 팀과 트랙 정보로부터 이름 목록 가져오기
-function getNamesByTeamAndTrack(team : Team, track: Track | 'all') {
+function getNamesByTeamAndTrack(team : Team, track: Track | 'all' | 'client') {
   if (!['all', 'business', 'campus', 'user'].includes(team)) {
     throw new Error('잘못된 팀 이름입니다.');
   }
@@ -170,7 +170,10 @@ function getNamesByTeamAndTrack(team : Team, track: Track | 'all') {
   if (track === 'all') {
     return Object.values(BCSD_ACTIVE_MEMBER_LIST[team]).flat();
   }
-
+  if(track === 'client') {
+    const clientTracks = ['frontend', 'android', 'ios'];
+    return clientTracks.flatMap(track => TRACK_NAME_MAPPER[track as keyof typeof TRACK_NAME_MAPPER]);
+  }
   // 특정 팀과 트랙에 해당하는 사람 이름 반환
   return BCSD_ACTIVE_MEMBER_LIST[team][track] || [];
 }
