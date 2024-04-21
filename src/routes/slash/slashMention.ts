@@ -143,11 +143,14 @@ async function mentionUsersByTeamAndTrack(team : Team, track: Track | 'all' | 'c
 
   const activeUsers = usersList.members!.filter(user => !user.deleted && !user.is_bot);
 
-  // 빈 배열을 가진 트랙 식별
-  const emptyTracks = Object.values(BCSD_ACTIVE_MEMBER_LIST).flatMap(group =>
-    Object.entries(group).filter(([, members]) => members.length === 0).map(([track]) => track)
+  // 비어있는 트랙 식별
+  const emptyTracks = Object.entries(BCSD_ACTIVE_MEMBER_LIST).flatMap(([teamKey, trackList]) =>
+    Object.entries(trackList).filter(([trackKey, members]) => members.length === 0 && teamKey === team && trackKey === track).map(([track]) => track)
   );
-
+  boltApp.client.chat.postMessage({
+    channel: 'C06PJ76SAM7',
+    text: `emptyTracks: ${JSON.stringify(emptyTracks)}`,
+  })
   const emptyTrackDisplayNames = emptyTracks.map(track => TRACK_NAME_MAPPER[track as keyof typeof TRACK_NAME_MAPPER]);
   boltApp.client.chat.postMessage({
     channel: 'C06PJ76SAM7',
@@ -158,10 +161,7 @@ async function mentionUsersByTeamAndTrack(team : Team, track: Track | 'all' | 'c
     const displayName = user.profile?.display_name;
     return !emptyTrackDisplayNames.some(emptyTrackDisplayName => displayName?.endsWith(emptyTrackDisplayName));
   });
-  boltApp.client.chat.postMessage({
-    channel: 'C06PJ76SAM7',
-    text: `filteredUsers: ${JSON.stringify(filteredUsers)}`,
-  })
+
   // 이름 목록에 있는 각 이름으로 시작하는 사용자의 ID 찾기
   const mentions = names.flatMap((name : string) => 
     filteredUsers
