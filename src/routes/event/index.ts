@@ -275,7 +275,13 @@ boltApp.message('!점메추', async ({ event }) => {
   }
 });
 
-
+boltApp.message('!파티파티', async ({ event }) => {
+  boltApp.client.chat.postMessage({
+    channel: event.channel,
+    text: `:party_blob::meow_party::aaw_yeah::party_dancing_bear::aaw_yeah_reverse::rainbow_blob::party_blob2:`,
+    thread_ts: event.ts,
+  });
+});
 
 
 export default eventRouter;
