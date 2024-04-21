@@ -137,7 +137,10 @@ boltApp.view({ callback_id: 그룹맨션_callback_id , type: 'view_submission' }
 async function mentionUsersByTeamAndTrack(team : Team, track: Track | 'all' | 'client') {
   // 팀과 트랙으로 이름 목록 가져오기
   const names = getNamesByTeamAndTrack(team, track);
-  
+  boltApp.client.chat.postMessage({
+    channel: 'C06PJ76SAM7',
+    text: `names: ${JSON.stringify(names)}`,
+  })
   // 사용자 목록 가져오기
   const usersList = await getClientUserList();
 
