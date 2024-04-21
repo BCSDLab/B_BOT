@@ -147,15 +147,9 @@ async function mentionUsersByTeamAndTrack(team : Team, track: Track | 'all' | 'c
   const emptyTracks = Object.entries(BCSD_ACTIVE_MEMBER_LIST).flatMap(([teamKey, trackList]) =>
     Object.entries(trackList).filter(([trackKey, members]) => members.length === 0 && teamKey === team && trackKey === track).map(([track]) => track)
   );
-  boltApp.client.chat.postMessage({
-    channel: 'C06PJ76SAM7',
-    text: `emptyTracks: ${JSON.stringify(emptyTracks)}`,
-  })
+
   const emptyTrackDisplayNames = emptyTracks.map(track => TRACK_NAME_MAPPER[track as keyof typeof TRACK_NAME_MAPPER]);
-  boltApp.client.chat.postMessage({
-    channel: 'C06PJ76SAM7',
-    text: `emptyTrackDisplayNames: ${JSON.stringify(emptyTrackDisplayNames)}`,
-  })
+
   // 비어있는 트랙 이름으로 끝나는 사용자 제외
   const filteredUsers = activeUsers.filter(user => {
     const displayName = user.profile?.display_name;
