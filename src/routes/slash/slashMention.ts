@@ -158,7 +158,10 @@ async function mentionUsersByTeamAndTrack(team : Team, track: Track | 'all' | 'c
     const displayName = user.profile?.display_name;
     return !emptyTrackDisplayNames.some(emptyTrackDisplayName => displayName?.endsWith(emptyTrackDisplayName));
   });
-
+  boltApp.client.chat.postMessage({
+    channel: 'C06PJ76SAM7',
+    text: `filteredUsers: ${JSON.stringify(filteredUsers)}`,
+  })
   // 이름 목록에 있는 각 이름으로 시작하는 사용자의 ID 찾기
   const mentions = names.flatMap((name : string) => 
     filteredUsers
