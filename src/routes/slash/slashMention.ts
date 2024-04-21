@@ -148,9 +148,11 @@ async function mentionUsersByTeamAndTrack(team : Team, track: Track | 'all' | 'c
     Object.entries(group).filter(([, members]) => members.length === 0).map(([track]) => track)
   );
 
-
   const emptyTrackDisplayNames = emptyTracks.map(track => TRACK_NAME_MAPPER[track as keyof typeof TRACK_NAME_MAPPER]);
-
+  boltApp.client.chat.postMessage({
+    channel: 'C06PJ76SAM7',
+    text: `emptyTrackDisplayNames: ${JSON.stringify(emptyTrackDisplayNames)}`,
+  })
   // 비어있는 트랙 이름으로 끝나는 사용자 제외
   const filteredUsers = activeUsers.filter(user => {
     const displayName = user.profile?.display_name;
@@ -163,10 +165,7 @@ async function mentionUsersByTeamAndTrack(team : Team, track: Track | 'all' | 'c
       .filter(user => user.profile!.display_name && user.profile!.display_name.startsWith(name))
       .map(user => `<@${user.id}>`)
   );
-  boltApp.client.chat.postMessage({
-    channel: 'C06PJ76SAM7',
-    text: `mention: ${JSON.stringify(mentions)}`,
-  })
+ 
   return mentions;
 }
 
