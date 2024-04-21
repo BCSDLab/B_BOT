@@ -7,6 +7,7 @@ import { getClientUserList } from '../../api/user';
 import { MEMBER_TYPES_KOREAN, MEMBER_TYPES_LOWERCASE, TRACKS_KOREAN, TRACKS_LOWERCASE, TRACK_NAME_MAPPER, TRACK_NAME_KOREAN_MAPPER, MEMBER_TYPES_KOREAN_MAPPER} from '../../const/track';
 import { match } from 'ts-pattern';
 import { getPRThreadInfo } from '../../api/internal';
+import { getKoinShops } from '../../api/koin';
 
 const eventRouter = express.Router();
 
@@ -232,6 +233,49 @@ boltApp.message('!멘션', async ({ event, message }) => {
     handleMessageEventError({ event, error });
   }
 });
+
+boltApp.message('!가위바위보', async ({ event }) => {
+  const 가위바위보 = ['가위', '바위', '보'];
+  const randomIndex = Math.floor(Math.random() * 가위바위보.length);
+  const randomValue = 가위바위보[randomIndex];
+
+  boltApp.client.chat.postMessage({
+    channel: event.channel,
+    text: randomValue + '!',
+    thread_ts: event.ts,
+  });
+});
+
+boltApp.message('!주사위', async ({ event }) => {
+  const 주사위 = Math.floor(Math.random() * 6) + 1;
+
+  boltApp.client.chat.postMessage({
+    channel: event.channel,
+    text: `주사위 결과: ${주사위}`,
+    thread_ts: event.ts,
+  });
+});
+
+boltApp.message('!점메추', async ({ event }) => {
+  try {
+    const shopList = (await getKoinShops()).data.shops.map(shop => shop.name);
+    const randomIndex = Math.floor(Math.random() * shopList.length);
+
+    boltApp.client.chat.postMessage({
+      channel: event.channel,
+      text: `${shopList[randomIndex]} 어떠세요?`,
+      thread_ts: event.ts,
+    });
+  } catch (error) {
+    boltApp.client.chat.postMessage({
+      channel: event.channel,
+      text: `점심 메뉴 추천을 가져오는 중 오류가 발생했습니다.`,
+      thread_ts: event.ts,
+    });
+  }
+});
+
+
 
 
 export default eventRouter;

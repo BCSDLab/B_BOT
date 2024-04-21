@@ -1,4 +1,4 @@
-import { apiClient } from "../config/apiClient";
+import { internalApiClient } from "../config/apiClient";
 
 interface PRThreadInfo {
   pullRequestLink: string, 
@@ -8,11 +8,11 @@ interface PRThreadInfo {
 }
 
 export const getPRThreadInfo = ({ pullRequestLink }: { pullRequestLink: string }) => {
-  return apiClient.get<Omit<PRThreadInfo, 'pullRequestLink'>>(`/b-bot/pull-request/thread?pullRequestLink=${pullRequestLink}`);
+  return internalApiClient.get<Omit<PRThreadInfo, 'pullRequestLink'>>(`/b-bot/pull-request/thread?pullRequestLink=${pullRequestLink}`);
 }
 
 export const postPRThreadInfo = ({ pullRequestLink, reviewers, writer, ts }: PRThreadInfo) => {
-  return apiClient.post<void>('/b-bot/pull-request/thread', {
+  return internalApiClient.post<void>('/b-bot/pull-request/thread', {
     pullRequestLink,
     reviewers,
     writer,
