@@ -28,6 +28,7 @@
     "axios": "^1.6.8",
     "dotenv": "^16.4.4",
     "dotenv-webpack": "^8.0.1",
+    "mysql2": "^3.9.7",
     "ts-pattern": "^5.0.8"
   }
 }

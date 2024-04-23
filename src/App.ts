@@ -10,7 +10,7 @@ import meetingRouter from './routes/slash/google-meet';
 import frontendPRMergedRouter from './routes/api/pr-merged/frontend';
 import frontendUpdatePackageRouter from './routes/api/update-package/frontend';
 import frontendErrorNoticeRouter from './routes/api/error-notice/frontend';
-
+import testMysql from './routes/mysql/testmysql';
 dotenv.config();  // Load environment variables from .env file 
 // Express 앱 생성
 
@@ -28,7 +28,7 @@ expressApp.use('/api/review-request/frontend', frontendReviewMenotionRouter);
 expressApp.use('/api/pr-merged/frontend', frontendPRMergedRouter);
 expressApp.use('/api/update-package/frontend', frontendUpdatePackageRouter);
 expressApp.use('/api/error-notice/frontend', frontendErrorNoticeRouter);
-
+expressApp.use('/test-mysql', testMysql);
 // 서버 시작
 const port = process.env.PORT || 3000;
 
