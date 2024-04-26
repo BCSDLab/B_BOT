@@ -303,7 +303,6 @@ boltApp.message('!아이스브레이킹', async ({event}) => {
     boltApp.client.chat.postMessage({
       channel: event.channel,
       text: `${아이스브레이킹주제}`,
-      thread_ts: event.ts,
     }) 
   } catch (error) {
     boltApp.client.chat.postMessage({
