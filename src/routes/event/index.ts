@@ -260,10 +260,12 @@ boltApp.message('!점메추', async ({ event }) => {
   try {
     const shopList = (await getKoinShops()).data.shops.map(shop => shop.name);
     const randomIndex = Math.floor(Math.random() * shopList.length);
+    let recommend = `${shopList[randomIndex]} 어떠세요?`;
 
+    if (shopList[randomIndex].includes('콜밴') || shopList[randomIndex].includes('콜벤')) recommend = '오늘은 굶으세요.'
     boltApp.client.chat.postMessage({
       channel: event.channel,
-      text: `${shopList[randomIndex]} 어떠세요?`,
+      text: recommend,
       thread_ts: event.ts,
     });
   } catch (error) {
