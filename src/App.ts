@@ -28,7 +28,7 @@ expressApp.use('/api/review-request/frontend', frontendReviewMenotionRouter);
 expressApp.use('/api/pr-merged/frontend', frontendPRMergedRouter);
 expressApp.use('/api/update-package/frontend', frontendUpdatePackageRouter);
 expressApp.use('/api/error-notice/frontend', frontendErrorNoticeRouter);
-expressApp.use('/test-mysql', testMysql);
+expressApp.use('/mysql/test', testMysql);
 // 서버 시작
 const port = process.env.PORT || 3000;
 
