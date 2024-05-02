@@ -22,7 +22,8 @@ slashTestRouter.post('/', async (req, res) => {
   }
 })
 
-boltApp.command('/test', async (args) => {
+boltApp.command('/test', async ({ack, client, respond, command}) => {
+  await ack();
   await boltApp.client.chat.postMessage({
     channel: 'C06PJ76SAM7',
     text: '테스트 서버 멀쩡함',

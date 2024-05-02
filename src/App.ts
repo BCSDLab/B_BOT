@@ -17,8 +17,6 @@ dotenv.config();  // Load environment variables from .env file
 
 boltApp.start();
 
-expressApp.use('/slash/test', slashTestRouter);
-
 expressApp.use(express.json())
 expressApp.use('/event', eventRouter);
 expressApp.use('/slash/member', slashMemberRouter);
