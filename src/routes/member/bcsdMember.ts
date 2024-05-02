@@ -16,9 +16,7 @@ export const syncMembers = async function () {
 
     const results = await Promise.all(updatePromises);
 
-    const resultCount = results.reduce((acc: number, result: ResultSet) => {
+    return results.reduce((acc: number, result: ResultSet) => {
         return acc + result.rows.affectedRows;
     }, 0);
-
-    return `${resultCount} 개의 데이터가 업데이트되었습니다.`;
 };

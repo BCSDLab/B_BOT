@@ -6,16 +6,16 @@ const slashMemberRouter = express.Router();
 
 boltApp.command('/사용자동기화', async ({ack, client, respond, command}) => {
     try {
-        await syncMembers();
+        let resultCount = await syncMembers();
+        await client.chat.postMessage({
+            channel: command.channel_id,
+            text: `${resultCount}명 동기화 완료`,
+            thread_ts: command.message_ts
+        });
     } catch (error) {
-        respond(`에러 발생: ${error}`);
+        await respond(`에러 발생: ${error}`);
     }
 
-    await client.chat.postMessage({
-        channel: command.channel_id,
-        text: '해당하는 인원이 없습니다.',
-        thread_ts: command.message_ts
-    });
 });
 
 export default slashMemberRouter
