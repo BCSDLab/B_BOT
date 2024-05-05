@@ -10,7 +10,10 @@ boltApp.command('/사용자동기화', async ({ack, client, respond, command}) =
         let resultCount = await syncMembers();
         await client.chat.postMessage({
             channel: command.channel_id,
-            text: `${resultCount}명 동기화 완료`,
+            text: `
+            ${resultCount.updatedMember}명 동기화 완료
+            ${resultCount.updatedImages}명 이미지동기화 완료
+            `,
             thread_ts: command.message_ts
         });
     } catch (error) {
