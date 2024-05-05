@@ -3,15 +3,15 @@ import axios from "axios";
 const BASE_PATH = process.env.API_PATH!;
 
 export const internalApiClient = axios.create({
-  baseURL: "https://api.internal.bcsdlab.com",
-  headers: {
-    'Content-Type': 'application/json',
-  },
+    baseURL: "https://api.internal.bcsdlab.com",
+    headers: {
+        'Content-Type': 'application/json',
+    },
 });
 
 export const koinApiClient = axios.create({
-  baseURL: 'https://api.koreatech.in',
-  headers: {
-    'Content-Type': 'application/json',
-  },
+    baseURL: 'https://api.koreatech.in',
+    headers: {
+        'Content-Type': 'application/json',
+    },
 });
