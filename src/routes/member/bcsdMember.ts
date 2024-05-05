@@ -1,5 +1,4 @@
-import express from "express";
-import {query, ResultSet} from "../mysql";
+import {query, ResultSet} from "../../config/mysql";
 import {getClientUserList} from "../../api/user";
 
 export const syncMembers = async function () {
