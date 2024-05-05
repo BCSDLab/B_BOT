@@ -1,7 +1,5 @@
 import axios from "axios";
 
-const BASE_PATH = process.env.API_PATH!;
-
 export const internalApiClient = axios.create({
     baseURL: "https://api.internal.bcsdlab.com",
     headers: {
