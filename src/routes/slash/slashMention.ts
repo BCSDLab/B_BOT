@@ -95,14 +95,14 @@ boltApp.view({callback_id: 그룹맨션_callback_id, type: 'view_submission'}, a
 
 export interface BcsdMember {
     name: string,
-    slackId: string,
-    teamName: Team,
-    trackName: Track,
+    slack_id: string,
+    team_name: Team,
+    track_name: Track,
     memberType: MemberType
 }
 
 function toSlackMentions(members: ResultSet): string[] {
-    return members.rows.map((member: BcsdMember) => `<@${member.slackId}>`);
+    return members.rows.map((member: BcsdMember) => `<@${member.slack_id}>`);
 }
 
 async function getMentionTargetMembers(team: Team, track: Track, memberType: MemberType): Promise<string[]> {
@@ -121,6 +121,10 @@ async function getMentionTargetMembers(team: Team, track: Track, memberType: Mem
                   AND m.is_deleted = 0;`
 
     let members: ResultSet = await query(sql);
+    console.log('쿼리 실행!')
+    console.log(`쿼리결과 ${members}`)
+    console.log(`쿼리결과 rows: ${members.rows}`)
+    console.log(`쿼리결과 fields: ${members.fields}`)
 
     // 모든 트랙, 모든 팀 호출, 모든 타입 호출
     if (track === 'all' && team == 'all' && memberType == 'all') {
@@ -128,34 +132,34 @@ async function getMentionTargetMembers(team: Team, track: Track, memberType: Mem
     }
 
     if (team === 'all' && memberType == 'all') {
-        let filtered = members.rows.filter((member: BcsdMember) => member.trackName === track);
+        let filtered = members.rows.filter((member: BcsdMember) => member.track_name === track);
         return toSlackMentions(filtered);
     }
 
     if (track === 'all' && memberType == 'all') {
-        let filtered = members.rows.filter((member: BcsdMember) => member.teamName === team);
+        let filtered = members.rows.filter((member: BcsdMember) => member.team_name === team);
         return toSlackMentions(filtered);
     }
 
     if (track === 'all') {
-        let filtered = members.rows.filter((member: BcsdMember) => member.teamName === team && member.memberType === memberType);
+        let filtered = members.rows.filter((member: BcsdMember) => member.team_name === team && member.memberType === memberType);
         return toSlackMentions(filtered);
     }
 
     if (team === 'all') {
-        let filtered = members.rows.filter((member: BcsdMember) => member.trackName === track && member.memberType === memberType);
+        let filtered = members.rows.filter((member: BcsdMember) => member.track_name === track && member.memberType === memberType);
         return toSlackMentions(filtered);
     }
 
     if (memberType === 'all') {
-        let filtered = members.rows.filter((member: BcsdMember) => member.teamName === team && member.trackName === track);
+        let filtered = members.rows.filter((member: BcsdMember) => member.team_name === team && member.track_name === track);
         return toSlackMentions(filtered);
     }
 
     let filtered = members.rows.filter((member: BcsdMember) =>
-        member.teamName === team
+        member.team_name === team
         && member.memberType === memberType
-        && member.trackName === track
+        && member.track_name === track
     );
 
     return toSlackMentions(filtered);
