@@ -1,6 +1,5 @@
 import mysql from "mysql2";
 import dotenv from "dotenv";
-import {Team} from "../../models/mention";
 
 dotenv.config();
 

@@ -3,20 +3,20 @@ import express from 'express';
 import {boltApp} from '../../config/boltApp';
 import {makeEvent} from '../../config/makeEvent';
 import {handleMessageEventError} from '../../utils/handleEventError';
-import {getClientUserList} from '../../api/user';
 import {
-  MEMBER_TYPES_KOREAN,
-  MEMBER_TYPES_KOREAN_MAPPER,
-  MEMBER_TYPES_LOWERCASE,
-  TRACK_NAME_KOREAN_MAPPER,
-  TRACK_NAME_MAPPER,
-  TRACKS_KOREAN,
-  TRACKS_LOWERCASE
+    MEMBER_TYPES_KOREAN,
+    MEMBER_TYPES_KOREAN_MAPPER,
+    MEMBER_TYPES_LOWERCASE,
+    TRACK_NAME_KOREAN_MAPPER,
+    TRACKS_KOREAN,
+    TRACKS_LOWERCASE
 } from '../../const/track';
-import {match} from 'ts-pattern';
 import {getPRThreadInfo} from '../../api/internal';
 import {getKoinShops} from '../../api/koin';
 import {아이스브레이킹} from '../../const/comment';
+import {BcsdMember, getAllMembers} from "../../utils/member";
+import {KnownEventFromType} from "@slack/bolt";
+
 
 const eventRouter = express.Router();
 
@@ -50,6 +50,7 @@ boltApp.event('app_mention', async ({event, say}) => {
     await say(`Hello, <@${event.user}>!`);
 });
 
+// TODO: 90일 지나서 없어짐. 회칙 업데이트가 필요함
 boltApp.message('!회칙', async ({event, message, body}) => {
     await boltApp.client.chat.postMessage({
         channel: event.channel,
@@ -60,41 +61,12 @@ boltApp.message('!회칙', async ({event, message, body}) => {
     });
 });
 
-boltApp.message("!최원빈", async ({event}) => {
-    const userList = await getClientUserList();
-
-    const 최원빈 = userList.members!.find(user => user.profile!.display_name?.startsWith("최원빈"));
-
-    if (최원빈) {
-        boltApp.client.chat.postMessage({
-            channel: event.channel,
-            text: `<@${최원빈.id}>님 확인해주세요!`,
-            thread_ts: event.ts,
-        });
-    } else {
-        boltApp.client.chat.postMessage({
-            channel: event.channel,
-            text: `최원빈님을 찾을 수 없습니다.`,
-            thread_ts: event.ts,
-        });
-    }
-});
-
-boltApp.message('!슬랙봇그룹', async ({event}) => {
-    const userList = await getClientUserList();
-
-    const slackBotGroup = userList.members!.filter(user =>
-        user.profile!.display_name?.startsWith("최정훈") ||
-        user.profile!.display_name?.startsWith("최원빈") ||
-        user.profile!.display_name?.startsWith("김경윤") ||
-        user.profile!.display_name?.startsWith("김도훈")
-    );
-
+function sendMention(slackBotGroup: BcsdMember[], event: KnownEventFromType<"message">) {
     if (slackBotGroup) {
-        const slackBotGroupMember = slackBotGroup.map(user => `<@${user.id}>`).join(', ');
+        const slackBotGroupMember = slackBotGroup.map(user => `<@${user.slack_id}>`).join(', ');
         boltApp.client.chat.postMessage({
             channel: event.channel,
-            text: `${slackBotGroupMember} 님 확인해주세요!`,
+            text: `단체멘션! ${slackBotGroupMember} 님 확인해주세요!`,
             thread_ts: event.ts,
         });
     } else {
@@ -104,87 +76,61 @@ boltApp.message('!슬랙봇그룹', async ({event}) => {
             thread_ts: event.ts,
         });
     }
+}
+
+boltApp.message('!슬랙봇그룹', async ({event}) => {
+    const members = await getAllMembers();
+    const slackBotGroup = members.filter(member =>
+        member.name === "최정훈" ||
+        member.name === "최원빈" ||
+        member.name === "김경윤" ||
+        member.name === "김도훈"
+    );
+    sendMention(slackBotGroup, event);
 });
 
-boltApp.message("!리팩토링그룹", async ({event, message}) => {
-    const userList = await getClientUserList();
-
-    const refactoringUsers = userList.members!.filter(user => user.profile!.display_name?.startsWith('김대관') ||
-        user.profile!.display_name?.startsWith('김혜준') || user.profile!.display_name?.startsWith('정민구') || user.profile!.display_name?.startsWith('채승윤')
+boltApp.message("!리팩토링그룹", async ({event}) => {
+    const members = await getAllMembers();
+    const refactoringUsers = members.filter(member =>
+        member.name === '김대관' ||
+        member.name === '김혜준' ||
+        member.name === '정민구' ||
+        member.name === '채승윤'
     )
-
-    if (refactoringUsers) {
-        const refactorMembers = refactoringUsers.map(user => `<@${user.id}>`).join(', ');
-        boltApp.client.chat.postMessage({
-            channel: event.channel,
-            text: `${refactorMembers} 여러분 확인해주세요!`,
-            thread_ts: event.ts,
-        });
-    } else {
-        boltApp.client.chat.postMessage({
-            channel: event.channel,
-            text: `해당하는 그룹 멤버를 찾을 수 없습니다.`,
-            thread_ts: event.ts,
-        });
-    }
+    sendMention(refactoringUsers, event);
 });
 
 boltApp.message('!인포메이트S', async ({event, message}) => {
-    const 인포메이트S이름 = ["이해루", "김하나", "윤해진", "곽승주"];
-
-    const userList = await getClientUserList();
-
-    const 인포메이트S멘션 = 인포메이트S이름.reduce((acc, name) => {
-        const user = userList.members!.find(user => user.profile!.display_name?.startsWith(name));
-
-        if (user) {
-            acc.push(`<@${user.id}>`);
-        }
-
-        return acc;
-    }, [] as string[]);
-
-    boltApp.client.chat.postMessage({
-        channel: event.channel,
-        text: `인포메이트S 멤버들 확인해주세요!\n${인포메이트S멘션.join(', ')}\n`,
-        thread_ts: event.ts,
-    });
+    const members = await getAllMembers();
+    const infoMateSMembers = members.filter(member =>
+        member.name === '이해루' ||
+        member.name === '김하나' ||
+        member.name === '윤해진' ||
+        member.name === '곽승주'
+    )
+    sendMention(infoMateSMembers, event);
 });
 
 boltApp.message('!인포메이트B', async ({event}) => {
-    const userList = await getClientUserList();
-
-    const informateB = userList.members!.filter(user =>
-        user.profile!.display_name?.startsWith("김소민") ||
-        user.profile!.display_name?.startsWith("김대의") ||
-        user.profile!.display_name?.startsWith("정해성") ||
-        user.profile!.display_name?.startsWith("김민재")
-    );
-
-    if (informateB) {
-        const informateBMembers = informateB.map(user => `<@${user.id}>`);
-        boltApp.client.chat.postMessage({
-            channel: event.channel,
-            text: `인포메이트B 멤버들 확인해주세요!\n${informateBMembers.join(', ')}\n`,
-            thread_ts: event.ts,
-        });
-    } else {
-        boltApp.client.chat.postMessage({
-            channel: event.channel,
-            text: `인포메이트B 멤버들을 찾을 수 없습니다.`,
-            thread_ts: event.ts,
-        });
-    }
+    const members = await getAllMembers();
+    const infoMateBMembers = members.filter(member =>
+        member.name === '김소민' ||
+        member.name === '김대의' ||
+        member.name === '정해성' ||
+        member.name === '김민재'
+    )
+    sendMention(infoMateBMembers, event)
 })
 
 boltApp.message('!멘션', async ({event, message}) => {
     try {
         // 메시지 형태 -> !멘션 frontend.beginner
         if ('text' in message) {
+            const members = await getAllMembers();
             const mentionTarget = message.text!.split(' ')[1];
-
             let [track, memberType] = mentionTarget.split('.');
 
+            // 한글.한글 형태인 경우
             if (TRACKS_KOREAN.some(t => t === track) && MEMBER_TYPES_KOREAN.some(t => t === memberType)) {
                 track = TRACK_NAME_KOREAN_MAPPER[track as keyof typeof TRACK_NAME_KOREAN_MAPPER];
                 memberType = MEMBER_TYPES_KOREAN_MAPPER[memberType as keyof typeof MEMBER_TYPES_KOREAN_MAPPER];
@@ -198,39 +144,7 @@ boltApp.message('!멘션', async ({event, message}) => {
                 throw new Error('잘못된 멘션 형식입니다.');
             }
 
-            // 사용자 목록 가져오기
-            const usersList = await getClientUserList();
-
-            const activeUsers = usersList.members!.filter(user => user.deleted === false && user.is_bot === false);
-
-            // 이모지로 상태 표시한 사용자 필터링
-            const memberTypeUsers = match(memberType)
-                .with("beginner", () => activeUsers!.filter((user) => user.profile!.status_emoji !== ":green_apple:" && user.profile!.status_emoji !== ":sparkles:" && user.profile!.status_emoji !== ":apple:" && user.profile!.status_emoji !== ":tangerine:"))
-                .with("regular", () => activeUsers!.filter((user) => user.profile!.status_emoji === ":green_apple:" || user.profile!.status_emoji === ":apple:" || user.profile!.status_emoji === ":tangerine:"))
-                .with("mentor", () => activeUsers!.filter((user) => user.profile!.status_emoji === ":sparkles:"))
-                .otherwise(() => {
-                    throw new Error("잘못된 멘션 형식입니다.");
-                });
-
-            const mentions = memberTypeUsers
-                .filter(user => user.profile!.display_name && user.profile!.display_name.endsWith(TRACK_NAME_MAPPER[track as keyof typeof TRACK_NAME_MAPPER]))
-                .map(user => `<@${user.id}>`);
-
-
-            // 멘션한 사용자가 존재하는 경우, 해당 메시지의 스레드에 멘션
-            if (mentions.length > 0) {
-                await boltApp.client.chat.postMessage({
-                    channel: event.channel,
-                    text: `단체멘션! 해당하는 분들은 메시지를 확인해주세요.\n${mentions.join(', ')}\n`,
-                    thread_ts: event.ts, // 현재 메시지의 스레드 또는 메시지의 타임스탬프를 사용
-                });
-            } else {
-                await boltApp.client.chat.postMessage({
-                    channel: event.channel,
-                    text: `해당하는 멘션 대상이 없습니다.`,
-                    thread_ts: event.ts,
-                });
-            }
+            sendMention(members, event)
         }
     } catch (error) {
         handleMessageEventError({event, error});

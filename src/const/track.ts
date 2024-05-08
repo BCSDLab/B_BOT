@@ -3,7 +3,7 @@ export const TRACKS_LOWERCASE = ["frontend", "backend", "android", "uiux", "ios"
 export const TRACKS_KOREAN = ["프론트엔드", "벡엔드", "안드로이드", "유아이유엑스", "아이오에스", "게임", "프엔", "벡엔", "안드"] as const;
 
 export const TRACK_NAME_MAPPER = {
-    "frontend": "FrontEnd",
+    "FrontEnd": "FrontEnd",
     "backend": "BackEnd",
     "android": "Android",
     "uiux": "UI/UX",
@@ -14,21 +14,21 @@ export const TRACK_NAME_MAPPER = {
 } as const;
 
 export const TRACK_NAME_KOREAN_MAPPER = {
-    "프론트엔드": "frontend",
-    "벡엔드": "backend",
-    "안드로이드": "android",
-    "유아이유엑스": "uiux",
-    "아이오에스": "ios",
-    "게임": "game",
-    "프엔": "frontend",
-    "벡엔": "backend",
-    "안드": "android",
+    "프론트엔드": "FrontEnd",
+    "벡엔드": "BackEnd",
+    "안드로이드": "Android",
+    "유아이유엑스": "UI/UX",
+    "아이오에스": "iOS",
+    "게임": "Game",
+    "프엔": "FrontEnd",
+    "벡엔": "BackEnd",
+    "안드": "Android",
 } as const;
 
 export const MEMBER_TYPES_KOREAN_MAPPER = {
-    "비기너": "beginner",
-    "레귤러": "regular",
-    "멘토": "mentor"
+    "비기너": "BEGINNER",
+    "레귤러": "REGULAR",
+    "멘토": "MENTOR"
 }
 export const MEMBER_TYPES_LOWERCASE = ["beginner", "regular", "mentor"] as const;
 
