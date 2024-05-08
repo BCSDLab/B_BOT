@@ -96,6 +96,8 @@ export interface BcsdMember {
 }
 
 function toSlackMentions(members: BcsdMember[]): string[] {
+    console.log('변환!!!')
+    members.forEach((member) => console.log(member))
     return members.map((member: BcsdMember) => `<@${member.slack_id}>`);
 }
 
@@ -115,34 +117,42 @@ async function getMentionTargetMembers(team: Team, track: Track, memberType: Mem
                   AND m.is_deleted = 0;`
 
     let members: BcsdMember[] = await query(sql).then((result) => result.rows);
+    console.log('쿼리호출!!')
+    members.forEach((member) => console.log(member))
 
     // 모든 트랙, 모든 팀 호출, 모든 타입 호출
     if (track === 'all' && team == 'all' && memberType == 'all') {
+        members.forEach((member) => console.log(member))
         return toSlackMentions(members);
     }
 
     if (team === 'all' && memberType == 'all') {
         let filtered = members.filter((member: BcsdMember) => member.track_name === track);
+        filtered.forEach((member) => console.log(member))
         return toSlackMentions(filtered);
     }
 
     if (track === 'all' && memberType == 'all') {
         let filtered = members.filter((member: BcsdMember) => member.team_name === team);
+        filtered.forEach((member) => console.log(member))
         return toSlackMentions(filtered);
     }
 
     if (track === 'all') {
         let filtered = members.filter((member: BcsdMember) => member.team_name === team && member.member_type === memberType);
+        filtered.forEach((member) => console.log(member))
         return toSlackMentions(filtered);
     }
 
     if (team === 'all') {
         let filtered = members.filter((member: BcsdMember) => member.track_name === track && member.member_type === memberType);
+        filtered.forEach((member) => console.log(member))
         return toSlackMentions(filtered);
     }
 
     if (memberType === 'all') {
         let filtered = members.filter((member: BcsdMember) => member.team_name === team && member.track_name === track);
+        filtered.forEach((member) => console.log(member))
         return toSlackMentions(filtered);
     }
 
@@ -152,6 +162,7 @@ async function getMentionTargetMembers(team: Team, track: Track, memberType: Mem
         && member.track_name === track
     );
 
+    filtered.forEach((member) => console.log(member))
     return toSlackMentions(filtered);
 }
 
