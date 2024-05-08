@@ -14,4 +14,4 @@ export type Track =
 
 export type Team = 'Business' | 'Campus' | 'User' | 'all';
 
-export type MemberType = 'Beginner' | 'Regular' | 'Mentor' | 'all';
+export type MemberType = 'BEGINNER' | 'REGULAR' | 'MENTOR' | 'all';

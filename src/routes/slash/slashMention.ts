@@ -121,12 +121,12 @@ async function getMentionTargetMembers(team: Team, track: Track, memberType: Mem
     members.forEach((member) => console.log(member))
 
     // 모든 트랙, 모든 팀 호출, 모든 타입 호출
-    if (track === 'all' && team == 'all' && memberType == 'all') {
+    if (track === 'all' && team === 'all' && memberType == 'all') {
         members.forEach((member) => console.log(member))
         return toSlackMentions(members);
     }
 
-    if (team === 'all' && memberType == 'all') {
+    if (team === 'all' && memberType === 'all') {
         let filtered = members.filter((member: BcsdMember) => member.track_name === track);
         filtered.forEach((member) => console.log(member))
         return toSlackMentions(filtered);
@@ -211,56 +211,56 @@ const 그룹맨션_모달_뷰 = {
                             type: "plain_text",
                             text: "FrontEnd"
                         },
-                        value: "frontend"
+                        value: "FrontEnd"
                     },
                     {
                         text: {
                             type: "plain_text",
                             text: "BackEnd"
                         },
-                        value: "backend"
+                        value: "BackEnd"
                     },
                     {
                         text: {
                             type: "plain_text",
                             text: "Android"
                         },
-                        value: "android"
+                        value: "Android"
                     },
                     {
                         text: {
                             type: "plain_text",
                             text: "UI/UX"
                         },
-                        value: "uiux"
+                        value: "UI/UX"
                     },
                     {
                         text: {
                             type: "plain_text",
                             text: "Game"
                         },
-                        value: "game"
+                        value: "Game"
                     },
                     {
                         text: {
                             type: "plain_text",
                             text: "iOS"
                         },
-                        value: "ios"
+                        value: "iOS"
                     },
                     {
                         text: {
                             type: "plain_text",
                             text: "Product Manager"
                         },
-                        value: "pm"
+                        value: "PM"
                     },
                     {
                         text: {
                             type: "plain_text",
                             text: "Data Analyst"
                         },
-                        value: "da"
+                        value: "Data"
                     }
                 ]
             },
@@ -295,21 +295,21 @@ const 그룹맨션_모달_뷰 = {
                             type: "plain_text",
                             text: "Business Team"
                         },
-                        value: "business"
+                        value: "Business"
                     },
                     {
                         text: {
                             type: "plain_text",
                             text: "Campus Team"
                         },
-                        value: "campus"
+                        value: "Campus"
                     },
                     {
                         text: {
                             type: "plain_text",
                             text: "User Team"
                         },
-                        value: "user"
+                        value: "User"
                     },
                 ]
             },
@@ -329,7 +329,7 @@ const 그룹맨션_모달_뷰 = {
                         type: "plain_text",
                         text: "Regular"
                     },
-                    value: "regular"
+                    value: "REGULAR"
                 },
                 options: [
                     {
@@ -344,21 +344,21 @@ const 그룹맨션_모달_뷰 = {
                             type: "plain_text",
                             text: "Mentor"
                         },
-                        value: "mentor"
+                        value: "MENTOR"
                     },
                     {
                         text: {
                             type: "plain_text",
                             text: "Regular"
                         },
-                        value: "regular"
+                        value: "REGULAR"
                     },
                     {
                         text: {
                             type: "plain_text",
                             text: "Beginner"
                         },
-                        value: "beginner"
+                        value: "BEGINNER"
                     },
                 ]
             },
