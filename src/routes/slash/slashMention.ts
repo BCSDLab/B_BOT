@@ -56,9 +56,18 @@ boltApp.command('/멘션', async ({ack, client, respond, command}) => {
 boltApp.view({callback_id: 그룹맨션_callback_id, type: 'view_submission'}, async ({ack, view, client, respond}) => {
     try {
         await ack();
+        console.log(view['state']['values']['track']['track_select']['selected_option'])
+        console.log(view['state']['values']['team']['team_select']['selected_option'])
+        console.log(view['state']['values']['member_type']['member_type_select']['selected_option'])
+
         const track = view['state']['values']['track']['track_select']['selected_option']?.value as Track;
         const team = view['state']['values']['team']['team_select']['selected_option']?.value as Team;
         const memberType = view['state']['values']['member_type']['member_type_select']['selected_option']?.value as MemberType;
+
+        console.log('----- as 끝난 이후 =-----')
+        console.log(view['state']['values']['track']['track_select']['selected_option'])
+        console.log(view['state']['values']['team']['team_select']['selected_option'])
+        console.log(view['state']['values']['member_type']['member_type_select']['selected_option'])
 
         const {channel_id, ts, userId} = JSON.parse(view['private_metadata']);
         const selectedMember = await getMentionTargetMembers(team, track, memberType);
