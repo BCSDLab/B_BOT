@@ -1,5 +1,6 @@
 import mysql from "mysql2";
 import dotenv from "dotenv";
+import {Team} from "../../models/mention";
 
 dotenv.config();
 
@@ -20,7 +21,7 @@ export interface ResultSet {
     fields: any,
 }
 
-export const query = async function (query: string, values?: any[]): Promise<ResultSet> {
+export const query = async function (query: string, values?: any): Promise<ResultSet> {
     let conn = await getConn();
     let [rows, fields] = await conn.query(query, values);
     conn.release();

@@ -5,6 +5,7 @@ import {BCSD_ACTIVE_MEMBER_LIST, MEMBER_TYPES_LOWERCASE, TRACK_NAME_MAPPER, TRAC
 import {getClientUserList} from '../../api/user';
 import {match} from 'ts-pattern';
 import findMentionMessage from '../../utils/findMentionMessage';
+import {query, ResultSet} from "../../config/mysql";
 
 const slashMentionRouter = express.Router();
 
@@ -55,146 +56,101 @@ boltApp.command('/멘션', async ({ack, client, respond, command}) => {
 boltApp.view({callback_id: 그룹맨션_callback_id, type: 'view_submission'}, async ({ack, view, client, respond}) => {
     try {
         await ack();
-        const track = view['state']['values']['track']['track_select']['selected_option']?.value as Track | 'all' | 'client';
-        const team = view['state']['values']['team']['team_select']['selected_option']?.value as Team | 'all';
-        const member_type = view['state']['values']['member_type']['member_type_select']['selected_option']?.value as MemberType | 'all';
+        const track = view['state']['values']['track']['track_select']['selected_option']?.value as Track;
+        const team = view['state']['values']['team']['team_select']['selected_option']?.value as Team;
+        const memberType = view['state']['values']['member_type']['member_type_select']['selected_option']?.value as MemberType;
 
         const {channel_id, ts, userId} = JSON.parse(view['private_metadata']);
+        const selectedMember = await getMentionTargetMembers(team, track, memberType);
 
-        if (team !== "all") {
-            const selectedMember = await mentionUsersByTeamAndTrack(team, track);
-            if (selectedMember.length > 0) {
-                client.chat.postMessage({
-                    channel: channel_id,
-                    text: `<@${userId}>님의 ${team}팀 ${track === 'all' ? '모든 트랙' : `${track}트랙`} 단체멘션!\n${selectedMember.join(', ')}\n확인 부탁드립니다 :dancing_toad:`,
-                    thread_ts: ts,
-                });
-            } else {
-                client.chat.postMessage({
-                    channel: channel_id,
-                    text: '해당하는 인원이 없습니다.',
-                    thread_ts: ts,
-                });
-            }
+        if (selectedMember.length > 0) {
+            let trackText = `${track === 'all' ? '' : `${track}트랙`}`;
+            let teamText = `${team === 'all' ? '' : `${team}팀`}`;
+            let memberTypeText = `${memberType === 'all' ? '' : `${memberType}`}`;
+            await client.chat.postMessage({
+                channel: channel_id,
+                text: `<@${userId}>님의  ${teamText} ${trackText} ${memberTypeText} 단체멘션!\n${selectedMember.join(', ')}\n확인 부탁드립니다 :dancing_toad:`,
+                thread_ts: ts,
+            });
         } else {
-            //팀이 전체인 경우
-            if (
-                (!track && !member_type) ||
-                !TRACKS_LOWERCASE.some(t => t === track) ||
-                !MEMBER_TYPES_LOWERCASE.some(t => t === member_type)
-            ) {
-                throw new Error('잘못된 멘션 형식입니다.');
-            }
-
-            // 사용자 목록 가져오기
-            const usersList = await getClientUserList();
-
-            const activeUsers = usersList.members!.filter(user => user.deleted === false && user.is_bot === false);
-
-            // 이모지로 상태 표시한 사용자 필터링
-            const memberTypeUsers = match(member_type)
-                .with("beginner", () => activeUsers!.filter((user) => user.profile!.status_emoji !== ":green_apple:" && user.profile!.status_emoji !== ":sparkles:" && user.profile!.status_emoji !== ":apple:" && user.profile!.status_emoji !== ":tangerine:"))
-                .with("regular", () => activeUsers!.filter((user) => user.profile!.status_emoji === ":green_apple:" || user.profile!.status_emoji === ":apple:" || user.profile!.status_emoji === ":tangerine:"))
-                .with("mentor", () => activeUsers!.filter((user) => user.profile!.status_emoji === ":sparkles:"))
-                .otherwise(() => {
-                    throw new Error("잘못된 멘션 형식입니다.");
-                });
-
-            const mentionMessage = findMentionMessage(track, member_type);
-
-            let selectedMember: string [] = []
-            if (track === 'client') {
-                const clientTracks = ['frontend', 'android', 'ios'];
-                selectedMember = memberTypeUsers
-                    .filter(user => user.profile!.display_name &&
-                        clientTracks.some(clienttrack => user.profile!.display_name!.endsWith(TRACK_NAME_MAPPER[clienttrack as keyof typeof TRACK_NAME_MAPPER]))
-                    )
-                    .map(user => `<@${user.id}>`);
-            } else {
-                selectedMember = memberTypeUsers
-                    .filter(user => user.profile!.display_name && user.profile!.display_name.endsWith(TRACK_NAME_MAPPER[track as keyof typeof TRACK_NAME_MAPPER]))
-                    .map(user => `<@${user.id}>`);
-            }
-
-            if (selectedMember.length > 0) {
-                client.chat.postMessage({
-                    channel: channel_id,
-                    text: `<@${userId}>님의 ${mentionMessage} 단체멘션!\n${selectedMember.join(', ')}\n확인 부탁드립니다 :dancing_toad:`,
-                    thread_ts: ts,
-                });
-            } else {
-                client.chat.postMessage({
-                    channel: channel_id,
-                    text: '해당하는 인원이 없습니다.',
-                    thread_ts: ts,
-                });
-            }
+            await client.chat.postMessage({
+                channel: channel_id,
+                text: '해당하는 인원이 없습니다.',
+                thread_ts: ts,
+            });
         }
-
     } catch (error) {
-        respond(`에러 발생: ${error}`);
+        await respond(`에러 발생: ${error}`);
     }
 });
 
-async function mentionUsersByTeamAndTrack(team: Team, track: Track | 'all' | 'client') {
-    // 팀과 트랙으로 이름 목록 가져오기
-    const names = getNamesByTeamAndTrack(team, track);
-
-    // 사용자 목록 가져오기
-    const usersList = await getClientUserList();
-
-    const activeUsers = usersList.members!.filter(user => !user.deleted && !user.is_bot);
-
-    // 비어있는 트랙 식별
-    const emptyTracks = Object.entries(BCSD_ACTIVE_MEMBER_LIST).flatMap(([teamKey, trackList]) =>
-        Object.entries(trackList).filter(([trackKey, members]) => members.length === 0 && teamKey === team && trackKey === track).map(([track]) => track)
-    );
-
-    const emptyTrackDisplayNames = emptyTracks.map(track => TRACK_NAME_MAPPER[track as keyof typeof TRACK_NAME_MAPPER]);
-
-    // 비어있는 트랙 이름으로 끝나는 사용자 제외
-    const filteredUsers = activeUsers.filter(user => {
-        const displayName = user.profile?.display_name;
-        return !emptyTrackDisplayNames.some(emptyTrackDisplayName => displayName?.endsWith(emptyTrackDisplayName));
-    });
-
-    // 이름 목록에 있는 각 이름으로 시작하는 사용자의 ID 찾기
-    const mentions = names.flatMap((name: string) =>
-        filteredUsers
-            .filter(user => user.profile!.display_name && user.profile!.display_name.startsWith(name))
-            .map(user => `<@${user.id}>`)
-    );
-
-    return mentions;
+export interface BcsdMember {
+    name: string,
+    slackId: string,
+    teamName: Team,
+    trackName: Track,
+    memberType: MemberType
 }
 
-// 팀과 트랙 정보로부터 이름 목록 가져오기
-function getNamesByTeamAndTrack(team: Team, track: Track | 'all' | 'client') {
-    // 팀 이름 유효성 확인
-    if (!['all', 'business', 'campus', 'user'].includes(team)) {
-        throw new Error('잘못된 팀 이름입니다.');
+function toSlackMentions(members: ResultSet): string[] {
+    return members.rows.map((member: BcsdMember) => `<@${member.slackId}>`);
+}
+
+async function getMentionTargetMembers(team: Team, track: Track, memberType: MemberType): Promise<string[]> {
+
+    // DB에서 모든 유저를 가져온다.
+    let sql = `SELECT m.name        AS name,
+                       m.slack_id    AS slack_id,
+                       t.name        AS team_name,
+                       tr.name       AS track_name,
+                       m.member_type AS member_type
+                FROM member m
+                         LEFT JOIN team_map tm ON m.id = tm.member_id
+                         LEFT JOIN team t ON tm.team_id = t.id
+                         LEFT JOIN track tr ON m.track_id = tr.id
+                WHERE m.slack_id IS NOT NULL
+                  AND m.is_deleted = 0;`
+
+    let members: ResultSet = await query(sql);
+
+    // 모든 트랙, 모든 팀 호출, 모든 타입 호출
+    if (track === 'all' && team == 'all' && memberType == 'all') {
+        return toSlackMentions(members);
     }
 
-    // 트랙 이름 유효성 확인
-    if (!['all', 'frontend', 'backend', 'android', 'ios', 'uiux', 'pm', 'da', 'game', 'client'].includes(track)) {
-        throw new Error('잘못된 트랙 이름입니다.');
+    if (team === 'all' && memberType == 'all') {
+        let filtered = members.rows.filter((member: BcsdMember) => member.trackName === track);
+        return toSlackMentions(filtered);
     }
 
-    // 트랙이 'all'일 경우, 해당 팀의 모든 트랙에 대한 사람들의 이름 반환
+    if (track === 'all' && memberType == 'all') {
+        let filtered = members.rows.filter((member: BcsdMember) => member.teamName === team);
+        return toSlackMentions(filtered);
+    }
+
     if (track === 'all') {
-        return Object.values(BCSD_ACTIVE_MEMBER_LIST[team]).flat();
+        let filtered = members.rows.filter((member: BcsdMember) => member.teamName === team && member.memberType === memberType);
+        return toSlackMentions(filtered);
     }
 
-    // 트랙이 'client'일 경우, 'frontend', 'android', 'ios' 트랙의 사람들의 이름 반환
-    if (track === 'client') {
-        const clientTracks = ['frontend', 'android', 'ios'];
-        return clientTracks.flatMap(trk => BCSD_ACTIVE_MEMBER_LIST[team][trk as keyof typeof BCSD_ACTIVE_MEMBER_LIST[typeof team]] || []);
+    if (team === 'all') {
+        let filtered = members.rows.filter((member: BcsdMember) => member.trackName === track && member.memberType === memberType);
+        return toSlackMentions(filtered);
     }
 
-    // 특정 팀과 트랙에 해당하는 사람 이름 반환
-    return BCSD_ACTIVE_MEMBER_LIST[team][track] || [];
+    if (memberType === 'all') {
+        let filtered = members.rows.filter((member: BcsdMember) => member.teamName === team && member.trackName === track);
+        return toSlackMentions(filtered);
+    }
+
+    let filtered = members.rows.filter((member: BcsdMember) =>
+        member.teamName === team
+        && member.memberType === memberType
+        && member.trackName === track
+    );
+
+    return toSlackMentions(filtered);
 }
-
 
 const 그룹맨션_모달_뷰 = {
     type: 'modal',

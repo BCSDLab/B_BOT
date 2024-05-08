@@ -1,5 +1,17 @@
-export type Track = 'frontend' | 'backend' | 'android' | 'ios' | 'uiux' | 'pm' | 'da' | 'game';
+export type Track =
+    'FrontEnd'
+    | 'BackEnd'
+    | 'Android'
+    | 'UI/UX'
+    | 'Game'
+    | 'iOS'
+    | 'PS'
+    | 'DevOps'
+    | 'Data'
+    | 'PM'
+    | 'client'
+    | 'all';
 
-export type Team = 'business' | 'campus' | 'user';
+export type Team = 'Business' | 'Campus' | 'User' | 'all';
 
-export type MemberType = 'beginner' | 'regular' | 'mentor';
+export type MemberType = 'Beginner' | 'Regular' | 'Mentor' | 'all';
