@@ -98,7 +98,7 @@ export interface BcsdMember {
     slack_id: string,
     team_name: Team,
     track_name: Track,
-    memberType: MemberType
+    member_type: MemberType
 }
 
 function toSlackMentions(members: ResultSet): string[] {
@@ -141,12 +141,12 @@ async function getMentionTargetMembers(team: Team, track: Track, memberType: Mem
     }
 
     if (track === 'all') {
-        let filtered = members.rows.filter((member: BcsdMember) => member.team_name === team && member.memberType === memberType);
+        let filtered = members.rows.filter((member: BcsdMember) => member.team_name === team && member.member_type === memberType);
         return toSlackMentions(filtered);
     }
 
     if (team === 'all') {
-        let filtered = members.rows.filter((member: BcsdMember) => member.track_name === track && member.memberType === memberType);
+        let filtered = members.rows.filter((member: BcsdMember) => member.track_name === track && member.member_type === memberType);
         return toSlackMentions(filtered);
     }
 
@@ -157,7 +157,7 @@ async function getMentionTargetMembers(team: Team, track: Track, memberType: Mem
 
     let filtered = members.rows.filter((member: BcsdMember) =>
         member.team_name === team
-        && member.memberType === memberType
+        && member.member_type === memberType
         && member.track_name === track
     );
 
