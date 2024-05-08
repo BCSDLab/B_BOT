@@ -61,8 +61,9 @@ boltApp.view({callback_id: 그룹맨션_callback_id, type: 'view_submission'}, a
         const memberType = view['state']['values']['member_type']['member_type_select']['selected_option']?.value as MemberType;
 
         const {channel_id, ts, userId} = JSON.parse(view['private_metadata']);
-        const selectedMember = await getMentionTargetMembers(team, track, memberType);
+        console.log(track, team, memberType)
         console.log(channel_id, ts, userId)
+        const selectedMember = await getMentionTargetMembers(team, track, memberType);
         console.log(selectedMember)
 
         if (selectedMember.length > 0) {
@@ -117,8 +118,10 @@ async function getMentionTargetMembers(team: Team, track: Track, memberType: Mem
                   AND m.is_deleted = 0;`
 
     let members: BcsdMember[] = await query(sql).then((result) => result.rows);
+    console.log('호출 대상!!', team, track, memberType)
     console.log('쿼리호출!!')
     members.forEach((member) => console.log(member))
+
 
     // 모든 트랙, 모든 팀 호출, 모든 타입 호출
     if (track === 'all' && team === 'all' && memberType == 'all') {
