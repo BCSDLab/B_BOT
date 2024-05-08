@@ -122,9 +122,8 @@ async function getMentionTargetMembers(team: Team, track: Track, memberType: Mem
 
     let members: ResultSet = await query(sql);
     console.log('쿼리 실행!')
-    console.log(`쿼리결과 ${members}`)
-    console.log(`쿼리결과 rows: ${members.rows}`)
-    console.log(`쿼리결과 fields: ${members.fields}`)
+    members.rows.forEach((temp: any) => console.log(temp))
+    members.fields.forEach((temp: any) => console.log(temp))
 
     // 모든 트랙, 모든 팀 호출, 모든 타입 호출
     if (track === 'all' && team == 'all' && memberType == 'all') {
