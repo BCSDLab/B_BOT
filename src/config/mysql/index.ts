@@ -11,7 +11,7 @@ const pool = mysql.createPool({
     database: process.env.DB_NAME
 });
 
-export const getConn = async () => {
+const getConn = async () => {
     return pool.promise().getConnection();
 };
 
