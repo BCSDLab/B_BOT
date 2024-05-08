@@ -104,6 +104,7 @@ function toSlackMentions(members: BcsdMember[]): string[] {
 
 async function getMentionTargetMembers(team: Team, track: Track, memberType: MemberType): Promise<string[]> {
 
+    console.log('시작합니다!', team, track, memberType)
     // DB에서 모든 유저를 가져온다.
     let sql = `SELECT m.name        AS name,
                        m.slack_id    AS slack_id,
@@ -116,55 +117,74 @@ async function getMentionTargetMembers(team: Team, track: Track, memberType: Mem
                          LEFT JOIN track tr ON m.track_id = tr.id
                 WHERE m.slack_id IS NOT NULL
                   AND m.is_deleted = 0;`
-
-    let members: BcsdMember[] = await query(sql).then((result) => result.rows);
-    console.log('호출 대상!!', team, track, memberType)
     console.log('쿼리호출!!')
+    console.log('호출 대상!!', team, track, memberType)
+    let members: BcsdMember[] = await query(sql).then((result) => result.rows);
+
+    // members.forEach((member) => console.log(member))
+    //
+    // // 모든 트랙, 모든 팀 호출, 모든 타입 호출
+    // if (track === 'all' && team === 'all' && memberType == 'all') {
+    //     console.log('셋다 all 호출!!!!')
+    //     members.forEach((member) => console.log(member))
+    //     return toSlackMentions(members);
+    // }
+    //
+    // if (track === 'all' && team === 'all') {
+    //     console.log('트랙, 팀 all 호출!!!!', track)
+    //     let filtered = members.filter((member: BcsdMember) => member.member_type === memberType);
+    //     console.log('필터링된 값!!')
+    //     filtered.forEach((member) => console.log(member))
+    //     return toSlackMentions(filtered);
+    // }
+    //
+    // if (team === 'all' && memberType === 'all') {
+    //     console.log('팀, 멤버타입 all 호출!!!!')
+    //     let filtered = members.filter((member: BcsdMember) => member.track_name === track);
+    //     console.log('필터링된 값!!')
+    //     filtered.forEach((member) => console.log(member))
+    //     return toSlackMentions(filtered);
+    // }
+    //
+    // if (track === 'all' && memberType == 'all') {
+    //     console.log('트랙, 멤버타입 all 호출!!!!')
+    //     let filtered = members.filter((member: BcsdMember) => member.team_name === team);
+    //     filtered.forEach((member) => console.log(member))
+    //     return toSlackMentions(filtered);
+    // }
+    //
+    // if (track === 'all') {
+    //     console.log('트랙 all 호출!!!!')
+    //     let filtered = members.filter((member: BcsdMember) => member.team_name === team && member.member_type === memberType);
+    //     console.log('필터링된 값!!')
+    //     filtered.forEach((member) => console.log(member))
+    //     return toSlackMentions(filtered);
+    // }
+    //
+    // if (team === 'all') {
+    //     console.log('팀 all 호출!!!!')
+    //     let filtered = members.filter((member: BcsdMember) => member.track_name === track && member.member_type === memberType);
+    //     console.log('필터링된 값!!')
+    //     filtered.forEach((member) => console.log(member))
+    //     return toSlackMentions(filtered);
+    // }
+    //
+    // if (memberType === 'all') {
+    //     console.log('멤버타입 all 호출!!!!')
+    //     let filtered = members.filter((member: BcsdMember) => member.team_name === team && member.track_name === track);
+    //     console.log('필터링된 값!!')
+    //     filtered.forEach((member) => console.log(member))
+    //     return toSlackMentions(filtered);
+    // }
+    console.log('필터링 전!')
     members.forEach((member) => console.log(member))
 
-
-    // 모든 트랙, 모든 팀 호출, 모든 타입 호출
-    if (track === 'all' && team === 'all' && memberType == 'all') {
-        members.forEach((member) => console.log(member))
-        return toSlackMentions(members);
-    }
-
-    if (team === 'all' && memberType === 'all') {
-        let filtered = members.filter((member: BcsdMember) => member.track_name === track);
-        filtered.forEach((member) => console.log(member))
-        return toSlackMentions(filtered);
-    }
-
-    if (track === 'all' && memberType == 'all') {
-        let filtered = members.filter((member: BcsdMember) => member.team_name === team);
-        filtered.forEach((member) => console.log(member))
-        return toSlackMentions(filtered);
-    }
-
-    if (track === 'all') {
-        let filtered = members.filter((member: BcsdMember) => member.team_name === team && member.member_type === memberType);
-        filtered.forEach((member) => console.log(member))
-        return toSlackMentions(filtered);
-    }
-
-    if (team === 'all') {
-        let filtered = members.filter((member: BcsdMember) => member.track_name === track && member.member_type === memberType);
-        filtered.forEach((member) => console.log(member))
-        return toSlackMentions(filtered);
-    }
-
-    if (memberType === 'all') {
-        let filtered = members.filter((member: BcsdMember) => member.team_name === team && member.track_name === track);
-        filtered.forEach((member) => console.log(member))
-        return toSlackMentions(filtered);
-    }
-
     let filtered = members.filter((member: BcsdMember) =>
-        member.team_name === team
-        && member.member_type === memberType
-        && member.track_name === track
+        (team === 'all' || member.team_name === team) &&
+        (track === 'all' || member.track_name === track) &&
+        (memberType === 'all' || member.member_type === memberType)
     );
-
+    console.log('필터링 후!')
     filtered.forEach((member) => console.log(member))
     return toSlackMentions(filtered);
 }
