@@ -16,6 +16,7 @@ import {getKoinShops} from '../../api/koin';
 import {아이스브레이킹} from '../../const/comment';
 import {BcsdMember, getAllMembers} from "../../utils/member";
 import {KnownEventFromType} from "@slack/bolt";
+import {MemberType} from "../../models/mention";
 
 
 const eventRouter = express.Router();
@@ -126,14 +127,13 @@ boltApp.message('!멘션', async ({event, message}) => {
     try {
         // 메시지 형태 -> !멘션 frontend.beginner
         if ('text' in message) {
-            const members = await getAllMembers();
             const mentionTarget = message.text!.split(' ')[1];
             let [track, memberType] = mentionTarget.split('.');
 
             // 한글.한글 형태인 경우
             if (TRACKS_KOREAN.some(t => t === track) && MEMBER_TYPES_KOREAN.some(t => t === memberType)) {
                 track = TRACK_NAME_KOREAN_MAPPER[track as keyof typeof TRACK_NAME_KOREAN_MAPPER];
-                memberType = MEMBER_TYPES_KOREAN_MAPPER[memberType as keyof typeof MEMBER_TYPES_KOREAN_MAPPER];
+                memberType = MEMBER_TYPES_KOREAN_MAPPER[memberType as keyof typeof MEMBER_TYPES_KOREAN_MAPPER] as MemberType;
             }
 
             if (
@@ -143,8 +143,12 @@ boltApp.message('!멘션', async ({event, message}) => {
             ) {
                 throw new Error('잘못된 멘션 형식입니다.');
             }
-
-            sendMention(members, event)
+            let members = await getAllMembers();
+            let filtered = members.filter((member) =>
+                member.track_name === track ||
+                member.member_type === memberType
+            );
+            sendMention(filtered, event)
         }
     } catch (error) {
         handleMessageEventError({event, error});

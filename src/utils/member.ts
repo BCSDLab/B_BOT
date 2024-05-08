@@ -9,7 +9,6 @@ export interface BcsdMember {
     member_type: MemberType
 }
 
-
 export async function getAllMembers(): Promise<BcsdMember[]> {
     let sql = `SELECT m.name        AS name,
                        m.slack_id    AS slack_id,
