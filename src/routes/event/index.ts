@@ -256,7 +256,7 @@ boltApp.message('!추첨', async ({ event, message }) => {
 
             boltApp.client.chat.postMessage({
                 channel: event.channel,
-                text: `:hand: 이모지를 단 인원중 한명을 추첨한 결과를 발표합니다!\n<@${winner}>님, 선정되셨습니다! 축하합니다! :tada:`,
+                text: `:hand: 이모지를 단 인원 ${participants.length}명 중 한명을 추첨한 결과를 발표합니다!\n<@${winner}>님, 선정되셨습니다! 축하합니다! :tada:`,
                 thread_ts: event.ts,
             });
             return;
