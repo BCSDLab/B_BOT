@@ -233,7 +233,7 @@ boltApp.message('!아이스브레이킹', async ({event}) => {
     }
 });
 
-boltApp.message('!실험추첨', async ({ event, message }) => {
+boltApp.message('!추첨', async ({ event, message }) => {
     try {
         const threadInfo = await boltApp.client.conversations.replies({
             channel: event.channel,
