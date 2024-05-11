@@ -233,4 +233,39 @@ boltApp.message('!아이스브레이킹', async ({event}) => {
     }
 });
 
+boltApp.message('!추첨', async ({event}) => {
+    try {
+        const threadInfo = await boltApp.client.conversations.replies({
+            channel: event.channel,
+            ts: event.ts,
+        });
+        if(threadInfo.ok === true){
+            const participants = threadInfo.messages![0].reactions?.find(reaction => reaction.name === 'hand')?.users;
+            if(participants == null) {
+                boltApp.client.chat.postMessage({
+                    channel: event.channel,
+                    text: `추첨 대상이 없습니다 :cry:`,
+                    thread_ts: event.ts,
+                });  
+                return;
+            }
+
+            const randomIndex = Math.floor(Math.random() * participants.length);
+            const winner = participants[randomIndex];
+
+            boltApp.client.chat.postMessage({
+                channel: event.channel,
+                text: `:hand: 이모지를 단 인원중 한명을 추첨한 결과를 발표합니다!\n<@${winner}>님, 선정되셨습니다! 축하합니다! :tada:`,
+                thread_ts: event.ts,
+            });
+        }
+    } catch (error) {
+        boltApp.client.chat.postMessage({
+            channel: event.channel,
+            text: `추첨을 진행하는 중 오류가 발생했습니다.`,
+            thread_ts: event.ts,
+        });
+    }
+});
+
 export default eventRouter;
