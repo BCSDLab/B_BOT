@@ -37,10 +37,17 @@ export async function getMentionTargetMembers(team: Team, track: Track, memberTy
                 WHERE m.slack_id IS NOT NULL
                   AND m.is_deleted = 0;`
     let members: BcsdMember[] = await query(sql).then((result) => result.rows);
-    let filtered = members.filter((member: BcsdMember) =>
+    
+    let tracks: string[] = [];
+    if (track === 'client') {
+        tracks = ['Frontend', 'Android', 'iOS'];
+    }
+    
+    const filtered: BcsdMember[] = members.filter((member) =>
         (team === 'all' || member.team_name === team) &&
-        (track === 'all' || member.track_name === track) &&
+        (track === 'all' || (track === 'client' ? tracks.includes(member.track_name) : member.track_name === track)) &&
         (memberType === 'all' || member.member_type === memberType)
     );
-    return filtered.map((member: BcsdMember) => `<@${member.slack_id}>`);
+    
+    return filtered.map(member => `<@${member.slack_id}>`);
 }
