@@ -40,7 +40,7 @@ export async function getMentionTargetMembers(team: Team, track: Track, memberTy
     
     let tracks: string[] = [];
     if (track === 'client') {
-        tracks = ['Frontend', 'Android', 'iOS'];
+        tracks = ['FrontEnd', 'Android', 'iOS'];
     }
     
     const filtered: BcsdMember[] = members.filter((member) =>
