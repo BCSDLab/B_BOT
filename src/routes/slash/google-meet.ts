@@ -1,32 +1,20 @@
-// Assuming the necessary type definitions exist or you are willing to create them.
 import * as fs from 'fs/promises';
 import process from 'process';
 import express from 'express';
 import dotenv from 'dotenv';
 import {authenticate} from '@google-cloud/local-auth';
 import {auth, OAuth2Client} from 'google-auth-library';
-// This import assumes @google-apps/meet exists and has TypeScript definitions.
-// If not, you'd need to provide appropriate types or declarations.
 import {SpacesServiceClient} from '@google-apps/meet';
 import {boltApp} from '../../config/boltApp';
 
 const meetingRouter = express.Router();
 dotenv.config();
 
-// If modifying these scopes, delete token.json.
 const SCOPES: string[] = ['https://www.googleapis.com/auth/meetings.space.created'];
 
-// The file token.json stores the user's access and refresh tokens, and is
-// created automatically when the authorization flow completes for the first
-// time.
 const TOKEN_PATH: string = "/home/ubuntu/secret/token.json";
 const CREDENTIALS_PATH: string = "/home/ubuntu/secret/credentials.json";
 
-/**
- * Reads previously authorized credentials from the save file.
- *
- * @return {Promise<OAuth2Client|null>}
- */
 async function loadSavedCredentialsIfExist(): Promise<OAuth2Client | null> {
     try {
         const content: string = await fs.readFile(TOKEN_PATH, {encoding: 'utf8'});
@@ -38,12 +26,6 @@ async function loadSavedCredentialsIfExist(): Promise<OAuth2Client | null> {
     }
 }
 
-/**
- * Serializes credentials to a file compatible with GoogleAuth.fromJSON.
- *
- * @param {OAuth2Client} client
- * @return {Promise<void>}
- */
 async function saveCredentials(client: OAuth2Client): Promise<void> {
     const content: string = await fs.readFile(CREDENTIALS_PATH, {encoding: 'utf8'});
     const keys = JSON.parse(content);
@@ -57,11 +39,6 @@ async function saveCredentials(client: OAuth2Client): Promise<void> {
     await fs.writeFile(TOKEN_PATH, payload);
 }
 
-/**
- * Load or request authorization to call APIs.
- *
- * @return {Promise<OAuth2Client>}
- */
 async function authorize(): Promise<OAuth2Client> {
     let client: OAuth2Client | null = await loadSavedCredentialsIfExist();
     if (client) {
@@ -77,10 +54,6 @@ async function authorize(): Promise<OAuth2Client> {
     return client;
 }
 
-/**
- * Creates a new meeting space.
- * @param {OAuth2Client} authClient An authorized OAuth2 client.
- */
 async function createSpace(authClient: OAuth2Client) {
     const meetClient = new SpacesServiceClient({
         authClient: authClient as any, // TODO: Remove the need for the cast.
@@ -95,8 +68,7 @@ async function createSpace(authClient: OAuth2Client) {
     };
 
     // Run request
-    const response = await meetClient.createSpace(request);
-    return response;
+    return await meetClient.createSpace(request);
 }
 
 boltApp.command('/회의생성', async ({ack, client, command, logger}) => {
@@ -115,7 +87,7 @@ boltApp.command('/회의생성', async ({ack, client, command, logger}) => {
         logger.info(TOKEN_PATH, "토큰패스", CREDENTIALS_PATH, '로그입니다!!!')
         const errorMessage = error instanceof Error ? error.message : '';
         const errorStack = error instanceof Error ? error.stack : '';
-        client.chat.postMessage({
+        await client.chat.postMessage({
             text: `Error: ${errorMessage}\n${errorStack}`,
             channel: command.user_id,
         })
@@ -139,7 +111,7 @@ boltApp.message('회의생성!', async ({event, client, logger}) => {
         logger.info(TOKEN_PATH, "토큰패스", CREDENTIALS_PATH, '로그입니다!!!')
         const errorMessage = error instanceof Error ? error.message : '';
         const errorStack = error instanceof Error ? error.stack : '';
-        client.chat.postMessage({
+        await client.chat.postMessage({
             text: `Error: ${errorMessage}\n${errorStack}`,
             channel: event.channel,
             ts: event.ts
