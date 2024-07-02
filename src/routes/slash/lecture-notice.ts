@@ -19,8 +19,10 @@ lectureNoticeRouter.post('/', (req, res) => {
 
 let threadChannelId = '';
 
-// command - '/'명령을 처리하기 위해 사용
-// ack - 명령 수신확인 메서드, body - 수신한 데이터
+/**
+ * command - '/'명령을 처리하기 위해 사용
+ * ack - 명령 수신확인 메서드, body - 수신한 데이터
+ */
 boltApp.command('/강의공지', async ({ack, client, command, logger}) => {
     await ack();
 
@@ -132,7 +134,7 @@ boltApp.command('/강의공지', async ({ack, client, command, logger}) => {
                                 {
                                     text: {
                                         type: 'plain_text',
-                                        text: '진행 여부',
+                                        text: '온라인',
                                     },
                                     value: 'option',
                                 },

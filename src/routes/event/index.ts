@@ -5,7 +5,7 @@ import {getPRThreadInfo} from '../../api/internal';
 import {getKoinShops} from '../../api/koin';
 import {아이스브레이킹} from '../../const/comment';
 import {ThreadBroadcastMessageEvent} from "@slack/bolt";
-
+import fs from "fs";
 
 const eventRouter = express.Router();
 
@@ -40,12 +40,15 @@ boltApp.event('app_mention', async ({event, say}) => {
 });
 
 boltApp.message('!회칙', async ({event, message, body}) => {
-    await boltApp.client.chat.postMessage({
-        channel: event.channel,
-        attachments: [{
-            title: "BCSD Lab 회칙 ver.2024",
-            title_link: 'https://drive.google.com/file/d/1Cf2D7Cf--O597dKqA3R-ofkpGZ_QGWq7/view'
-        }],
+    const filePath = 'src/image/회칙.pdf';
+    const fileContent = fs.readFileSync(filePath);
+
+    await boltApp.client.files.upload({
+        channels: event.channel,
+        initial_comment: 'BCSD Lab 회칙',
+        file: fileContent,
+        filename: 'BCSD Lab 회칙 ver.2024',
+        filetype: 'pdf',
     });
 });
 

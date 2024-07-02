@@ -1,6 +1,7 @@
 import express from 'express';
 import {boltApp} from '../../config/boltApp';
 import {makeEvent} from '../../config/makeEvent';
+import {channels} from "../../const/channel";
 
 const slashTestRouter = express.Router();
 slashTestRouter.use(express.urlencoded());
@@ -8,7 +9,7 @@ slashTestRouter.use(express.urlencoded());
 slashTestRouter.post('/', async (req, res) => {
     try {
         await boltApp.client.chat.postMessage({
-            channel: 'C06PJ76SAM7',
+            channel: channels.삐봇요청_test,
             text: JSON.stringify(req.body)
         })
 
@@ -25,7 +26,7 @@ slashTestRouter.post('/', async (req, res) => {
 boltApp.command('/test', async ({ack, client, respond, command}) => {
     await ack();
     await boltApp.client.chat.postMessage({
-        channel: 'C06PJ76SAM7',
+        channel: channels.삐봇요청_test,
         text: '테스트 서버 멀쩡함',
     })
 })
