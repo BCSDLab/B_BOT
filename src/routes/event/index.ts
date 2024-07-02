@@ -1,4 +1,3 @@
-// eventRouter.js
 import express from 'express';
 import {boltApp} from '../../config/boltApp';
 import {makeEvent} from '../../config/makeEvent';
@@ -198,7 +197,6 @@ boltApp.message('!점메추', async ({event}) => {
     }
 });
 
-
 boltApp.message('!축하', async ({event}) => {
     try {
         boltApp.client.chat.postMessage({
@@ -233,21 +231,21 @@ boltApp.message('!아이스브레이킹', async ({event}) => {
     }
 });
 
-boltApp.message('!추첨', async ({ event, message }) => {
+boltApp.message('!추첨', async ({event, message}) => {
     try {
         const threadInfo = await boltApp.client.conversations.replies({
             channel: event.channel,
             ts: (message as ThreadBroadcastMessageEvent).thread_ts ?? event.ts,
         });
 
-        if(threadInfo.ok === true){
+        if (threadInfo.ok === true) {
             const participants = threadInfo.messages![0].reactions?.find(reaction => reaction.name === 'hand')?.users;
-            if(participants == null) {
+            if (participants == null) {
                 boltApp.client.chat.postMessage({
                     channel: event.channel,
                     text: `추첨 대상이 없습니다 :cry:`,
                     thread_ts: event.ts,
-                });  
+                });
                 return;
             }
 
@@ -266,7 +264,7 @@ boltApp.message('!추첨', async ({ event, message }) => {
             text: `추첨 대상이 없습니다 :cry:`,
             thread_ts: event.ts,
         });
-        
+
     } catch (error) {
         boltApp.client.chat.postMessage({
             channel: event.channel,

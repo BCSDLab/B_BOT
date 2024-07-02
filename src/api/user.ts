@@ -1,11 +1,9 @@
 import {boltApp} from "../config/boltApp";
 
 export const getClientUserList = async () => {
-    const usersList = await boltApp.client.users.list()!;
-    return usersList;
+    return await boltApp.client.users.list()!;
 }
 
 export const getChannelList = async () => {
-    const channelList = await boltApp.client.conversations.list()!;
-    return channelList;
+    return await boltApp.client.conversations.list()!;
 }

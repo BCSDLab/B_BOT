@@ -2,7 +2,7 @@ import {Request, Response} from "express";
 
 export function makeEvent(req: Request, res: Response) {
     let ackCalled = false;
-    const event = {
+    return {
         body: req.body,
         ack: async (response: any) => {
             if (ackCalled) {
@@ -20,6 +20,4 @@ export function makeEvent(req: Request, res: Response) {
             ackCalled = true;
         }
     };
-
-    return event;
 }

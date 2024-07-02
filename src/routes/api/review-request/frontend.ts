@@ -20,7 +20,9 @@ frontendReviewMenotionRouter.post<any, any, any, RequestBody>('/', async (req, r
         const mentionList = userList.members!.filter((member) => reviewers.some((reviewer) => member.profile!.display_name!.startsWith(reviewer)));
         const writerMember = userList.members!.find((member) => member.profile!.display_name!.startsWith(writer));
 
-        if (mentionList.length === 0) throw new Error('리뷰어를 찾을 수 없습니다!');
+        if (mentionList.length === 0) {
+            throw new Error('리뷰어를 찾을 수 없습니다!');
+        }
 
         const writerMentionString = writerMember ? `<@${writerMember?.id}>` : writer;
         const mentionString = mentionList.map((member) => `<@${member.id}>`).join(', ');

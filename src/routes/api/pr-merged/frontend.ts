@@ -23,7 +23,7 @@ frontendPRMergedRouter.post<any, any, any, RequestBody>('/', async (req, res) =>
         const writerMentionString = writerMember ? `<@${writerMember?.id}>` : writer;
         const mentionString = mentionList.map((member) => `<@${member.id}>`).join(', ');
 
-        boltApp.client.chat.update({
+        await boltApp.client.chat.update({
             ts,
             channel: channels.frontend_github,
             text: '리뷰어가 할당되었습니다! :blob-wave:',

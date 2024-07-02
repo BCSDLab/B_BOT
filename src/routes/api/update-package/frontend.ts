@@ -18,7 +18,7 @@ frontendUpdatePackageRouter.post<any, any, any, RequestBody>('/', async (req, re
         const packageName = 패키지명[repositoryName];
 
         if (!packageName) {
-            boltApp.client.chat.postMessage({
+            await boltApp.client.chat.postMessage({
                 channel: channels.트랙_front_end,
                 text: `패키지가 배포되었지만, 패키지 이름을 찾을 수 없어요., ${repositoryName}, ${packageName}, ${pullRequestLink}, ${pullRequestTitle}, ${version}`,
                 unfurl_links: true,
@@ -27,7 +27,7 @@ frontendUpdatePackageRouter.post<any, any, any, RequestBody>('/', async (req, re
             res.status(500).send(`패키지가 배포되었지만, 패키지 이름을 찾을 수 없어요., ${repositoryName}, ${packageName}, ${pullRequestLink}, ${pullRequestTitle}, ${version}`);
         }
 
-        boltApp.client.chat.postMessage({
+        await boltApp.client.chat.postMessage({
             channel: channels.트랙_front_end,
             text: `\`${packageName}\` 패키지가 업데이트됐어요!`,
             unfurl_links: true,
