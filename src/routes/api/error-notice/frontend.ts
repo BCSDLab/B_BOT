@@ -19,7 +19,7 @@ frontendErrorNoticeRouter.post<any, any, any, RequestBody>('/', async (req, res)
             channel = channels.코인_오류_front_end_stage;
         }
 
-        boltApp.client.chat.postMessage({
+        await boltApp.client.chat.postMessage({
             channel,
             text: ':siren: 클라이언트 에러가 발생했어요 :siren:',
             unfurl_links: true,
