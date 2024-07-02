@@ -1,21 +1,10 @@
 import express from 'express';
 import {boltApp} from '../../config/boltApp';
 import {makeEvent} from '../../config/makeEvent';
-import {handleMessageEventError} from '../../utils/handleEventError';
-import {
-    MEMBER_TYPES_KOREAN,
-    MEMBER_TYPES_KOREAN_MAPPER,
-    MEMBER_TYPES_LOWERCASE,
-    TRACK_NAME_KOREAN_MAPPER,
-    TRACKS_KOREAN,
-    TRACKS_LOWERCASE
-} from '../../const/track';
 import {getPRThreadInfo} from '../../api/internal';
 import {getKoinShops} from '../../api/koin';
 import {아이스브레이킹} from '../../const/comment';
-import {BcsdMember, getAllMembers} from "../../utils/member";
-import {KnownEventFromType, ThreadBroadcastMessageEvent} from "@slack/bolt";
-import {MemberType} from "../../models/mention";
+import {ThreadBroadcastMessageEvent} from "@slack/bolt";
 
 
 const eventRouter = express.Router();
@@ -59,55 +48,6 @@ boltApp.message('!회칙', async ({event, message, body}) => {
             title_link: 'https://drive.google.com/file/d/1Cf2D7Cf--O597dKqA3R-ofkpGZ_QGWq7/view'
         }],
     });
-});
-
-function sendMention(slackBotGroup: BcsdMember[], event: KnownEventFromType<"message">) {
-    if (slackBotGroup) {
-        const slackBotGroupMember = slackBotGroup.map(user => `<@${user.slack_id}>`).join(', ');
-        boltApp.client.chat.postMessage({
-            channel: event.channel,
-            text: `단체멘션! ${slackBotGroupMember} 님 확인해주세요!`,
-            thread_ts: event.ts,
-        });
-    } else {
-        boltApp.client.chat.postMessage({
-            channel: event.channel,
-            text: `조건에 맞는 사용자를 찾을 수 없습니다.`,
-            thread_ts: event.ts,
-        });
-    }
-}
-
-boltApp.message('!멘션', async ({event, message}) => {
-    try {
-        // 메시지 형태 -> !멘션 frontend.beginner
-        if ('text' in message) {
-            const mentionTarget = message.text!.split(' ')[1];
-            let [track, memberType] = mentionTarget.split('.');
-
-            // 한글.한글 형태인 경우
-            if (TRACKS_KOREAN.some(t => t === track) && MEMBER_TYPES_KOREAN.some(t => t === memberType)) {
-                track = TRACK_NAME_KOREAN_MAPPER[track as keyof typeof TRACK_NAME_KOREAN_MAPPER];
-                memberType = MEMBER_TYPES_KOREAN_MAPPER[memberType as keyof typeof MEMBER_TYPES_KOREAN_MAPPER] as MemberType;
-            }
-
-            if (
-                (!track && !memberType) ||
-                !TRACKS_LOWERCASE.some(t => t === track) ||
-                !MEMBER_TYPES_LOWERCASE.some(t => t === memberType)
-            ) {
-                throw new Error('잘못된 멘션 형식입니다.');
-            }
-            let members = await getAllMembers();
-            let filtered = members.filter((member) =>
-                member.track_name === track ||
-                member.member_type === memberType
-            );
-            sendMention(filtered, event)
-        }
-    } catch (error) {
-        handleMessageEventError({event, error});
-    }
 });
 
 boltApp.message('!가위바위보', async ({event}) => {
