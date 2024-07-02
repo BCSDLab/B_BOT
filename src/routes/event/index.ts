@@ -39,7 +39,6 @@ boltApp.event('app_mention', async ({event, say}) => {
     await say(`Hello, <@${event.user}>!`);
 });
 
-// TODO: 90일 지나서 없어짐. 회칙 업데이트가 필요함
 boltApp.message('!회칙', async ({event, message, body}) => {
     await boltApp.client.chat.postMessage({
         channel: event.channel,
