@@ -1,8 +1,9 @@
 import dotenv from 'dotenv';
 import {App} from '@slack/bolt'
 import express from 'express';
+import {LogLevel} from "@slack/web-api";
 
-dotenv.config();  // Load environment variables from .env file 
+dotenv.config();  // Load environment variables from .env file
 
 export const expressApp = express();
 
@@ -13,4 +14,5 @@ export const boltApp = new App({
     appToken: process.env.SLACK_APP_TOKEN!,
     socketMode: true,
     developerMode: true,
+    logLevel: LogLevel.INFO,
 });
