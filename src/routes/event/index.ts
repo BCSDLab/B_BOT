@@ -40,7 +40,7 @@ boltApp.event('app_mention', async ({event, say}) => {
 });
 
 boltApp.message('!회칙', async ({event, message, body}) => {
-    const filePath = 'src/image/회칙.pdf';
+    const filePath = 'src/image/rule.pdf';
     const fileContent = fs.readFileSync(filePath);
 
     await boltApp.client.files.upload({
