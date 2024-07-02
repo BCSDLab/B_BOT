@@ -56,7 +56,7 @@ boltApp.message('!회칙', async ({event, message, body}) => {
         channel: event.channel,
         attachments: [{
             title: "BCSD Lab 회칙 ver.2024",
-            title_link: 'https://bcsdlab.slack.com/files/UKVPYFYP4/F06HEH48TT5/bcsd_lab_________________2024.pdf'
+            title_link: 'https://drive.google.com/file/d/1Cf2D7Cf--O597dKqA3R-ofkpGZ_QGWq7/view'
         }],
     });
 });
