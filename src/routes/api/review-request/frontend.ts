@@ -1,8 +1,8 @@
 import express from 'express';
-import {getClientUserList} from '../../../api/user';
 import {boltApp} from '../../../config/boltApp';
 import {channels} from '../../../const/channel';
 import {postPRThreadInfo} from '../../../api/internal';
+import {BcsdMember, getAllMembers} from "../../../utils/member";
 
 const frontendReviewMentionRouter = express.Router();
 
@@ -16,16 +16,16 @@ frontendReviewMentionRouter.post<any, any, any, RequestBody>('/', async (req, re
     try {
         const {pullRequestLink, reviewers, writer} = req.body;
 
-        const userList = await getClientUserList();
-        const mentionList = userList.members!.filter((member) => reviewers.some((reviewer) => member.profile!.display_name!.startsWith(reviewer)));
-        const writerMember = userList.members!.find((member) => member.profile!.display_name!.startsWith(writer));
+        const userList: BcsdMember[] = await getAllMembers();
+        const mentionList = userList.filter((member) => reviewers.some((reviewer) => member.name == reviewer && member.track_name === "FrontEnd"));
+        const writerMember = userList.find((member) => member.name === writer);
 
         if (mentionList.length === 0) {
             throw new Error('리뷰어를 찾을 수 없습니다!');
         }
 
-        const writerMentionString = writerMember ? `<@${writerMember?.id}>` : writer;
-        const mentionString = mentionList.map((member) => `<@${member.id}>`).join(', ');
+        const writerMentionString = writerMember ? `<@${writerMember.slack_id}>` : writer;
+        const mentionString = mentionList.map((member) => `<@${member.slack_id}>`).join(', ');
 
         const result = await boltApp.client.chat.postMessage({
             channel: channels.frontend_github,

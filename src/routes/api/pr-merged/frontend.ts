@@ -3,6 +3,7 @@ import {boltApp} from '../../../config/boltApp';
 import {channels} from '../../../const/channel';
 import {getPRThreadInfo} from '../../../api/internal';
 import {getClientUserList} from '../../../api/user';
+import {getAllMembers} from "../../../utils/member";
 
 const frontendPRMergedRouter = express.Router();
 
@@ -15,13 +16,13 @@ frontendPRMergedRouter.post<any, any, any, RequestBody>('/', async (req, res) =>
         const {pullRequestLink} = req.body;
 
         const {data: {reviewers, ts, writer}} = await getPRThreadInfo({pullRequestLink});
-        const userList = await getClientUserList();
+        const userList = await getAllMembers()
 
-        const mentionList = userList.members!.filter((member) => reviewers.some((reviewer) => member.profile!.display_name!.startsWith(reviewer)));
-        const writerMember = userList.members!.find((member) => member.profile!.display_name!.startsWith(writer));
+        const mentionList = userList.filter((member) => reviewers.some((reviewer) => member.name == reviewer && member.track_name === "FrontEnd"));
+        const writerMember = userList.find((member) => member.name === writer);
 
-        const writerMentionString = writerMember ? `<@${writerMember?.id}>` : writer;
-        const mentionString = mentionList.map((member) => `<@${member.id}>`).join(', ');
+        const writerMentionString = writerMember ? `<@${writerMember.slack_id}>` : writer;
+        const mentionString = mentionList.map((member) => `<@${member.slack_id}>`).join(', ');
 
         await boltApp.client.chat.update({
             ts,

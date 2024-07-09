@@ -16,9 +16,8 @@ backendPRMergedRouter.post<any, any, any, RequestBody>('/', async (req, res) => 
 
         const {data: {reviewers, ts, writer}} = await getPRThreadInfo({pullRequestLink});
         const userList = await getAllMembers()
-        // mention 대상이 되는 인원들
+
         const mentionList = userList.filter((member) => reviewers.some((reviewer) => member.name == reviewer && member.track_name === "BackEnd"));
-        // PR을 작성한 인원
         const writerMember = userList.find((member) => member.name === writer);
 
         const writerMentionString = writerMember ? `<@${writerMember.slack_id}>` : writer;
