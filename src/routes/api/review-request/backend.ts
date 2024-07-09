@@ -1,10 +1,10 @@
 import express from 'express';
-import {getClientUserList} from '../../../api/user';
 import {boltApp} from '../../../config/boltApp';
 import {channels} from '../../../const/channel';
 import {postPRThreadInfo} from '../../../api/internal';
+import {BcsdMember, getAllMembers} from "../../../utils/member";
 
-const frontendReviewMentionRouter = express.Router();
+const backendReviewMentionRouter = express.Router();
 
 interface RequestBody {
     pullRequestLink: string,
@@ -12,23 +12,26 @@ interface RequestBody {
     writer: string
 }
 
-frontendReviewMentionRouter.post<any, any, any, RequestBody>('/', async (req, res) => {
+// github action 상에서 랜덤 리뷰어가 지정되어 API로 내려온다.
+backendReviewMentionRouter.post<any, any, any, RequestBody>('/', async (req, res) => {
     try {
         const {pullRequestLink, reviewers, writer} = req.body;
 
-        const userList = await getClientUserList();
-        const mentionList = userList.members!.filter((member) => reviewers.some((reviewer) => member.profile!.display_name!.startsWith(reviewer)));
-        const writerMember = userList.members!.find((member) => member.profile!.display_name!.startsWith(writer));
+        const userList: BcsdMember[] = await getAllMembers();
+        // mention 대상이 되는 인원들
+        const mentionList = userList.filter((member) => reviewers.some((reviewer) => member.name == reviewer && member.track_name === "BackEnd"));
+        // PR을 작성한 인원
+        const writerMember = userList.find((member) => member.name === writer);
 
         if (mentionList.length === 0) {
             throw new Error('리뷰어를 찾을 수 없습니다!');
         }
 
-        const writerMentionString = writerMember ? `<@${writerMember?.id}>` : writer;
-        const mentionString = mentionList.map((member) => `<@${member.id}>`).join(', ');
+        const writerMentionString = writerMember ? `<@${writerMember.slack_id}>` : writer;
+        const mentionString = mentionList.map((member) => `<@${member.slack_id}>`).join(', ');
 
         const result = await boltApp.client.chat.postMessage({
-            channel: channels.frontend_github,
+            channel: channels.backend_github,
             text: '리뷰어가 할당되었습니다! :blob-wave:',
             unfurl_links: true,
             blocks: [
@@ -62,4 +65,4 @@ frontendReviewMentionRouter.post<any, any, any, RequestBody>('/', async (req, re
     }
 });
 
-export default frontendReviewMentionRouter;
+export default backendReviewMentionRouter;
