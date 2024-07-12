@@ -18,7 +18,7 @@ frontendReviewMentionRouter.post<any, any, any, RequestBody>('/', async (req, re
 
         const userList: BcsdMember[] = await getAllMembers();
         const mentionList = userList.filter((member) => reviewers.some((reviewer) => member.name == reviewer && member.track_name === "FrontEnd"));
-        const writerMember = userList.find((member) => member.name === writer);
+        const writerMember = userList.find((member) => member.name === writer && member.track_name === "FrontEnd");
 
         if (mentionList.length === 0) {
             throw new Error('리뷰어를 찾을 수 없습니다!');
