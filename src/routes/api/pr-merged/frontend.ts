@@ -19,7 +19,7 @@ frontendPRMergedRouter.post<any, any, any, RequestBody>('/', async (req, res) =>
         const userList = await getAllMembers()
 
         const mentionList = userList.filter((member) => reviewers.some((reviewer) => member.name == reviewer && member.track_name === "FrontEnd"));
-        const writerMember = userList.find((member) => member.name === writer);
+        const writerMember = userList.find((member) => member.name === writer && member.track_name === "FrontEnd");
 
         const writerMentionString = writerMember ? `<@${writerMember.slack_id}>` : writer;
         const mentionString = mentionList.map((member) => `<@${member.slack_id}>`).join(', ');
