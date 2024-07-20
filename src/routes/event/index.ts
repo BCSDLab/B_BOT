@@ -181,7 +181,7 @@ boltApp.message('@', async ({event, message }) => {
         });
         await boltApp.client.chat.postMessage({
             channel: event.channel,
-            text: `${JSON.stringify(event)}, ${JSON.stringify(message)}, ${JSON.stringify(threadInfo)}`,
+            text: `${(message as ThreadBroadcastMessageEvent).text}`,
             thread_ts: event.ts,
         })
         
