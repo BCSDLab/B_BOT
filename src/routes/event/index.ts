@@ -198,7 +198,7 @@ boltApp.message('@', async ({event, message }) => {
             if (mentionCount >= 2) {
                 clearInterval(mentionInterval);
             }
-        }, 1000);
+        }, 5000);
 
     } catch (error) {
         await boltApp.client.chat.postMessage({
