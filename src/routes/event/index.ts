@@ -184,20 +184,21 @@ boltApp.message('@', async ({event, message }) => {
             text: `${(message as ThreadBroadcastMessageEvent).text}`,
             thread_ts: event.ts,
         })
-        
-
-        if (threadInfo.ok) {
-            const participants = threadInfo.messages![0];
-            if (participants == null) {
+        let mentionCount = 0;
+        const mentionInterval = setInterval(async () => {
+            mentionCount++;
+            if (threadInfo.ok) {
+                const participants = threadInfo.messages![0].reactions;
                 await boltApp.client.chat.postMessage({
                     channel: event.channel,
-                    text: `${participants}`,
+                    text: `${JSON.stringify(participants)}`,
                     thread_ts: event.ts,
-                });
-                return;
+                })
             }
-            return;
-        }
+            if (mentionCount >= 2) {
+                clearInterval(mentionInterval);
+            }
+        }, 1800000); // 1800000 밀리초 = 30분
 
     } catch (error) {
         await boltApp.client.chat.postMessage({
