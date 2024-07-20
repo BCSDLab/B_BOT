@@ -175,15 +175,16 @@ boltApp.message('!추첨', async ({event, message}) => {
 //멘션 반응확인
 boltApp.message('@', async ({event, message}) => {
     try {
-        await boltApp.client.chat.postMessage({
-            channel: event.channel,
-            text: `멘션찾기`,
-            thread_ts: event.ts,
-        })
         const threadInfo = await boltApp.client.conversations.replies({
             channel: event.channel,
             ts: (message as ThreadBroadcastMessageEvent).thread_ts ?? event.ts,
         });
+        await boltApp.client.chat.postMessage({
+            channel: event.channel,
+            text: `${message}`,
+            thread_ts: event.ts,
+        })
+        
 
         if (threadInfo.ok) {
             const participants = threadInfo.messages![0];
