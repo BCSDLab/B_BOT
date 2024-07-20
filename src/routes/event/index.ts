@@ -172,4 +172,33 @@ boltApp.message('!추첨', async ({event, message}) => {
     }
 });
 
+//멘션 반응확인
+boltApp.message('@', async ({event, message}) => {
+    try {
+        const threadInfo = await boltApp.client.conversations.replies({
+            channel: event.channel,
+            ts: (message as ThreadBroadcastMessageEvent).thread_ts ?? event.ts,
+        });
+
+        if (threadInfo.ok) {
+            const participants = threadInfo.messages![0];
+            if (participants == null) {
+                await boltApp.client.chat.postMessage({
+                    channel: event.channel,
+                    text: `${participants}`,
+                    thread_ts: event.ts,
+                });
+                return;
+            }
+            return;
+        }
+
+    } catch (error) {
+        await boltApp.client.chat.postMessage({
+            channel: event.channel,
+            text: `멘션을 찾는 중 에러 발생`,
+            thread_ts: event.ts,
+        });
+    }
+});
 export default eventRouter;
