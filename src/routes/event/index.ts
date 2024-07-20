@@ -173,7 +173,7 @@ boltApp.message('!추첨', async ({event, message}) => {
 });
 
 //멘션 반응확인
-boltApp.message('@', async ({event, message}) => {
+boltApp.message('@', async ({event, message }) => {
     try {
         const threadInfo = await boltApp.client.conversations.replies({
             channel: event.channel,
@@ -181,7 +181,7 @@ boltApp.message('@', async ({event, message}) => {
         });
         await boltApp.client.chat.postMessage({
             channel: event.channel,
-            text: `${message}`,
+            text: `${JSON.stringify(event)}, ${JSON.stringify(message)}, ${JSON.stringify(threadInfo)}`,
             thread_ts: event.ts,
         })
         
