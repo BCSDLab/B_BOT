@@ -77,7 +77,7 @@ boltApp.view({ callback_id: '그룹맨션_callback_id', type: 'view_submission' 
         });
 
         if (threadInfo.ok) {
-          const originalMessage = threadInfo.messages?.[0];
+          const originalMessage = threadInfo.messages![0];
           if (!originalMessage) return;
 
           const checkedUsers = new Set(originalMessage.reactions?.find(reaction => reaction.name === 'white_check_mark')?.users || []);
