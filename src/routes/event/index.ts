@@ -214,7 +214,6 @@ boltApp.message('!축하테스트', async ({event}) => {
         await boltApp.client.chat.postMessage({
             channel: 'C06PJ76SAM7',
             text: `:tada:테스트입니당:tada:`,
-            thread_ts: 'C06PJ76SAM7',
         });
     } catch (error) {
         await boltApp.client.chat.postMessage({
