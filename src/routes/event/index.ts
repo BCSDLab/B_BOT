@@ -208,4 +208,20 @@ boltApp.message('!추첨', async ({event, message}) => {
 //         });
 //     }
 // });
+
+boltApp.message('!축하테스트', async ({event}) => {
+    try {
+        await boltApp.client.chat.postMessage({
+            channel: 'C06PJ76SAM7',
+            text: `:tada:테스트입니당:tada:`,
+            thread_ts: event.ts,
+        });
+    } catch (error) {
+        await boltApp.client.chat.postMessage({
+            channel: event.channel,
+            text: `어라 삐봇의 상태가`,
+            thread_ts: event.ts,
+        });
+    }
+});
 export default eventRouter;
