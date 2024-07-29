@@ -49,36 +49,60 @@ boltApp.command('/멘션', async ({ack, client, respond, command}) => {
     }
 });
 
-boltApp.view({callback_id: 그룹맨션_callback_id, type: 'view_submission'}, async ({ack, view, client, respond}) => {
-    try {
-        await ack();
-        const track = view['state']['values']['track']['track_select']['selected_option']?.value as Track;
-        const team = view['state']['values']['team']['team_select']['selected_option']?.value as Team;
-        const memberType = view['state']['values']['member_type']['member_type_select']['selected_option']?.value as MemberType;
+boltApp.view({ callback_id: '그룹맨션_callback_id', type: 'view_submission' }, async ({ ack, view, client, respond }) => {
+  try {
+    await ack();
+    const track = view['state']['values']['track']['track_select']['selected_option']?.value as Track;
+    const team = view['state']['values']['team']['team_select']['selected_option']?.value as Team;
+    const memberType = view['state']['values']['member_type']['member_type_select']['selected_option']?.value as MemberType;
 
-        const {channel_id, ts, userId} = JSON.parse(view['private_metadata']);
-        const selectedMember = await getMentionTargetMembers(team, track, memberType);
+    const { channel_id, ts, userId } = JSON.parse(view['private_metadata']);
+    const selectedMember = await getMentionTargetMembers(team, track, memberType);
 
-        if (selectedMember.length > 0) {
-            let trackText = `${track === 'all' ? '' : `${track}트랙`} `;
-            let teamText = `${team === 'all' ? '' : `${team}팀`} `;
-            let memberTypeText = `${memberType === 'all' ? '' : `${memberType.toLowerCase()}`} `;
+    if (selectedMember.length > 0) {
+      let trackText = `${track === 'all' ? '' : `${track}트랙`} `;
+      let teamText = `${team === 'all' ? '' : `${team}팀`} `;
+      let memberTypeText = `${memberType === 'all' ? '' : `${memberType.toLowerCase()}`} `;
 
+      const result = await client.chat.postMessage({
+        channel: channel_id,
+        text: `<@${userId}>님의 ${teamText}${trackText}${memberTypeText}단체멘션!\n${selectedMember.join(', ')}\n확인 부탁드립니다 :dancing_toad:`,
+        thread_ts: ts,
+      });
+
+      setTimeout(async () => {
+        const threadInfo = await client.conversations.replies({
+          channel: channel_id,
+          ts: result.ts!,
+        });
+
+        if (threadInfo.ok) {
+          const originalMessage = threadInfo.messages?.[0];
+          if (!originalMessage) return;
+
+          const checkedUsers = new Set(originalMessage.reactions?.find(reaction => reaction.name === 'white_check_mark')?.users || []);
+          const uncheckedUsers = selectedMember.filter(user => !checkedUsers.has(user));
+
+          if (uncheckedUsers.length > 0) {
             await client.chat.postMessage({
-                channel: channel_id,
-                text: `<@${userId}>님의 ${teamText}${trackText}${memberTypeText}단체멘션!\n${selectedMember.join(', ')}\n확인 부탁드립니다 :dancing_toad:`,
-                thread_ts: ts,
+              channel: channel_id,
+              text: `<@${uncheckedUsers.join('>, <@')}> 다시 확인 부탁드립니다!`,
+              thread_ts: ts,
             });
-        } else {
-            await client.chat.postMessage({
-                channel: channel_id,
-                text: '해당하는 인원이 없습니다.',
-                thread_ts: ts,
-            });
+          }
         }
-    } catch (error) {
-        await respond(`에러 발생: ${error}`);
+      }, 100000);
+
+    } else {
+      await client.chat.postMessage({
+        channel: channel_id,
+        text: '해당하는 인원이 없습니다.',
+        thread_ts: ts,
+      });
     }
+  } catch (error) {
+    await respond(`에러 발생: ${error}`);
+  }
 });
 
 const 그룹맨션_모달_뷰 = {
