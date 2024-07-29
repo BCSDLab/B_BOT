@@ -208,13 +208,13 @@ boltApp.message('!추첨', async ({event, message}) => {
 //         });
 //     }
 // });
-let choiID= 'UGTP2MY2G'
+
 boltApp.message('!축하테스트', async ({event}) => {
     try {
         await boltApp.client.chat.postMessage({
             channel: 'C06PJ76SAM7',
             text: `
-@${choiID}
+<@UGTP2MY2G>
 `,
         });
     } catch (error) {
