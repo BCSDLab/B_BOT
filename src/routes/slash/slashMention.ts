@@ -91,7 +91,7 @@ boltApp.view({ callback_id: '그룹맨션_callback_id', type: 'view_submission' 
             });
           }
         }
-      }, 100000);
+      }, 10000);
 
     } else {
       await client.chat.postMessage({
