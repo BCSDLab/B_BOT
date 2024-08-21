@@ -29,9 +29,11 @@ expressApp.use('/api/pr-merged/frontend', frontendPRMergedRouter);
 expressApp.use('/api/update-package/frontend', frontendUpdatePackageRouter);
 expressApp.use('/api/error-notice/frontend', frontendErrorNoticeRouter);
 
-// TOOD: 중복 코드 줄이기
+/*
+** 백엔드 미사용으로 인한 주석 **
 expressApp.use('/api/review-request/backend', backendReviewMentionRouter);
 expressApp.use('/api/pr-merged/backend', backendPRMergedRouter);
+*/
 
 // 서버 시작
 const port = process.env.PORT || 3000;
