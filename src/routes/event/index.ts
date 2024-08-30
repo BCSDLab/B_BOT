@@ -111,6 +111,22 @@ boltApp.message('!축하', async ({event}) => {
     }
 });
 
+boltApp.message('!감사', async ({event}) => {
+    try {
+        await boltApp.client.chat.postMessage({
+            channel: event.channel,
+            text: `:blob_bowing::blob_bowing::blob_bowing::blob_bowing::blob_bowing::blob_bowing::blob_bowing:`,
+            thread_ts: event.ts,
+        });
+    } catch (error) {
+        await boltApp.client.chat.postMessage({
+            channel: event.channel,
+            text: `어라 삐봇의 상태가`,
+            thread_ts: event.ts,
+        });
+    }
+});
+
 boltApp.message('!아이스브레이킹', async ({event}) => {
     try {
         const randomIndex = Math.floor(Math.random() * 아이스브레이킹.length);
