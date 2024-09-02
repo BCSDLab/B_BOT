@@ -145,7 +145,7 @@ boltApp.message(/(!룰렛|룰렛!)/, async ({event}) => {
         if (emojiText === ':seven::seven::seven:') {
             await boltApp.client.chat.postMessage({
                 channel: event.channel,
-                text: `${emojiText} :tada::tada::tada:축하합니다! 당첨입니다!:tada::tada::tada: ${emojiText}`,
+                text: `$:slot_machine: :tada::tada::tada:축하합니다! ${emojiText} 당첨입니다!:tada::tada::tada: :slot_machine:`,
                 thread_ts: event.ts,
             });
         } else {
