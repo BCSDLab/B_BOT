@@ -151,7 +151,7 @@ boltApp.message(/(!룰렛|룰렛!)/, async ({event}) => {
         } else {
             await boltApp.client.chat.postMessage({
                 channel: event.channel,
-                text: `${emojiText} :meow_sad-rain:`,
+                text: `${emojiText} 다음기회에... :meow_sad-rain:`,
                 thread_ts: event.ts,
             });
         }
