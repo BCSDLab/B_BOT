@@ -134,6 +134,35 @@ boltApp.message(/(!감사|감사!)/, async ({event}) => {
     }
 });
 
+boltApp.message(/(!룰렛|룰렛!)/, async ({event}) => {
+    const emojis = [
+        ':one:',':two:',':three:',':four:',':five:',':six:',':seven:',':eight:',':nine:',':zero:'
+    ];
+    const selectedEmojis = emojis.sort(() => 0.5 - Math.random()).slice(0, 3);
+    const emojiText = selectedEmojis.join('');
+    
+    try {
+        if (emojiText === ':seven::seven::seven:') {
+            await boltApp.client.chat.postMessage({
+                channel: event.channel,
+                text: `${emojiText} 축하합니다! 당첨입니다! ${emojiText}`,
+                thread_ts: event.ts,
+            });
+        } else {
+            await boltApp.client.chat.postMessage({
+                channel: event.channel,
+                text: `${emojiText} 아쉽네요 :meow_sad-rain:`,
+                thread_ts: event.ts,
+            });
+        }
+    } catch (error) {
+        await boltApp.client.chat.postMessage({
+            channel: event.channel,
+            text: `어라 삐봇의 상태가`,
+            thread_ts: event.ts,
+        });
+    }
+});
 
 boltApp.message('!아이스브레이킹', async ({event}) => {
     try {
