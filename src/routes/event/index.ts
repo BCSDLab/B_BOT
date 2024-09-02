@@ -113,7 +113,7 @@ boltApp.message('!축하', async ({event}) => {
 
 boltApp.message(/(!감사|감사!)/, async ({event}) => {
     const emojis = [
-        ':감사하트:', ':blob_bowing:', ':grand_zul:', ':meow_sparkle:', ':thank_you:', ':meow_party:', ':sparkles:', ':meow_heart:', ':blob-clap:'
+        ':감사하트:', ':blob_bowing:', ':grand_zul:', ':meow_sparkle:', ':thank_you:', ':meow_party:', ':meow_heart:', ':blob-clap:'
         , ':blob_excited:', ':mario_luigi_dance:'
     ];
     const selectedEmojis = emojis.sort(() => 0.5 - Math.random()).slice(0, 6);
