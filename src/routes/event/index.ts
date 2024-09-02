@@ -115,7 +115,7 @@ boltApp.message(/(!감사|감사!)/, async ({event}) => {
     try {
         await boltApp.client.chat.postMessage({
             channel: event.channel,
-            text: `:감사하트::blob_bowing::grand_zul::meow_sparkle::man_bowing::woman_bowing::meow_party:`,
+            text: `:감사하트::blob_bowing::grand_zul::meow_sparkle::thank_you::meow_party:`,
             thread_ts: event.ts,
         });
     } catch (error) {
