@@ -138,20 +138,20 @@ boltApp.message(/(!룰렛|룰렛!)/, async ({event}) => {
     const emojis = [
         ':one:',':two:',':three:',':four:',':five:',':six:',':seven:',':eight:',':nine:',':zero:'
     ];
-    const selectedEmojis = emojis.sort(() => 0.5 - Math.random()).slice(0, 3);
+    const selectedEmojis = Array.from({ length: 3 }, () => emojis[Math.floor(Math.random() * emojis.length)]);
     const emojiText = selectedEmojis.join('');
     
     try {
         if (emojiText === ':seven::seven::seven:') {
             await boltApp.client.chat.postMessage({
                 channel: event.channel,
-                text: `${emojiText} 축하합니다! 당첨입니다! ${emojiText}`,
+                text: `${emojiText} :tada::tada::tada:축하합니다! 당첨입니다!:tada::tada::tada: ${emojiText}`,
                 thread_ts: event.ts,
             });
         } else {
             await boltApp.client.chat.postMessage({
                 channel: event.channel,
-                text: `${emojiText} 아쉽네요 :meow_sad-rain:`,
+                text: `${emojiText} :meow_sad-rain:`,
                 thread_ts: event.ts,
             });
         }
