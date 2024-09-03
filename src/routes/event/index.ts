@@ -5,6 +5,7 @@ import {getPRThreadInfo} from '../../api/internal';
 import {getKoinShops} from '../../api/koin';
 import {아이스브레이킹} from '../../const/comment';
 import {ThreadBroadcastMessageEvent} from "@slack/bolt";
+import { GenericMessageEvent, MessageEvent } from '@slack/bolt';
 import fs from "fs";
 
 const eventRouter = express.Router();
@@ -134,25 +135,34 @@ boltApp.message(/(!감사|감사!)/, async ({event}) => {
     }
 });
 
-boltApp.message(/(!룰렛|룰렛!)/, async ({event}) => {
+boltApp.message(/(!룰렛|룰렛!)/, async ({ event }) => {
     const emojis = [
-        ':one:',':two:',':three:',':four:',':five:',':six:',':seven:',':eight:',':nine:',':zero:'
+        ':one:', ':two:', ':three:', ':four:', ':five:', ':six:', ':seven:', ':eight:', ':nine:', ':zero:'
     ];
     const selectedEmojis = Array.from({ length: 3 }, () => emojis[Math.floor(Math.random() * emojis.length)]);
     const emojiText = selectedEmojis.join('');
-    
+
     try {
+        const messageEvent = event as GenericMessageEvent;
+
         if (emojiText === ':seven::seven::seven:') {
             await boltApp.client.chat.postMessage({
-                channel: event.channel,
-                text: `$:slot_machine: :tada::tada::tada:축하합니다! ${emojiText} 당첨입니다!:tada::tada::tada: :slot_machine:`,
-                thread_ts: event.ts,
+                channel: messageEvent.channel,
+                text: `:slot_machine: :tada::tada::tada: 축하합니다! ${emojiText} 당첨입니다! :tada::tada::tada: :slot_machine:`,
+                thread_ts: messageEvent.ts,
             });
+            await boltApp.client.chat.postMessage({
+                channel: 'C06PJ76SAM7',
+                text: `<@${messageEvent.user}>님이 777을 뽑으셨습니다!`,
+            });
+
         } else {
             await boltApp.client.chat.postMessage({
-                channel: event.channel,
-                text: `${emojiText} 다음기회에... :meow_sad-rain:`,
-                thread_ts: event.ts,
+                // channel: messageEvent.channel,
+                // text: `${emojiText} 다음기회에... :meow_sad-rain:`,
+                channel: 'C06PJ76SAM7',
+                text: `<@${messageEvent.user}>님이 테스트중입니다.`,
+                // thread_ts: messageEvent.ts,
             });
         }
     } catch (error) {
@@ -163,6 +173,7 @@ boltApp.message(/(!룰렛|룰렛!)/, async ({event}) => {
         });
     }
 });
+
 
 boltApp.message('!아이스브레이킹', async ({event}) => {
     try {
