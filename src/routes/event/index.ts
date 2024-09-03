@@ -5,7 +5,7 @@ import {getPRThreadInfo} from '../../api/internal';
 import {getKoinShops} from '../../api/koin';
 import {아이스브레이킹} from '../../const/comment';
 import {ThreadBroadcastMessageEvent} from "@slack/bolt";
-import { GenericMessageEvent, MessageEvent } from '@slack/bolt';
+import { GenericMessageEvent } from '@slack/bolt';
 import fs from "fs";
 
 const eventRouter = express.Router();
@@ -152,17 +152,15 @@ boltApp.message(/(!룰렛|룰렛!)/, async ({ event }) => {
                 thread_ts: messageEvent.ts,
             });
             await boltApp.client.chat.postMessage({
-                channel: 'C06PJ76SAM7',
-                text: `<@${messageEvent.user}>님이 777을 뽑으셨습니다!`,
+                channel: 'C06JWD4UQJW',
+                text: `:tada::tada::tada:<@${messageEvent.user}>님이 :seven::seven::seven:을 뽑으셨습니다!축하해주세요!!!:tada::tada::tada:`,
             });
 
         } else {
             await boltApp.client.chat.postMessage({
-                // channel: messageEvent.channel,
-                // text: `${emojiText} 다음기회에... :meow_sad-rain:`,
-                channel: 'C06PJ76SAM7',
-                text: `<@${messageEvent.user}>님이 테스트중입니다.`,
-                // thread_ts: messageEvent.ts,
+                channel: messageEvent.channel,
+                text: `${emojiText} 다음기회에... :meow_sad-rain:`,
+                thread_ts: messageEvent.ts,
             });
         }
     } catch (error) {
