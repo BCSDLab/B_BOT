@@ -69,8 +69,8 @@ boltApp.shortcut('thread_check_mention', async ({ ack, client, shortcut }: { ack
           await client.chat.postMessage({
               channel: channel.id,
               text: `메시지 확인 하셨나요? :meow_sad-rain: 
-              ${mentionText}
-              메시지 확인 후 댓글이나 이모지를 남겨주세요 :dancing_toad:`,
+${mentionText}
+메시지 확인 후 댓글이나 이모지를 남겨주세요 :dancing_toad:`,
               thread_ts: ts,
             });
         } else {
