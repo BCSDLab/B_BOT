@@ -1,23 +1,12 @@
-import express from 'express';
 import { boltApp } from '../../config/boltApp';
 import { SlackShortcut, MessageShortcut } from '@slack/bolt';
 
-const slashMentionRouter = express.Router();
-
-const 쓰레드체크멘션_callback_id = 'thread_check_mention';
 
 // 쓰레드에서 멘션된 사람 중, 이모지를 달지 않은 사람을 멘션하는 기능
 boltApp.shortcut('thread_check_mention', async ({ ack, client, shortcut }: { ack: () => void, client: any, shortcut: SlackShortcut }) => {
     try {
         await ack();
-
-        if ((shortcut as MessageShortcut).type !== 'message_action') {
-            await client.chat.postMessage({
-                channel: (shortcut as MessageShortcut).channel.id,
-                text: '이 기능은 메시지 액션에서만 사용할 수 있습니다.',
-            });
-            return;
-        }
+        if (shortcut.type !== 'message_action') return;
 
         const messageShortcut = shortcut as MessageShortcut;
         const { channel, message } = messageShortcut;
@@ -91,5 +80,3 @@ boltApp.shortcut('thread_check_mention', async ({ ack, client, shortcut }: { ack
         });
     }
 });
-
-export default slashMentionRouter;

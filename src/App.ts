@@ -12,6 +12,7 @@ import frontendUpdatePackageRouter from './routes/api/update-package/frontend';
 import frontendErrorNoticeRouter from './routes/api/error-notice/frontend';
 import backendReviewMentionRouter from "./routes/api/review-request/backend";
 import backendPRMergedRouter from "./routes/api/pr-merged/backend";
+import './routes/slash/threadCheckMention';
 
 dotenv.config();  // Load environment variables from .env file
 // Express 앱 생성
