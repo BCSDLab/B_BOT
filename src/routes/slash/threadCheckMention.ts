@@ -9,9 +9,9 @@ boltApp.shortcut('thread_check_mention', async ({ ack, client, shortcut }: { ack
         if (shortcut.type !== 'message_action') return;
 
         const messageShortcut = shortcut as MessageShortcut;
-        const { channel, message } = messageShortcut;
+        const { channel, message, user } = messageShortcut;
 
-        if (!message || !channel) {
+        if (!message || !channel || !user) {
             await client.chat.postMessage({
                 channel: channel.id,
                 text: '메시지 정보를 찾을 수 없습니다.',
@@ -20,6 +20,7 @@ boltApp.shortcut('thread_check_mention', async ({ ack, client, shortcut }: { ack
         }
 
         const { ts } = message;
+        const triggeringUserId = user.id;
 
         const result = await client.conversations.replies({
             channel: channel.id,
@@ -52,7 +53,7 @@ boltApp.shortcut('thread_check_mention', async ({ ack, client, shortcut }: { ack
         }
 
         // 이모지를 달지 않은 멤버 필터링
-        const nonReactedMembers = Array.from(mentionedMembers).filter(member => !reactedUsers.has(member));
+        const nonReactedMembers = Array.from(mentionedMembers).filter(member => !reactedUsers.has(member) && member !== triggeringUserId);
 
         // 이모지를 달지 않은 멤버들을 다시 멘션
         if (nonReactedMembers.length > 0) {
