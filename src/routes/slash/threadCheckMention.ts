@@ -29,6 +29,7 @@ boltApp.shortcut('thread_check_mention', async ({ ack, client, shortcut }: { ack
 
         const mentionedMembers = new Set<string>();
         const reactedUsers = new Set<string>();
+        const commentingUsers = new Set<string>();
 
         if (result.messages) {
             for (const msg of result.messages) {
@@ -41,6 +42,10 @@ boltApp.shortcut('thread_check_mention', async ({ ack, client, shortcut }: { ack
                     });
                 }
 
+                 // 댓글을 작성한 사용자 수집
+                 if (msg.user) {
+                  commentingUsers.add(msg.user);
+              }
                 // 이모지를 단 사람 수집
                 if (msg.reactions) {
                     for (const reaction of msg.reactions) {
@@ -52,8 +57,10 @@ boltApp.shortcut('thread_check_mention', async ({ ack, client, shortcut }: { ack
             }
         }
 
-        // 이모지를 달지 않은 멤버 필터링
-        const nonReactedMembers = Array.from(mentionedMembers).filter(member => !reactedUsers.has(member) && member !== triggeringUserId);
+        // 이모지 또는 댓글을 달지 않은 멤버 필터링
+        const nonReactedMembers = Array.from(mentionedMembers).filter(member => 
+          !reactedUsers.has(member) && !commentingUsers.has(member) && member !== triggeringUserId
+      );
 
         // 이모지를 달지 않은 멤버들을 다시 멘션
         if (nonReactedMembers.length > 0) {
