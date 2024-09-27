@@ -1,7 +1,6 @@
 import { boltApp } from '../../config/boltApp';
 import { SlackShortcut, MessageShortcut } from '@slack/bolt';
 
-
 // 쓰레드에서 멘션된 사람 중, 이모지를 달지 않은 사람을 멘션하는 기능
 boltApp.shortcut('thread_check_mention', async ({ ack, client, shortcut }: { ack: () => void, client: any, shortcut: SlackShortcut }) => {
     try {
@@ -19,12 +18,15 @@ boltApp.shortcut('thread_check_mention', async ({ ack, client, shortcut }: { ack
             return;
         }
 
-        const { ts } = message;
+        const { ts, thread_ts } = message; // 메시지의 timestamp (ts)와 스레드의 본문 메시지 timestamp (thread_ts)
         const triggeringUserId = user.id;
 
+        const rootTs = thread_ts || ts;
+
+        // 스레드 전체의 대화 목록을 가져옴
         const result = await client.conversations.replies({
             channel: channel.id,
-            ts: ts,
+            ts: rootTs, // 전체 스레드 탐색
         });
 
         const mentionedMembers = new Set<string>();
@@ -42,10 +44,11 @@ boltApp.shortcut('thread_check_mention', async ({ ack, client, shortcut }: { ack
                     });
                 }
 
-                 // 댓글을 작성한 사용자 수집
-                 if (msg.user) {
-                  commentingUsers.add(msg.user);
-              }
+                // 댓글을 작성한 사용자 수집
+                if (msg.user) {
+                    commentingUsers.add(msg.user);
+                }
+
                 // 이모지를 단 사람 수집
                 if (msg.reactions) {
                     for (const reaction of msg.reactions) {
@@ -59,25 +62,25 @@ boltApp.shortcut('thread_check_mention', async ({ ack, client, shortcut }: { ack
 
         // 이모지 또는 댓글을 달지 않은 멤버 필터링
         const nonReactedMembers = Array.from(mentionedMembers).filter(member => 
-          !reactedUsers.has(member) && !commentingUsers.has(member) && member !== triggeringUserId
-      );
+            !reactedUsers.has(member) && !commentingUsers.has(member) && member !== triggeringUserId
+        );
 
         // 이모지를 달지 않은 멤버들을 다시 멘션
         if (nonReactedMembers.length > 0) {
-          const mentionText = nonReactedMembers.map(user => `<@${user}>`).join(', ');
-    
-          await client.chat.postMessage({
-              channel: channel.id,
-              text: `메시지 확인 하셨나요? :meow_sad-rain: 
+            const mentionText = nonReactedMembers.map(user => `<@${user}>`).join(', ');
+
+            await client.chat.postMessage({
+                channel: channel.id,
+                text: `메시지 확인 하셨나요? :meow_sad-rain: 
 ${mentionText}
 메시지 확인 후 댓글이나 이모지를 남겨주세요 :dancing_toad:`,
-              thread_ts: ts,
+                thread_ts: rootTs,
             });
         } else {
             await client.chat.postMessage({
                 channel: channel.id,
                 text: '모든 멤버가 메시지를 확인했습니다. :blob_excited:',
-                thread_ts: ts,
+                thread_ts: rootTs,
             });
         }
     } catch (error: any) {
