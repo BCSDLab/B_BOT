@@ -71,7 +71,8 @@ boltApp.shortcut('thread_check_mention', async ({ ack, client, shortcut }: { ack
 
             await client.chat.postMessage({
                 channel: channel.id,
-                text: `메시지 확인 하셨나요? :meow_sad-rain: 
+                text: `${triggeringUserId}님의 리마인드!
+메시지 확인 하셨나요? :meow_sad-rain: 
 ${mentionText}
 메시지 확인 후 댓글이나 이모지를 남겨주세요 :dancing_toad:`,
                 thread_ts: rootTs,
@@ -79,7 +80,8 @@ ${mentionText}
         } else {
             await client.chat.postMessage({
                 channel: channel.id,
-                text: '모든 멤버가 메시지를 확인했습니다. :blob_excited:',
+                text: `${triggeringUserId}님의 리마인드!
+모든 멤버가 메시지를 확인했습니다. :blob_excited:`,
                 thread_ts: rootTs,
             });
         }
