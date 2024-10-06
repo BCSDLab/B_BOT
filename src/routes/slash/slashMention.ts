@@ -226,6 +226,14 @@ const 그룹맨션_모달_뷰 = {
                         },
                         value: "User"
                     },
+                    {
+                        text: {
+                            type: "plain_text",
+                            text: "트랙장"
+                        },
+                        value: "TrackLeader"
+                    }
+
                 ]
             },
         },
