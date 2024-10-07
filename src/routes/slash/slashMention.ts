@@ -232,6 +232,13 @@ const 그룹맨션_모달_뷰 = {
                             text: "트랙장"
                         },
                         value: "TrackLeader"
+                    },
+                    {
+                        text: {
+                            type: "plain_text",
+                            text: "Branding Team"
+                        },
+                        value: "Branding"
                     }
 
                 ]

@@ -12,6 +12,6 @@ export type Track =
     | 'client'
     | 'all';
 
-export type Team = 'Business' | 'Campus' | 'User' | 'TrackLeader' |'all';
+export type Team = 'Business' | 'Campus' | 'User' | 'TrackLeader' | 'Branding' |'all';
 
 export type MemberType = 'BEGINNER' | 'REGULAR' | 'MENTOR' | 'all';
