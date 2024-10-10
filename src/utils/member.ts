@@ -12,7 +12,7 @@ export interface BcsdMember {
 export async function getAllMembers(): Promise<BcsdMember[]> {
     let sql = `SELECT m.name        AS name,
                        m.slack_id    AS slack_id,
-                       MAX(t.name)   AS team_name,
+                       t.name        AS team_name,
                        tr.name       AS track_name,
                        m.member_type AS member_type
                 FROM member m
@@ -25,7 +25,9 @@ export async function getAllMembers(): Promise<BcsdMember[]> {
 }
 
 export async function getMentionTargetMembers(team: Team, track: Track, memberType: MemberType): Promise<string[]> {
-    let members: BcsdMember[] = await getAllMembers();
+    const members: BcsdMember[] = Array.from(
+        new Map((await getAllMembers()).map(member => [member.slack_id, member])).values()
+    );
 
     let tracks: string[] = [];
     if (track === 'client') {
