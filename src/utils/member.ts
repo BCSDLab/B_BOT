@@ -25,7 +25,9 @@ export async function getAllMembers(): Promise<BcsdMember[]> {
 }
 
 export async function getMentionTargetMembers(team: Team, track: Track, memberType: MemberType): Promise<string[]> {
-    let members: BcsdMember[] = await getAllMembers();
+    const members: BcsdMember[] = Array.from(
+        new Map((await getAllMembers()).map(member => [member.slack_id, member])).values()
+    );
 
     let tracks: string[] = [];
     if (track === 'client') {
