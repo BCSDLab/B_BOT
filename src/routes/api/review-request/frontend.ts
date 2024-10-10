@@ -16,7 +16,9 @@ frontendReviewMentionRouter.post<any, any, any, RequestBody>('/', async (req, re
     try {
         const {pullRequestLink, reviewers, writer} = req.body;
 
-        const userList: BcsdMember[] = await getAllMembers();
+        const userList: BcsdMember[] = Array.from(
+            new Map((await getAllMembers()).map(member => [member.slack_id, member])).values()
+        );
         const mentionList = userList.filter((member) => reviewers.some((reviewer) => member.name == reviewer && member.track_name === "FrontEnd"));
         const writerMember = userList.find((member) => member.name === writer && member.track_name === "FrontEnd");
 
