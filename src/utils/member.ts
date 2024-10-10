@@ -10,7 +10,7 @@ export interface BcsdMember {
 }
 
 export async function getAllMembers(): Promise<BcsdMember[]> {
-    let sql = `SELECT m.name        AS name,
+    let sql = `SELECT DISTINCT m.name        AS name,
                        m.slack_id    AS slack_id,
                        t.name        AS team_name,
                        tr.name       AS track_name,
