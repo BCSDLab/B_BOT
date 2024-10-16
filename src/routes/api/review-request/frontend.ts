@@ -2,7 +2,7 @@ import express from 'express';
 import {boltApp} from '../../../config/boltApp';
 import {channels} from '../../../const/channel';
 import {postPRThreadInfo} from '../../../api/internal';
-import {BcsdMember, getAllMembers} from "../../../utils/member";
+import {BcsdMember, getAllDistinctMembers, TrackMember} from "../../../utils/member";
 
 const frontendReviewMentionRouter = express.Router();
 
@@ -16,7 +16,7 @@ frontendReviewMentionRouter.post<any, any, any, RequestBody>('/', async (req, re
     try {
         const {pullRequestLink, reviewers, writer} = req.body;
 
-        const userList: BcsdMember[] = await getAllMembers();
+        const userList: TrackMember[] = await getAllDistinctMembers();
 
         const mentionList = userList.filter((member) => reviewers.some((reviewer) => member.name == reviewer && member.track_name === "FrontEnd"));
         const writerMember = userList.find((member) => member.name === writer && member.track_name === "FrontEnd");
