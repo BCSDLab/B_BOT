@@ -20,8 +20,7 @@ export async function getAllMembers(): Promise<BcsdMember[]> {
                          LEFT JOIN team t ON tm.team_id = t.id
                          LEFT JOIN track tr ON m.track_id = tr.id
                 WHERE m.slack_id IS NOT NULL
-                  AND m.is_deleted = 0
-                  AND m.id = (SELECT MIN(m2.id) FROM member m2 WHERE m2.slack_id = m.slack_id);`
+                  AND m.is_deleted = 0;`
     return await query(sql).then((result) => result.rows);
 }
 
