@@ -10,17 +10,18 @@ export interface BcsdMember {
 }
 
 export async function getAllMembers(): Promise<BcsdMember[]> {
-    let sql = `SELECT m.name        AS name,
+    let sql = `SELECT MAX(m.name)        AS name,
                        m.slack_id    AS slack_id,
-                       t.name        AS team_name,
-                       tr.name       AS track_name,
+                       MAX(t.name)        AS team_name,
+                       MAX(tr.name)       AS track_name,
                        m.member_type AS member_type
                 FROM member m
                          LEFT JOIN team_map tm ON m.id = tm.member_id
                          LEFT JOIN team t ON tm.team_id = t.id
                          LEFT JOIN track tr ON m.track_id = tr.id
                 WHERE m.slack_id IS NOT NULL
-                  AND m.is_deleted = 0;`
+                  AND m.is_deleted = 0;
+                  GROUP BY m.slack_id;`;
     return await query(sql).then((result) => result.rows);
 }
 
