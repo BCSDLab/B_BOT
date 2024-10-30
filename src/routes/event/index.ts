@@ -96,7 +96,7 @@ boltApp.message('!점메추', async ({event}) => {
     }
 });
 
-boltApp.message('!축하', async ({event}) => {
+boltApp.message(/(!축하|축하!)/, async ({event}) => {
     try {
         await boltApp.client.chat.postMessage({
             channel: event.channel,
@@ -145,15 +145,17 @@ boltApp.message(/(!룰렛|룰렛!)/, async ({ event }) => {
     try {
         const messageEvent = event as GenericMessageEvent;
 
-        if (emojiText === ':seven::seven::seven:') {
+        if (emojiText !== ':seven::seven::seven:') {
+            // await boltApp.client.chat.postMessage({
+            //     channel: messageEvent.channel,
+            //     text: `:slot_machine: :tada::tada::tada: 축하합니다! ${emojiText} 당첨입니다! :tada::tada::tada: :slot_machine:`,
+            //     thread_ts: messageEvent.ts,
+            // });
             await boltApp.client.chat.postMessage({
-                channel: messageEvent.channel,
-                text: `:slot_machine: :tada::tada::tada: 축하합니다! ${emojiText} 당첨입니다! :tada::tada::tada: :slot_machine:`,
-                thread_ts: messageEvent.ts,
-            });
-            await boltApp.client.chat.postMessage({
-                channel: 'C06JWD4UQJW',
-                text: `:tada::tada::tada:<@${messageEvent.user}>님이 :seven::seven::seven:을 뽑으셨습니다!축하해주세요!!!:tada::tada::tada:`,
+                // channel: 'C06JWD4UQJW',
+                channel: 'C06PJ76SAM7',
+                // text: `:tada::tada::tada:<@${messageEvent.user}>님이 ${messageEvent.channel}에서 :seven::seven::seven:을 뽑으셨습니다!축하해주세요!!!:tada::tada::tada:`,
+                text: `${messageEvent.channel}에서 진행하는 테스트`,
             });
 
         } else {
