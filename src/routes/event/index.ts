@@ -135,6 +135,8 @@ boltApp.message(/(!감사|감사!)/, async ({event}) => {
     }
 });
 
+const attemptCounts: { [key: string]: number } = {};
+
 boltApp.message(/(!룰렛|룰렛!)/, async ({ event }) => {
     const emojis = [
         ':one:', ':two:', ':three:', ':four:', ':five:', ':six:', ':seven:', ':eight:', ':nine:', ':zero:'
@@ -145,6 +147,8 @@ boltApp.message(/(!룰렛|룰렛!)/, async ({ event }) => {
 
     try {
         const messageEvent = event as GenericMessageEvent;
+        const userId = (event as GenericMessageEvent).user;
+        attemptCounts[userId] = (attemptCounts[userId] || 0) + 1;
 
         if (emojiText === ':seven::seven::seven:') {
             await boltApp.client.chat.postMessage({
@@ -154,13 +158,13 @@ boltApp.message(/(!룰렛|룰렛!)/, async ({ event }) => {
             });
             await boltApp.client.chat.postMessage({
                 channel: 'C4A8YJ66P',
-                text: `:tada::tada::tada: <#${messageEvent.channel}>에서 <@${messageEvent.user}>님이 :seven::seven::seven:을 뽑으셨습니다! 축하해주세요!!!:tada::tada::tada:`,
+                text: `:tada::tada::tada: <@${messageEvent.user}>님이 <#${messageEvent.channel}>에서 오늘 ${attemptCounts[userId]}번 시도만에 :seven::seven::seven:을 뽑으셨습니다! 축하해주세요!!!:tada::tada::tada:`,
             });
 
         } else {
             await boltApp.client.chat.postMessage({
                 channel: messageEvent.channel,
-                text: `${emojiText} 다음기회에... :meow_sad-rain:`,
+                text: `${emojiText} 다음기회에... :meow_sad-rain: ${attemptCounts[userId]}번 시도`,
                 thread_ts: messageEvent.ts,
             });
         }
