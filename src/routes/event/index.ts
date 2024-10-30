@@ -141,9 +141,13 @@ boltApp.message(/(!룰렛|룰렛!)/, async ({ event }) => {
     ];
     const selectedEmojis = Array.from({ length: 3 }, () => emojis[Math.floor(Math.random() * emojis.length)]);
     const emojiText = selectedEmojis.join('');
+    
 
     try {
         const messageEvent = event as GenericMessageEvent;
+        const channelInfo = await boltApp.client.conversations.info({
+            channel: messageEvent.channel
+        });
 
         if (emojiText !== ':seven::seven::seven:') {
             // await boltApp.client.chat.postMessage({
@@ -155,7 +159,7 @@ boltApp.message(/(!룰렛|룰렛!)/, async ({ event }) => {
                 // channel: 'C06JWD4UQJW',
                 channel: 'C06PJ76SAM7',
                 // text: `:tada::tada::tada: ${messageEvent.channel}에서 <@${messageEvent.user}>님이 :seven::seven::seven:을 뽑으셨습니다!축하해주세요!!!:tada::tada::tada:`,
-                text: `<@${messageEvent.channel}>에서 진행하는 테스트`,
+                text: `<#${channelInfo.channel?.name}>에서 진행하는 테스트`,
             });
 
         } else {
