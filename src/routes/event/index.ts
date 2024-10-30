@@ -154,8 +154,8 @@ boltApp.message(/(!룰렛|룰렛!)/, async ({ event }) => {
             await boltApp.client.chat.postMessage({
                 // channel: 'C06JWD4UQJW',
                 channel: 'C06PJ76SAM7',
-                // text: `:tada::tada::tada:<@${messageEvent.user}>님이 ${messageEvent.channel}에서 :seven::seven::seven:을 뽑으셨습니다!축하해주세요!!!:tada::tada::tada:`,
-                text: `${messageEvent.channel}에서 진행하는 테스트`,
+                // text: `:tada::tada::tada: ${messageEvent.channel}에서 <@${messageEvent.user}>님이 :seven::seven::seven:을 뽑으셨습니다!축하해주세요!!!:tada::tada::tada:`,
+                text: `<@${messageEvent.channel}>에서 진행하는 테스트`,
             });
 
         } else {
