@@ -150,6 +150,15 @@ boltApp.message(/(!룰렛|룰렛!)/, async ({ event }) => {
         const userId = (event as GenericMessageEvent).user;
         attemptCounts[userId] = (attemptCounts[userId] || 0) + 1;
 
+        if (attemptCounts[userId] > 3) {
+            await boltApp.client.chat.postMessage({
+                channel: messageEvent.channel,
+                text: `<@${messageEvent.user}>님의 비공식 결과 ${emojiText} 오늘 시도 횟수 : ${attemptCounts[userId]}회`,
+                thread_ts: messageEvent.ts,
+            });
+            return;
+        }
+
         if (emojiText === ':seven::seven::seven:') {
             await boltApp.client.chat.postMessage({
                 channel: messageEvent.channel,
@@ -164,7 +173,8 @@ boltApp.message(/(!룰렛|룰렛!)/, async ({ event }) => {
         } else {
             await boltApp.client.chat.postMessage({
                 channel: messageEvent.channel,
-                text: `<@${messageEvent.user}>님의 결과 ${emojiText} :meow_sad-rain: 오늘 시도 횟수 : ${attemptCounts[userId]}회`,
+                text: `<@${messageEvent.user}>님의 결과 ${emojiText} :meow_sad-rain:
+오늘 남은 시도 횟수 : ${3 - attemptCounts[userId]}회`,
                 thread_ts: messageEvent.ts,
             });
         }
