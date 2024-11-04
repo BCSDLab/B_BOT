@@ -249,6 +249,23 @@ boltApp.message('!추첨', async ({event, message}) => {
     }
 });
 
+boltApp.message(/(!투표|투표!)/, async ({ event }) => {
+    const numberEmojis = ['one', 'two', 'three', 'four', 'five'];
+
+    try {
+        for (const emoji of numberEmojis) {
+            await boltApp.client.reactions.add({
+                channel: event.channel,
+                name: emoji,
+                timestamp: event.ts,
+            });
+        }
+    } catch (error) {
+        console.error(error);
+    }
+});
+
+
 // //멘션 반응확인
 // boltApp.message('@', async ({event, message }) => {
 //     try {
