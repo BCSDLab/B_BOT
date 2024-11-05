@@ -279,11 +279,6 @@ boltApp.message(/!?투표!? (\d+~\d+)/, async ({ event, client }) => {
                 });
                 await delay(500);
             }
-            await client.chat.postMessage({
-                channel: event.channel,
-                text: "투표 번호 순서가 틀릴 수 있으니 투표 전에 이모지를 다시 한 번 확인해주세요.",
-                thread_ts: event.ts,
-            });
         } catch (error) {
             console.error(error);
         }
