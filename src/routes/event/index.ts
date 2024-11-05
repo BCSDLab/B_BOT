@@ -277,7 +277,7 @@ boltApp.message(/!?투표!? (\d+~\d+)/, async ({ event, client }) => {
                     name: numberEmojis[i],
                     timestamp: event.ts,
                 });
-                await delay(500);
+                await delay(800);
             }
         } catch (error) {
             console.error(error);
