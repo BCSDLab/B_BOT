@@ -249,21 +249,84 @@ boltApp.message('!추첨', async ({event, message}) => {
     }
 });
 
-boltApp.message(/(!투표|투표!)/, async ({ event }) => {
-    const numberEmojis = ['one', 'two', 'three', 'four', 'five'];
+boltApp.message(/(!?투표)\s*(!?\d+~\d+)?/, async ({ event, client, context }) => {
+    if (typeof event.subtype !== 'undefined') return;
 
-    try {
-        for (const emoji of numberEmojis) {
-            await boltApp.client.reactions.add({
+    const messageText = event.text?.trim() || "";
+    const rangeMatch = messageText.match(/!?\d+~\d+/);
+
+    if (rangeMatch) {
+        const [start, end] = rangeMatch[0].split('~').map(Number);
+        
+        if (isNaN(start) || isNaN(end) || start < 1 || end > 10 || start > end) {
+            await client.chat.postMessage({
                 channel: event.channel,
-                name: emoji,
-                timestamp: event.ts,
+                user: event.user,
+                text: '1~10 사이의 숫자 범위를 입력해주세요.',
             });
+            return;
         }
-    } catch (error) {
-        console.error(error);
+
+        const numberEmojis = ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
+        
+        try {
+            for (let i = start - 1; i < end; i++) {
+                await client.reactions.add({
+                    channel: event.channel,
+                    name: numberEmojis[i],
+                    timestamp: event.ts,
+                });
+            }
+
+            await client.chat.postMessage({
+                channel: event.channel,
+                text: "투표 번호 순서가 틀릴 수 있으니 다시 한 번 확인해주세요.",
+                thread_ts: event.ts,
+            });
+        } catch (error) {
+            console.error(error);
+        }
+    } else {
+        try {
+            await client.views.open({
+                trigger_id: context.trigger_id,
+                view: {
+                    type: 'modal',
+                    callback_id: 'vote_modal',
+                    title: {
+                        type: 'plain_text',
+                        text: '투표 설정',
+                    },
+                    blocks: [
+                        {
+                            type: 'input',
+                            block_id: 'vote_count_block',
+                            element: {
+                                type: 'plain_text_input',
+                                action_id: 'vote_count_input',
+                                placeholder: {
+                                    type: 'plain_text',
+                                    text: '1~10 사이의 숫자를 입력하세요',
+                                },
+                            },
+                            label: {
+                                type: 'plain_text',
+                                text: '이모지 개수',
+                            },
+                        },
+                    ],
+                    submit: {
+                        type: 'plain_text',
+                        text: '확인',
+                    },
+                },
+            });
+        } catch (error) {
+            console.error(error);
+        }
     }
 });
+
 
 
 // //멘션 반응확인
