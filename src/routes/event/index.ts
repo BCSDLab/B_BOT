@@ -249,11 +249,11 @@ boltApp.message('!추첨', async ({event, message}) => {
     }
 });
 
-boltApp.message(/(!?투표)\s*(!?\d+~\d+)?/, async ({ event, client, context }) => {
+boltApp.message(/!?투표!?(\s*\d+~\d+)?/, async ({ event, client, context }) => {
     if (typeof event.subtype !== 'undefined') return;
 
     const messageText = event.text?.trim() || "";
-    const rangeMatch = messageText.match(/!?\d+~\d+/);
+    const rangeMatch = messageText.match(/\d+~\d+/);
 
     if (rangeMatch) {
         const [start, end] = rangeMatch[0].split('~').map(Number);
@@ -261,8 +261,8 @@ boltApp.message(/(!?투표)\s*(!?\d+~\d+)?/, async ({ event, client, context }) 
         if (isNaN(start) || isNaN(end) || start < 1 || end > 10 || start > end) {
             await client.chat.postMessage({
                 channel: event.channel,
-                user: event.user,
                 text: '1~10 사이의 숫자 범위를 입력해주세요.',
+                thread_ts: event.ts,
             });
             return;
         }
@@ -280,7 +280,7 @@ boltApp.message(/(!?투표)\s*(!?\d+~\d+)?/, async ({ event, client, context }) 
 
             await client.chat.postMessage({
                 channel: event.channel,
-                text: "투표 번호 순서가 틀릴 수 있으니 다시 한 번 확인해주세요.",
+                text: "투표 번호 순서가 틀릴 수 있으니 투표 전에 이모지를 다시 한 번 확인해주세요.",
                 thread_ts: event.ts,
             });
         } catch (error) {
@@ -326,6 +326,7 @@ boltApp.message(/(!?투표)\s*(!?\d+~\d+)?/, async ({ event, client, context }) 
         }
     }
 });
+
 
 
 
