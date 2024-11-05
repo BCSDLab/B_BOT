@@ -250,6 +250,7 @@ boltApp.message('!추첨', async ({event, message}) => {
 });
 
 boltApp.message(/!?투표!? (\d+~\d+)/, async ({ event, client }) => {
+    const delay = (ms: number | undefined) => new Promise(resolve => setTimeout(resolve, ms));
     if (typeof event.subtype !== 'undefined') return;
 
     const messageText = event.text?.trim() || "";
@@ -276,6 +277,7 @@ boltApp.message(/!?투표!? (\d+~\d+)/, async ({ event, client }) => {
                     name: numberEmojis[i],
                     timestamp: event.ts,
                 });
+                await delay(500);
             }
             await client.chat.postMessage({
                 channel: event.channel,
