@@ -2,7 +2,7 @@ export type Track =
     'FrontEnd'
     | 'BackEnd'
     | 'Android'
-    | 'UI/UX'
+    | 'Design'
     | 'Game'
     | 'iOS'
     | 'PS'

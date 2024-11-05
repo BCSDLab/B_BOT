@@ -145,9 +145,9 @@ const 그룹맨션_모달_뷰 = {
                     {
                         text: {
                             type: "plain_text",
-                            text: "UI/UX"
+                            text: "Design"
                         },
-                        value: "UI/UX"
+                        value: "Design"
                     },
                     {
                         text: {
