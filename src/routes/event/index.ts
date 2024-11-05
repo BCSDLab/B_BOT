@@ -257,17 +257,17 @@ boltApp.message(/!?투표!? (\d+~\d+)/, async ({ event, client }) => {
 
     if (rangeMatch) {
         const [start, end] = rangeMatch[0].split('~').map(Number);
-        
+
         if (isNaN(start) || isNaN(end) || start < 1 || end > 10 || start > end) {
             await client.chat.postMessage({
                 channel: event.channel,
-                text: '1~10 사이의 숫자 범위를 입력해주세요.',
+                text: '1~9 사이의 숫자 범위를 입력해주세요.',
                 thread_ts: event.ts,
             });
             return;
         }
 
-        const numberEmojis = ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
+        const numberEmojis = ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'];
         
         try {
             for (let i = start - 1; i < end; i++) {
