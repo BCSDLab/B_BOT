@@ -249,7 +249,7 @@ boltApp.message('!추첨', async ({event, message}) => {
     }
 });
 
-boltApp.message(/!?투표!?(\s*\d+~\d+)?/, async ({ event, client, context }) => {
+boltApp.message(/!?투표!? (\d+~\d+)/, async ({ event, client }) => {
     if (typeof event.subtype !== 'undefined') return;
 
     const messageText = event.text?.trim() || "";
@@ -277,7 +277,6 @@ boltApp.message(/!?투표!?(\s*\d+~\d+)?/, async ({ event, client, context }) =>
                     timestamp: event.ts,
                 });
             }
-
             await client.chat.postMessage({
                 channel: event.channel,
                 text: "투표 번호 순서가 틀릴 수 있으니 투표 전에 이모지를 다시 한 번 확인해주세요.",
@@ -286,47 +285,8 @@ boltApp.message(/!?투표!?(\s*\d+~\d+)?/, async ({ event, client, context }) =>
         } catch (error) {
             console.error(error);
         }
-    } else {
-        try {
-            await client.views.open({
-                trigger_id: context.trigger_id,
-                view: {
-                    type: 'modal',
-                    callback_id: 'vote_modal',
-                    title: {
-                        type: 'plain_text',
-                        text: '투표 설정',
-                    },
-                    blocks: [
-                        {
-                            type: 'input',
-                            block_id: 'vote_count_block',
-                            element: {
-                                type: 'plain_text_input',
-                                action_id: 'vote_count_input',
-                                placeholder: {
-                                    type: 'plain_text',
-                                    text: '1~10 사이의 숫자를 입력하세요',
-                                },
-                            },
-                            label: {
-                                type: 'plain_text',
-                                text: '이모지 개수',
-                            },
-                        },
-                    ],
-                    submit: {
-                        type: 'plain_text',
-                        text: '확인',
-                    },
-                },
-            });
-        } catch (error) {
-            console.error(error);
-        }
     }
 });
-
 
 
 
