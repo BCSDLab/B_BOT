@@ -339,6 +339,7 @@ boltApp.message(/!?투표!? (\d+~\d+)/, async ({ event, client }) => {
 
 interface Channel {
     id: string;
+    is_member?: boolean;
 }
 
 interface ConversationsListResponse {
@@ -358,9 +359,12 @@ const getAllChannelIds = async (client: any): Promise<string[]> => {
                 limit: 1000,
                 cursor: cursor,
                 types: 'public_channel,private_channel',
+                exclude_archived: true,
             });
-            response.channels.forEach((channel: Channel) => {
-                channelIds.push(channel.id);
+            response.channels.forEach(channel => {
+                if (channel.is_member) {
+                    channelIds.push(channel.id);
+                }
             });
             cursor = response.response_metadata.next_cursor;
         } while (cursor);
