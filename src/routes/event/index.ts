@@ -387,6 +387,7 @@ interface Message {
     thread_ts?: string;
     ts?: string;
     reactions?: Reaction[];
+    text?: string;
 }
 
 interface HistoryResponse {
@@ -452,7 +453,7 @@ boltApp.message(/!?상태창!?/, async ({ event, client }) => {
                 }
             });
 
-            // 스레드 참여 수 계산
+            // 스레드 참여 수 계산 및 스레드 메시지 포함
             for (const message of mainMessages) {
                 if (message.thread_ts && message.thread_ts === message.ts) {
                     const threadResponse: RepliesResponse = await client.conversations.replies({
@@ -464,8 +465,9 @@ boltApp.message(/!?상태창!?/, async ({ event, client }) => {
                     const threadMessages = threadResponse.messages?.slice(1); // 첫 메시지는 본문이므로 제외
                     const userCommentsInThread = threadMessages?.filter(msg => msg.user === userId);
 
-                    // 사용자가 댓글을 작성한 경우, 참여한 스레드로 카운트
+                    // 스레드에 사용자가 작성한 메시지 수 추가
                     if (userCommentsInThread && userCommentsInThread.length > 0) {
+                        totalMessages += userCommentsInThread.length;
                         totalThreadsParticipated++;
                     }
                 }
@@ -515,6 +517,7 @@ boltApp.message(/!?상태창!?/, async ({ event, client }) => {
         });
     }
 });
+
 
 
 
