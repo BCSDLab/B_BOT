@@ -462,7 +462,7 @@ boltApp.message(/(!상태창|상태창!)/, async ({ event, client }) => {
                         oldest: oneWeekAgo.toString(),
                     });
 
-                    const threadMessages = threadResponse.messages?.slice(1); // 첫 메시지는 본문이므로 제외
+                    const threadMessages = threadResponse.messages?.slice(1);
                     const userCommentsInThread = threadMessages?.filter(msg => msg.user === userId);
 
                     // 스레드에 사용자가 작성한 메시지 수 추가
@@ -498,13 +498,11 @@ boltApp.message(/(!상태창|상태창!)/, async ({ event, client }) => {
             text: `*<@${userId}>님의 일주일간 활동 기록*
 총 메시지 수: ${totalMessages}
 가장 활발했던 날: ${mostActiveDay}
-리액션 받은 횟수: ${totalReactionsReceived}
-리액션 많이 받은 메시지: ${mostReactedMessage.link}
-추가한 리액션 횟수: ${totalReactionsAdded}
+이모지 받은 횟수: ${totalReactionsReceived}
+추가한 이모지 횟수: ${totalReactionsAdded}
 가장 많이 추가한 이모지: :${mostAddedEmoji}:
 참여한 쓰레드 수: ${totalThreadsParticipated}
-멘션 받은 횟수: ${totalMentionsReceived}
-멘션 한 횟수: ${totalMentionsMade}`,
+이모지 많이 받은 메시지: ${mostReactedMessage.link}`,
             thread_ts: threadTs,
         });
     } catch (error) {
