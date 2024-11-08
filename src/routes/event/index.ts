@@ -459,7 +459,7 @@ boltApp.message(/!?상태창!?/, async ({ event, client }) => {
 
         await client.chat.postMessage({
             channel: event.channel,
-            text: `*일주일간의 활동 기록*
+            text: `*<@${userId}>님의 일주일간 활동 기록*
 총 메시지 수: ${totalMessages}
 가장 활발했던 날: ${mostActiveDay}
 리액션 받은 횟수: ${totalReactionsReceived}
