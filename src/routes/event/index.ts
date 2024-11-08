@@ -381,6 +381,7 @@ boltApp.message(/!?상태창!?/, async ({ event, client }) => {
     const userId = messageEvent.user;
     const oneWeekAgo = Math.floor((Date.now() - 7 * 24 * 60 * 60 * 1000) / 1000);
     const channelIds = await getAllChannelIds(client);
+    const threadTs = messageEvent.thread_ts || messageEvent.ts;
     let totalMessages = 0;
     let activeDays: { [key: string]: number } = {};
     let totalReactionsReceived = 0;
@@ -446,25 +447,12 @@ boltApp.message(/!?상태창!?/, async ({ event, client }) => {
         // 가장 많이 추가한 이모지 찾기
         const mostAddedEmoji = Object.keys(emojiCount).reduce((a, b) => emojiCount[a] > emojiCount[b] ? a : b, '');
 
-        // 참여한 쓰레드 수 계산
-        for (const channelId of channelIds) {
-            const response = await client.conversations.replies({
-                channel: channelId,
-                ts: event.ts,
-                oldest: oneWeekAgo.toString(),
-            });
-            totalThreadsParticipated += (response.messages ? response.messages.length - 1 : 0);
-        }
-
-        // 다이렉트 메시지 수 계산
-        const dmResponse = await client.im.history({
-            channel: userId,
+        // 다이렉트 메시지 수 계산 (예시)
+        const dmResponse = await client.conversations.history({
+            channel: event.channel,
             oldest: oneWeekAgo.toString(),
         });
         totalDMsSent = (dmResponse.messages as any[]).filter(msg => msg.user === userId).length;
-
-        // 멘션 한 횟수 계산
-        totalMentionsMade = totalMessages - totalDMsSent - totalThreadsParticipated;
 
         // 가장 활발했던 날 찾기
         const mostActiveDay = Object.keys(activeDays).reduce((a, b) => activeDays[a] > activeDays[b] ? a : b, '');
@@ -482,7 +470,7 @@ boltApp.message(/!?상태창!?/, async ({ event, client }) => {
 보낸 다이렉트 메시지 수: ${totalDMsSent}
 멘션 받은 횟수: ${totalMentionsReceived}
 멘션 한 횟수: ${totalMentionsMade}`,
-            thread_ts: event.ts,
+            thread_ts: threadTs,
         });
     } catch (error) {
         console.error(error);
@@ -490,10 +478,11 @@ boltApp.message(/!?상태창!?/, async ({ event, client }) => {
             channel: event.channel,
             text: `상태창을 불러오는 데 문제가 발생했습니다.
 에러: ${error}`,
-            thread_ts: event.ts,
+            thread_ts: threadTs,
         });
     }
 });
+
 
 
 export default eventRouter;
