@@ -398,7 +398,7 @@ interface RepliesResponse {
     messages?: Message[];
 }
 
-boltApp.message(/!?상태창!?/, async ({ event, client }) => {
+boltApp.message(/(!상태창|상태창!)/, async ({ event, client }) => {
     const messageEvent = event as GenericMessageEvent;
     const userId = messageEvent.user;
     const oneWeekAgo = Math.floor((Date.now() - 7 * 24 * 60 * 60 * 1000) / 1000);
