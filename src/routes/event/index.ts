@@ -417,7 +417,7 @@ boltApp.message(/!?상태창!?/, async ({ event, client }) => {
                             if (reaction.count !== undefined && reaction.count > mostReactedMessage.count) {
                                 mostReactedMessage = {
                                     count: reaction.count,
-                                    link: message.ts ? `<https://bcsdlab.slack.com/archives/${channelId}/p${message.ts.replace('.', '')}|이 메시지>` : '링크를 생성할 수 없습니다.',
+                                    link: message.ts ? `<https://bcsdlab.slack.com/archives/${channelId}/p${message.ts.replace('.', '')}|바로가기>` : '링크를 생성할 수 없습니다.',
                                 };
                             }
                         });
