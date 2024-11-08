@@ -376,53 +376,17 @@ const getAllChannelIds = async (client: any): Promise<string[]> => {
     }
 };
 
-// interface DMChannel {
-//     id: string;
-// }
 
-// interface DMChannelsResponse {
-//     channels: DMChannel[];
-// }
-
-// interface DMHistoryResponse {
-//     messages?: { user: string }[];
-// }
-
-// const getDirectMessagesSentCount = async (client: any, userId: string, oneWeekAgo: number): Promise<number> => {
-//     let totalDMsSent = 0;
-
-//     try {
-//         // DM 채널 목록 가져오기
-//         const dmChannelsResponse: DMChannelsResponse = await client.conversations.list({
-//             types: 'im', 
-//             limit: 1000, 
-//         });
-
-//         const dmChannels = dmChannelsResponse.channels || [];
-
-//         // 각 DM 채널의 메시지 기록을 확인
-//         for (const channel of dmChannels) {
-//             const dmHistoryResponse: DMHistoryResponse = await client.conversations.history({
-//                 channel: channel.id,
-//                 oldest: oneWeekAgo.toString(),
-//                 limit: 1000, 
-//             });
-
-//             // 사용자가 보낸 메시지 수를 필터링하여 집계
-//             const userMessages = dmHistoryResponse.messages?.filter(msg => msg.user === userId);
-//             totalDMsSent += userMessages ? userMessages.length : 0;
-//         }
-//     } catch (error) {
-//         console.error('Error fetching direct messages:', error);
-//     }
-
-//     return totalDMsSent;
-// };
+interface Reaction {
+    name?: string;
+    count?: number;
+}
 
 interface Message {
     user?: string;
     thread_ts?: string;
     ts?: string;
+    reactions?: Reaction[];
 }
 
 interface HistoryResponse {
@@ -433,45 +397,6 @@ interface RepliesResponse {
     messages?: Message[];
 }
 
-const getTotalMessagesIncludingThreads = async (
-    client: any,
-    userId: string,
-    channelIds: string[],
-    oneWeekAgo: number
-): Promise<number> => {
-    let totalMessages = 0;
-
-    await Promise.all(channelIds.map(async (channelId) => {
-        try {
-            const response: HistoryResponse = await client.conversations.history({
-                channel: channelId,
-                oldest: oneWeekAgo.toString(),
-                inclusive: true,
-            });
-
-            const mainMessages = response.messages || [];
-            totalMessages += mainMessages.filter(msg => msg.user === userId).length;
-
-            await Promise.all(mainMessages.map(async (message) => {
-                if (message.thread_ts && message.thread_ts === message.ts) {
-                    const threadResponse: RepliesResponse = await client.conversations.replies({
-                        channel: channelId,
-                        ts: message.thread_ts,
-                        oldest: oneWeekAgo.toString(),
-                    });
-
-                    const threadMessages = threadResponse.messages?.slice(1);
-                    totalMessages += (threadMessages?.filter((msg: Message) => msg.user === userId).length || 0);
-                }
-            }));
-        } catch (error) {
-            console.error(`Error processing channel ${channelId}:`, error);
-        }
-    }));
-
-    return totalMessages;
-};
-
 boltApp.message(/!?상태창!?/, async ({ event, client }) => {
     const messageEvent = event as GenericMessageEvent;
     const userId = messageEvent.user;
@@ -479,27 +404,28 @@ boltApp.message(/!?상태창!?/, async ({ event, client }) => {
     const channelIds = await getAllChannelIds(client);
     const threadTs = messageEvent.thread_ts || messageEvent.ts;
     let totalMessages = 0;
-    totalMessages = await getTotalMessagesIncludingThreads(client, userId, channelIds, oneWeekAgo);
     let activeDays: { [key: string]: number } = {};
     let totalReactionsReceived = 0;
     let totalReactionsAdded = 0;
     let mostReactedMessage = { count: 0, link: '' };
     let emojiCount: { [key: string]: number } = {};
     let totalThreadsParticipated = 0;
-    // let totalDMsSent = 0;
     let totalMentionsReceived = 0;
     let totalMentionsMade = 0;
 
     try {
-        // 메시지 기록 수집
         for (const channelId of channelIds) {
-            const response = await client.conversations.history({
+            const response: HistoryResponse = await client.conversations.history({
                 channel: channelId,
                 oldest: oneWeekAgo.toString(),
                 inclusive: true,
             });
 
-            response.messages?.forEach(message => {
+            const mainMessages = response.messages || [];
+
+            // 총 메시지 수 및 활성 날짜 계산
+            totalMessages += mainMessages.filter(msg => msg.user === userId).length;
+            mainMessages.forEach(message => {
                 if (message.user === userId) {
                     const messageDate = new Date(Number(message.ts) * 1000).toISOString().split('T')[0];
                     activeDays[messageDate] = (activeDays[messageDate] || 0) + 1;
@@ -521,10 +447,29 @@ boltApp.message(/!?상태창!?/, async ({ event, client }) => {
                 }
 
                 // 멘션 받은 횟수 계산
-                if (message.text && message.text.includes(`<@${userId}>`)) {
+                if ('text' in message && typeof message.text === 'string' && message.text.includes(`<@${userId}>`)) {
                     totalMentionsReceived++;
                 }
             });
+
+            // 스레드 참여 수 계산
+            for (const message of mainMessages) {
+                if (message.thread_ts && message.thread_ts === message.ts) {
+                    const threadResponse: RepliesResponse = await client.conversations.replies({
+                        channel: channelId,
+                        ts: message.thread_ts,
+                        oldest: oneWeekAgo.toString(),
+                    });
+
+                    const threadMessages = threadResponse.messages?.slice(1); // 첫 메시지는 본문이므로 제외
+                    const userCommentsInThread = threadMessages?.filter(msg => msg.user === userId);
+
+                    // 사용자가 댓글을 작성한 경우, 참여한 스레드로 카운트
+                    if (userCommentsInThread && userCommentsInThread.length > 0) {
+                        totalThreadsParticipated++;
+                    }
+                }
+            }
         }
 
         // 리액션 추가한 기록 수집
@@ -542,8 +487,6 @@ boltApp.message(/!?상태창!?/, async ({ event, client }) => {
 
         // 가장 많이 추가한 이모지 찾기
         const mostAddedEmoji = Object.keys(emojiCount).reduce((a, b) => emojiCount[a] > emojiCount[b] ? a : b, '');
-
-        // totalDMsSent = await getDirectMessagesSentCount(client, userId, oneWeekAgo);
 
         // 가장 활발했던 날 찾기
         const mostActiveDay = Object.keys(activeDays).reduce((a, b) => activeDays[a] > activeDays[b] ? a : b, '');
@@ -572,6 +515,7 @@ boltApp.message(/!?상태창!?/, async ({ event, client }) => {
         });
     }
 });
+
 
 
 
