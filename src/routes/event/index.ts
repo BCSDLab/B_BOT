@@ -376,6 +376,49 @@ const getAllChannelIds = async (client: any): Promise<string[]> => {
     }
 };
 
+interface DMChannel {
+    id: string;
+}
+
+interface DMChannelsResponse {
+    channels: DMChannel[];
+}
+
+interface DMHistoryResponse {
+    messages?: { user: string }[];
+}
+
+const getDirectMessagesSentCount = async (client: any, userId: string, oneWeekAgo: number): Promise<number> => {
+    let totalDMsSent = 0;
+
+    try {
+        // DM 채널 목록 가져오기
+        const dmChannelsResponse: DMChannelsResponse = await client.conversations.list({
+            types: 'im', 
+            limit: 1000, 
+        });
+
+        const dmChannels = dmChannelsResponse.channels || [];
+
+        // 각 DM 채널의 메시지 기록을 확인
+        for (const channel of dmChannels) {
+            const dmHistoryResponse: DMHistoryResponse = await client.conversations.history({
+                channel: channel.id,
+                oldest: oneWeekAgo.toString(),
+                limit: 1000, 
+            });
+
+            // 사용자가 보낸 메시지 수를 필터링하여 집계
+            const userMessages = dmHistoryResponse.messages?.filter(msg => msg.user === userId);
+            totalDMsSent += userMessages ? userMessages.length : 0;
+        }
+    } catch (error) {
+        console.error('Error fetching direct messages:', error);
+    }
+
+    return totalDMsSent;
+};
+
 boltApp.message(/!?상태창!?/, async ({ event, client }) => {
     const messageEvent = event as GenericMessageEvent;
     const userId = messageEvent.user;
@@ -447,12 +490,7 @@ boltApp.message(/!?상태창!?/, async ({ event, client }) => {
         // 가장 많이 추가한 이모지 찾기
         const mostAddedEmoji = Object.keys(emojiCount).reduce((a, b) => emojiCount[a] > emojiCount[b] ? a : b, '');
 
-        // 다이렉트 메시지 수 계산 (예시)
-        const dmResponse = await client.conversations.history({
-            channel: event.channel,
-            oldest: oneWeekAgo.toString(),
-        });
-        totalDMsSent = (dmResponse.messages as any[]).filter(msg => msg.user === userId).length;
+        totalDMsSent = await getDirectMessagesSentCount(client, userId, oneWeekAgo);
 
         // 가장 활발했던 날 찾기
         const mostActiveDay = Object.keys(activeDays).reduce((a, b) => activeDays[a] > activeDays[b] ? a : b, '');
