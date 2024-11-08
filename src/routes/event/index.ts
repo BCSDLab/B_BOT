@@ -484,7 +484,8 @@ boltApp.message(/!?상태창!?/, async ({ event, client }) => {
         console.error(error);
         await client.chat.postMessage({
             channel: event.channel,
-            text: "상태창을 불러오는 데 문제가 발생했습니다.",
+            text: `상태창을 불러오는 데 문제가 발생했습니다.
+에러: ${error}`,
             thread_ts: event.ts,
         });
     }
