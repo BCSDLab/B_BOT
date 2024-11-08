@@ -285,4 +285,210 @@ boltApp.message(/!?투표!? (\d+~\d+)/, async ({ event, client }) => {
     }
 });
 
+// boltApp.message(/(!투표결과|투표결과!)/, async ({ event, client }) => {
+//     if (typeof event.subtype !== 'undefined') return;
+
+//     try {
+//         const result = await client.reactions.get({
+//             channel: event.channel,
+//             timestamp: event.thread_ts || event.ts,
+//         });
+
+//         const reactions = result.message?.reactions || [];
+//         const emojiVotes: { [key: string]: string[] } = {};
+
+//         reactions.forEach(reaction => {
+//             if (reaction.name && reaction.users) {
+//                 emojiVotes[reaction.name] = reaction.users.map(user => `<@${user}>`);
+//             }
+//         });
+
+//         let voteResults = "최다 투표 결과입니다.\n";
+//         let maxVotes = 0;
+//         const maxVotedEmojis = [];
+
+//         for (const [emoji, voters] of Object.entries(emojiVotes)) {
+//             const voteCount = voters.length;
+//             if (voteCount > maxVotes) {
+//                 maxVotes = voteCount;
+//                 maxVotedEmojis.length = 0;
+//                 maxVotedEmojis.push({ emoji, voters });
+//             } else if (voteCount === maxVotes) {
+//                 maxVotedEmojis.push({ emoji, voters });
+//             }
+//         }
+
+//         maxVotedEmojis.forEach(({ emoji, voters }) => {
+//             voteResults += `:${emoji}: : ${voters.join(', ')}\n`;
+//         });
+
+//         await client.chat.postMessage({
+//             channel: event.channel,
+//             text: voteResults,
+//             thread_ts: event.ts,
+//         });
+//     } catch (error) {
+//         console.error(error);
+//         await client.chat.postMessage({
+//             channel: event.channel,
+//             text: "투표 결과를 불러오는 데 문제가 발생했습니다.",
+//             thread_ts: event.ts,
+//         });
+//     }
+// });
+
+interface Channel {
+    id: string;
+}
+
+interface ConversationsListResponse {
+    channels: Channel[];
+    response_metadata: {
+        next_cursor: string;
+    };
+}
+
+const getAllChannelIds = async (client: any): Promise<string[]> => {
+    let channelIds: string[] = [];
+    let cursor: string | undefined;
+
+    try {
+        do {
+            const response: ConversationsListResponse = await client.conversations.list({
+                limit: 1000,
+                cursor: cursor,
+                types: 'public_channel,private_channel',
+            });
+            response.channels.forEach((channel: Channel) => {
+                channelIds.push(channel.id);
+            });
+            cursor = response.response_metadata.next_cursor;
+        } while (cursor);
+
+        return channelIds;
+    } catch (error) {
+        console.error('Error fetching channel IDs:', error);
+        return [];
+    }
+};
+
+boltApp.message(/!?상태창!?/, async ({ event, client }) => {
+    const messageEvent = event as GenericMessageEvent;
+    const userId = messageEvent.user;
+    const oneWeekAgo = Math.floor((Date.now() - 7 * 24 * 60 * 60 * 1000) / 1000);
+    const channelIds = await getAllChannelIds(client);
+    let totalMessages = 0;
+    let activeDays: { [key: string]: number } = {};
+    let totalReactionsReceived = 0;
+    let totalReactionsAdded = 0;
+    let mostReactedMessage = { count: 0, link: '' };
+    let emojiCount: { [key: string]: number } = {};
+    let totalThreadsParticipated = 0;
+    let totalDMsSent = 0;
+    let totalMentionsReceived = 0;
+    let totalMentionsMade = 0;
+
+    try {
+        // 메시지 기록 수집
+        for (const channelId of channelIds) {
+            const response = await client.conversations.history({
+                channel: channelId,
+                oldest: oneWeekAgo.toString(),
+                inclusive: true,
+            });
+
+            response.messages?.forEach(message => {
+                if (message.user === userId) {
+                    totalMessages++;
+                    const messageDate = new Date(Number(message.ts) * 1000).toISOString().split('T')[0];
+                    activeDays[messageDate] = (activeDays[messageDate] || 0) + 1;
+
+                    // 리액션 받은 횟수 계산
+                    if (message.reactions) {
+                        message.reactions.forEach(reaction => {
+                            if (reaction.count !== undefined) {
+                                totalReactionsReceived += reaction.count;
+                            }
+                            if (reaction.count !== undefined && reaction.count > mostReactedMessage.count) {
+                                mostReactedMessage = {
+                                    count: reaction.count,
+                                    link: message.ts ? `<https://bcsdlab.slack.com/archives/${channelId}/p${message.ts.replace('.', '')}|이 메시지>` : '링크를 생성할 수 없습니다.',
+                                };
+                            }
+                        });
+                    }
+                }
+
+                // 멘션 받은 횟수 계산
+                if (message.text && message.text.includes(`<@${userId}>`)) {
+                    totalMentionsReceived++;
+                }
+            });
+        }
+
+        // 리액션 추가한 기록 수집
+        const reactionHistory = await client.reactions.list({ user: userId, oldest: oneWeekAgo });
+        reactionHistory.items?.forEach(item => {
+            if (item.message) {
+                totalReactionsAdded++;
+                item.message.reactions?.forEach(reaction => {
+                    if (reaction.name) {
+                        emojiCount[reaction.name] = (emojiCount[reaction.name] || 0) + 1;
+                    }
+                });
+            }
+        });
+
+        // 가장 많이 추가한 이모지 찾기
+        const mostAddedEmoji = Object.keys(emojiCount).reduce((a, b) => emojiCount[a] > emojiCount[b] ? a : b, '');
+
+        // 참여한 쓰레드 수 계산
+        for (const channelId of channelIds) {
+            const response = await client.conversations.replies({
+                channel: channelId,
+                ts: event.ts,
+                oldest: oneWeekAgo.toString(),
+            });
+            totalThreadsParticipated += (response.messages ? response.messages.length - 1 : 0);
+        }
+
+        // 다이렉트 메시지 수 계산
+        const dmResponse = await client.im.history({
+            channel: userId,
+            oldest: oneWeekAgo.toString(),
+        });
+        totalDMsSent = (dmResponse.messages as any[]).filter(msg => msg.user === userId).length;
+
+        // 멘션 한 횟수 계산
+        totalMentionsMade = totalMessages - totalDMsSent - totalThreadsParticipated;
+
+        // 가장 활발했던 날 찾기
+        const mostActiveDay = Object.keys(activeDays).reduce((a, b) => activeDays[a] > activeDays[b] ? a : b, '');
+
+        await client.chat.postMessage({
+            channel: event.channel,
+            text: `*일주일간의 활동 기록*
+총 메시지 수: ${totalMessages}
+가장 활발했던 날: ${mostActiveDay}
+리액션 받은 횟수: ${totalReactionsReceived}
+리액션 많이 받은 메시지: ${mostReactedMessage.link}
+추가한 리액션 횟수: ${totalReactionsAdded}
+가장 많이 추가한 이모지: :${mostAddedEmoji}:
+참여한 쓰레드 수: ${totalThreadsParticipated}
+보낸 다이렉트 메시지 수: ${totalDMsSent}
+멘션 받은 횟수: ${totalMentionsReceived}
+멘션 한 횟수: ${totalMentionsMade}`,
+            thread_ts: event.ts,
+        });
+    } catch (error) {
+        console.error(error);
+        await client.chat.postMessage({
+            channel: event.channel,
+            text: "상태창을 불러오는 데 문제가 발생했습니다.",
+            thread_ts: event.ts,
+        });
+    }
+});
+
+
 export default eventRouter;
