@@ -413,26 +413,8 @@ boltApp.message(/(!상태창|상태창!)/, async ({ event, client }) => {
     let totalThreadsParticipated = 0;
     let totalMentionsReceived = 0;
     let totalMentionsMade = 0;
-    let workspaceJoinDate = '';
-    let daysSinceJoined = 0;
 
     try {
-        const profileResponse = await client.users.profile.get({ user: userId });
-        const startDate = (profileResponse.profile as { start_date?: string }).start_date;
-
-        if (startDate) {
-            const joinDate = new Date(startDate); // 문자열 날짜를 Date 객체로 변환
-            workspaceJoinDate = joinDate.toISOString().split('T')[0]; // YYYY-MM-DD 형식
-            const currentDate = new Date();
-
-            // 오늘 날짜로부터 함께한 일수 계산
-            daysSinceJoined = Math.floor((currentDate.getTime() - joinDate.getTime()) / (1000 * 60 * 60 * 24));
-        } else {
-            workspaceJoinDate = '알 수 없음';
-            daysSinceJoined = 0;
-        }
-
-        
         for (const channelId of channelIds) {
             const response: HistoryResponse = await client.conversations.history({
                 channel: channelId,
@@ -514,7 +496,6 @@ boltApp.message(/(!상태창|상태창!)/, async ({ event, client }) => {
         await client.chat.postMessage({
             channel: event.channel,
             text: `*<@${userId}>님의 일주일간 활동 기록*
-BCSD 가입일: ${workspaceJoinDate} (함께한 지 ${daysSinceJoined}일째)
 총 메시지 수: ${totalMessages}
 가장 활발했던 날: ${mostActiveDay}
 이모지 받은 횟수: ${totalReactionsReceived}
