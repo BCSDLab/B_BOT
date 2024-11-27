@@ -417,11 +417,11 @@ boltApp.message(/(!상태창|상태창!)/, async ({ event, client }) => {
     let daysSinceJoined = 0;
 
     try {
-        const userInfoResponse = await client.users.info({ user: userId });
-        const userUpdated = userInfoResponse.user?.updated;
+        const profileResponse = await client.users.profile.get({ user: userId });
+        const startDate = (profileResponse.profile as { start_date?: string }).start_date;
 
-        if (userUpdated) {
-            const joinDate = new Date(userUpdated); // 문자열 날짜를 Date 객체로 변환
+        if (startDate) {
+            const joinDate = new Date(startDate); // 문자열 날짜를 Date 객체로 변환
             workspaceJoinDate = joinDate.toISOString().split('T')[0]; // YYYY-MM-DD 형식
             const currentDate = new Date();
 
