@@ -418,7 +418,7 @@ boltApp.message(/(!상태창|상태창!)/, async ({ event, client }) => {
 
     try {
         const profileResponse = await client.users.profile.get({ user: userId });
-        const startDate = profileResponse.profile?.start_date;
+        const startDate = (profileResponse.profile as { start_date?: string }).start_date;
 
         if (startDate) {
             const joinDate = new Date(startDate); // 문자열 날짜를 Date 객체로 변환
