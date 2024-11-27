@@ -398,12 +398,6 @@ interface RepliesResponse {
     messages?: Message[];
 }
 
-interface ExtendedUser {
-    id: string;
-    name: string;
-    created?: number;
-}
-
 boltApp.message(/(!상태창|상태창!)/, async ({ event, client }) => {
     const messageEvent = event as GenericMessageEvent;
     const userId = messageEvent.user;
@@ -423,17 +417,21 @@ boltApp.message(/(!상태창|상태창!)/, async ({ event, client }) => {
     let daysSinceJoined = 0;
 
     try {
-        const userInfo = await client.users.info({ user: userId });
-        const userCreated = (userInfo.user as ExtendedUser)?.created; // 워크스페이스 가입 UNIX 타임스탬프
+        const profileResponse = await client.users.profile.get({ user: userId });
+        const customFields = profileResponse.profile?.fields;
 
-        if (userCreated) {
-            const joinDate = new Date(userCreated * 1000);
-            workspaceJoinDate = joinDate.toISOString().split('T')[0]; // YYYY-MM-DD 형식으로 변환
+        // 사용자 정의 필드에서 `start_date` 가져오기
+        const startDateField = customFields
+            ? Object.values(customFields).find(field => field.label === 'Start Date' || field.label === 'start_date')
+            : null;
 
-            // 오늘 날짜로부터 함께한 일수 계산
+        if (startDateField?.value) {
+            const startDate = new Date(startDateField.value); // 사용자 정의 필드 값 파싱
+            workspaceJoinDate = startDate.toISOString().split('T')[0]; // YYYY-MM-DD 형식
             const currentDate = new Date();
-            daysSinceJoined = Math.floor((currentDate.getTime() - joinDate.getTime()) / (1000 * 60 * 60 * 24));
+            daysSinceJoined = Math.floor((currentDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
         }
+
         
         for (const channelId of channelIds) {
             const response: HistoryResponse = await client.conversations.history({
