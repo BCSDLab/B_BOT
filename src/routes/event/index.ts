@@ -418,18 +418,18 @@ boltApp.message(/(!상태창|상태창!)/, async ({ event, client }) => {
 
     try {
         const profileResponse = await client.users.profile.get({ user: userId });
-        const customFields = profileResponse.profile?.fields;
+        const startDate = profileResponse.profile?.start_date;
 
-        // 사용자 정의 필드에서 `start_date` 가져오기
-        const startDateField = customFields
-            ? Object.values(customFields).find(field => field.label === 'Start Date' || field.label === 'start_date')
-            : null;
-
-        if (startDateField?.value) {
-            const startDate = new Date(startDateField.value); // 사용자 정의 필드 값 파싱
-            workspaceJoinDate = startDate.toISOString().split('T')[0]; // YYYY-MM-DD 형식
+        if (startDate) {
+            const joinDate = new Date(startDate); // 문자열 날짜를 Date 객체로 변환
+            workspaceJoinDate = joinDate.toISOString().split('T')[0]; // YYYY-MM-DD 형식
             const currentDate = new Date();
-            daysSinceJoined = Math.floor((currentDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+
+            // 오늘 날짜로부터 함께한 일수 계산
+            daysSinceJoined = Math.floor((currentDate.getTime() - joinDate.getTime()) / (1000 * 60 * 60 * 24));
+        } else {
+            workspaceJoinDate = '알 수 없음';
+            daysSinceJoined = 0;
         }
 
         
