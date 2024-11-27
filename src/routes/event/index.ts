@@ -514,7 +514,9 @@ boltApp.message(/(!상태창|상태창!)/, async ({ event, client }) => {
         await client.chat.postMessage({
             channel: event.channel,
             text: `*<@${userId}>님의 일주일간 활동 기록*
-BCSD 가입일: ${workspaceJoinDate} (함께한 지 ${daysSinceJoined}일째)
+BCSD 가입일: ${userUpdated} (함께한 지 ${daysSinceJoined.toLocaleString()}일째)
+디버깅 : ${userInfoResponse.user}
+${userInfoResponse}
 총 메시지 수: ${totalMessages}
 가장 활발했던 날: ${mostActiveDay}
 이모지 받은 횟수: ${totalReactionsReceived}
