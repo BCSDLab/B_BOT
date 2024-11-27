@@ -398,6 +398,12 @@ interface RepliesResponse {
     messages?: Message[];
 }
 
+interface ExtendedUser {
+    id: string;
+    name: string;
+    created?: number;
+}
+
 boltApp.message(/(!상태창|상태창!)/, async ({ event, client }) => {
     const messageEvent = event as GenericMessageEvent;
     const userId = messageEvent.user;
@@ -418,7 +424,7 @@ boltApp.message(/(!상태창|상태창!)/, async ({ event, client }) => {
 
     try {
         const userInfo = await client.users.info({ user: userId });
-        const userCreated = userInfo.user?.created; // 워크스페이스 가입 UNIX 타임스탬프
+        const userCreated = (userInfo.user as ExtendedUser)?.created; // 워크스페이스 가입 UNIX 타임스탬프
 
         if (userCreated) {
             const joinDate = new Date(userCreated * 1000);
