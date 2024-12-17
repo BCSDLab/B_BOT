@@ -1,5 +1,5 @@
 import { boltApp } from '../../config/boltApp';
-import { SlackShortcut, MessageShortcut } from '@slack/bolt';
+import { MessageShortcut } from '@slack/bolt';
 
 boltApp.shortcut('b-bot_message', async ({ ack, client, shortcut }) => {
     await ack();
@@ -10,7 +10,7 @@ boltApp.shortcut('b-bot_message', async ({ ack, client, shortcut }) => {
 
     if (!message || !channel || !user) {
         await client.chat.postMessage({
-            channel: channel.id,
+            channel: channel?.id || 'C08689S918Q',
             text: '메시지 정보를 찾을 수 없습니다.',
         });
         return;
@@ -26,6 +26,7 @@ boltApp.shortcut('b-bot_message', async ({ ack, client, shortcut }) => {
             private_metadata: JSON.stringify({
                 channel: channel.id,
                 thread_ts: rootTs,
+                user_id: user.id
             }),
             title: {
                 type: 'plain_text',
@@ -58,11 +59,12 @@ boltApp.shortcut('b-bot_message', async ({ ack, client, shortcut }) => {
 });
 
 boltApp.view('bbot_input_modal', async ({ ack, body, client, view }) => {
-    await ack(); // 모달 제출 수신 확인
+    await ack();
 
     const metadata = JSON.parse(view.private_metadata);
     const channelId = metadata.channel;
     const threadTs = metadata.thread_ts;
+    const userId = metadata.user_id;
 
     const userInput = view.state.values['bbot_message_block']['bbot_message_input'].value || '';
 
@@ -72,6 +74,12 @@ boltApp.view('bbot_input_modal', async ({ ack, body, client, view }) => {
             text: userInput,
             thread_ts: threadTs
         });
+
+        await client.chat.postMessage({
+            channel: 'C08689S918Q',
+            text: `<@${userId}>님의 삐봇 메시지!\n${userInput}`
+        });
+
     } catch (error: any) {
         console.error(error);
         await client.chat.postMessage({
