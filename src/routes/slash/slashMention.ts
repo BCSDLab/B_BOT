@@ -66,8 +66,7 @@ boltApp.view({callback_id: 그룹맨션_callback_id, type: 'view_submission'}, a
 
             await client.chat.postMessage({
                 channel: channel_id,
-                // <@${userId}>님의 ${teamText}${trackText}${memberTypeText}단체멘션!\n
-                text: `${selectedMember.join(', ')}\n확인 부탁드립니다 :dancing_toad:`,
+                text: `<@${userId}>님의 ${teamText}${trackText}${memberTypeText}단체멘션!\n${selectedMember.join(', ')}\n확인 부탁드립니다 :dancing_toad:`,
                 thread_ts: ts,
             });
         } else {
