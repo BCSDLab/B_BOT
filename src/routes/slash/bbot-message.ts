@@ -1,10 +1,9 @@
 import { boltApp } from '../../config/boltApp';
 import { SlackShortcut, MessageShortcut } from '@slack/bolt';
 
-boltApp.shortcut('b-bot_message', async ({ ack, client, shortcut }: { ack: () => void, client: any, shortcut: SlackShortcut }) => {
+boltApp.shortcut('b-bot_message', async ({ ack, client, shortcut }) => {
     await ack();
 
-    // shortcut이 message_action 타입인지 확인
     if (shortcut.type !== 'message_action') return;
     const messageShortcut = shortcut as MessageShortcut;
     const { channel, message, user } = messageShortcut;
@@ -17,12 +16,17 @@ boltApp.shortcut('b-bot_message', async ({ ack, client, shortcut }: { ack: () =>
         return;
     }
 
-    // 메시지 단축키 실행 시 모달 표시
+    const rootTs = message.thread_ts || message.ts;
+
     await client.views.open({
         trigger_id: shortcut.trigger_id,
         view: {
             type: 'modal',
             callback_id: 'bbot_input_modal',
+            private_metadata: JSON.stringify({
+                channel: channel.id,
+                thread_ts: rootTs,
+            }),
             title: {
                 type: 'plain_text',
                 text: '삐봇 메시지 입력'
@@ -51,4 +55,29 @@ boltApp.shortcut('b-bot_message', async ({ ack, client, shortcut }: { ack: () =>
             ]
         }
     });
+});
+
+boltApp.view('bbot_input_modal', async ({ ack, body, client, view }) => {
+    await ack(); // 모달 제출 수신 확인
+
+    const metadata = JSON.parse(view.private_metadata);
+    const channelId = metadata.channel;
+    const threadTs = metadata.thread_ts;
+
+    const userInput = view.state.values['bbot_message_block']['bbot_message_input'].value || '';
+
+    try {
+        await client.chat.postMessage({
+            channel: channelId,
+            text: userInput,
+            thread_ts: threadTs
+        });
+    } catch (error: any) {
+        console.error(error);
+        await client.chat.postMessage({
+            channel: channelId,
+            text: `메시지 전송 중 에러 발생: ${error.message}`,
+            thread_ts: threadTs
+        });
+    }
 });
