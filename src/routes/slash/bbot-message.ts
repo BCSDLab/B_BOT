@@ -4,7 +4,7 @@ import { MessageShortcut } from '@slack/bolt';
 boltApp.shortcut('b-bot_message', async ({ ack, client, shortcut }) => {
     await ack(); 
 
-    
+
     if (shortcut.type !== 'message_action') return;
     const messageShortcut = shortcut as MessageShortcut;
     const { channel, message, user } = messageShortcut;
@@ -19,7 +19,7 @@ boltApp.shortcut('b-bot_message', async ({ ack, client, shortcut }) => {
 
     const rootTs = message.thread_ts || message.ts;
 
-    
+
     await client.views.open({
         trigger_id: shortcut.trigger_id,
         view: {
@@ -41,22 +41,6 @@ boltApp.shortcut('b-bot_message', async ({ ack, client, shortcut }) => {
             blocks: [
                 {
                     type: 'input',
-                    block_id: 'bbot_users_select_block',
-                    element: {
-                        type: 'users_select', 
-                        action_id: 'bbot_users_select_input',
-                        placeholder: {
-                            type: 'plain_text',
-                            text: '멘션할 사용자를 선택하세요'
-                        }
-                    },
-                    label: {
-                        type: 'plain_text',
-                        text: '멘션 대상 사용자'
-                    }
-                },
-                {
-                    type: 'input',
                     block_id: 'bbot_message_block',
                     element: {
                         type: 'plain_text_input',
@@ -71,6 +55,23 @@ boltApp.shortcut('b-bot_message', async ({ ack, client, shortcut }) => {
                         type: 'plain_text',
                         text: '메시지'
                     }
+                },
+                {
+                    type: 'input',
+                    block_id: 'bbot_users_select_block',
+                    element: {
+                        type: 'multi_users_select', 
+                        action_id: 'bbot_users_select_input',
+                        placeholder: {
+                            type: 'plain_text',
+                            text: '멘션할 사용자를 선택하세요'
+                        }
+                    },
+                    label: {
+                        type: 'plain_text',
+                        text: '멘션 대상 사용자'
+                    },
+                    optional: true
                 }
             ]
         }
@@ -85,9 +86,9 @@ boltApp.view('bbot_input_modal', async ({ ack, body, client, view }) => {
     const userId = metadata.user_id;
 
     const userInput = view.state.values['bbot_message_block']['bbot_message_input']?.value?.trim() || '';
-    const selectedUserId = view.state.values['bbot_users_select_block']['bbot_users_select_input'].selected_user || '';
+    const selectedUserIds = view.state.values['bbot_users_select_block']['bbot_users_select_input'].selected_users || [];
 
-    const mentionText = selectedUserId ? `<@${selectedUserId}>` : '';
+    const mentionText = selectedUserIds.length > 0 ? selectedUserIds.map((id: string) => `<@${id}>`).join(' ') : '';
 
     const finalMessage = mentionText ? `${mentionText} ${userInput}` : `${userInput}`;
 
