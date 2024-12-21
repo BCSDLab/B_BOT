@@ -2,8 +2,9 @@ import { boltApp } from '../../config/boltApp';
 import { MessageShortcut } from '@slack/bolt';
 
 boltApp.shortcut('b-bot_message', async ({ ack, client, shortcut }) => {
-    await ack();
+    await ack(); 
 
+    
     if (shortcut.type !== 'message_action') return;
     const messageShortcut = shortcut as MessageShortcut;
     const { channel, message, user } = messageShortcut;
@@ -18,6 +19,7 @@ boltApp.shortcut('b-bot_message', async ({ ack, client, shortcut }) => {
 
     const rootTs = message.thread_ts || message.ts;
 
+    
     await client.views.open({
         trigger_id: shortcut.trigger_id,
         view: {
@@ -39,10 +41,27 @@ boltApp.shortcut('b-bot_message', async ({ ack, client, shortcut }) => {
             blocks: [
                 {
                     type: 'input',
+                    block_id: 'bbot_users_select_block',
+                    element: {
+                        type: 'users_select', 
+                        action_id: 'bbot_users_select_input',
+                        placeholder: {
+                            type: 'plain_text',
+                            text: '멘션할 사용자를 선택하세요'
+                        }
+                    },
+                    label: {
+                        type: 'plain_text',
+                        text: '멘션 대상 사용자'
+                    }
+                },
+                {
+                    type: 'input',
                     block_id: 'bbot_message_block',
                     element: {
                         type: 'plain_text_input',
                         action_id: 'bbot_message_input',
+                        multiline: true, 
                         placeholder: {
                             type: 'plain_text',
                             text: '삐봇이 전달할 메시지를 입력하세요'
@@ -59,25 +78,29 @@ boltApp.shortcut('b-bot_message', async ({ ack, client, shortcut }) => {
 });
 
 boltApp.view('bbot_input_modal', async ({ ack, body, client, view }) => {
-    await ack();
-
+    await ack(); 
     const metadata = JSON.parse(view.private_metadata);
     const channelId = metadata.channel;
     const threadTs = metadata.thread_ts;
     const userId = metadata.user_id;
 
-    const userInput = view.state.values['bbot_message_block']['bbot_message_input'].value || '';
+    const userInput = view.state.values['bbot_message_block']['bbot_message_input']?.value?.trim() || '';
+    const selectedUserId = view.state.values['bbot_users_select_block']['bbot_users_select_input'].selected_user || '';
+
+    const mentionText = selectedUserId ? `<@${selectedUserId}>` : '';
+
+    const finalMessage = mentionText ? `${mentionText} ${userInput}` : `${userInput}`;
 
     try {
         await client.chat.postMessage({
             channel: channelId,
-            text: userInput,
+            text: finalMessage,
             thread_ts: threadTs
         });
 
         await client.chat.postMessage({
             channel: 'C08689S918Q',
-            text: `<@${userId}>님의 삐봇 메시지!\n${userInput}`
+            text: `<@${userId}>님의 삐봇 메시지!\n${finalMessage}`
         });
 
     } catch (error: any) {
