@@ -516,7 +516,13 @@ boltApp.message(/(!상태창|상태창!)/, async ({ event, client }) => {
     }
 });
 
-
+boltApp.message('!삐봇qhdks123!', async ({ event, client }) => {
+        await client.chat.postMessage({
+            channel: 'C06PJ76SAM7',
+            // channel: 'C4A8YJ66P',
+            text: 'test',
+        });
+});
 
 
 
