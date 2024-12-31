@@ -94,7 +94,7 @@ boltApp.command('/회의생성', async ({ack, client, command, logger}) => {
     }
 });
 
-boltApp.message(/^(!회의생성|회의생성!|!회의 생성|회의 생성!)$/, async ({event, client, logger}) => {
+boltApp.message(/(!회의생성|회의생성!|!회의 생성|회의 생성!)/, async ({event, client, logger}) => {
     try {
         const response = await authorize().then(createSpace);
         logger.info(response[0].meetingUri, '로그입니다!!!', TOKEN_PATH, '크라단셜', CREDENTIALS_PATH);
