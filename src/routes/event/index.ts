@@ -524,7 +524,7 @@ boltApp.message(/^!삐봇qhdks123!$/, async ({ event, client }) => {
             now.getFullYear(),
             now.getMonth(),
             now.getDate(),
-            0, 0, 0 
+            21, 2, 0 
         );
 
         // 오늘 설정 시간이 이미 지난 경우, 내일 설정 시간으로 설정
@@ -534,19 +534,24 @@ boltApp.message(/^!삐봇qhdks123!$/, async ({ event, client }) => {
 
         const scheduledTime = Math.floor(scheduledDate.getTime() / 1000);
 
+        // 예약 완료 메시지를 원본 메시지의 스레드에 전송
+
         // 메시지 예약 전송
         await client.chat.scheduleMessage({
-            channel: 'C4A8YJ66P', // 예약할 채널 ID
+            channel: 'C06PJ76SAM7', // 예약할 채널 ID
             // 전송할 메시지 내용
-            text: `2025년 새해가 밝았습니다!
-다들 올해 원하는 목표 꼭 이루시길 바랍니다.
-새해 복 많이 받으시고, 행복한 한 해 되세요. :tada:`, 
+//             text: `2025년 새해가 밝았습니다!
+// 다들 올해 원하는 목표 꼭 이루시길 바랍니다.
+// 새해 복 많이 받으시고, 행복한 한 해 되세요. :tada:`, 
+            text: `:meow_nod:`,
             post_at: scheduledTime, // 메시지 전송 시간 (Unix 타임스탬프)
         });
 
+        const formattedTime = scheduledDate.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false });
+
         await client.chat.postMessage({
             channel: event.channel,
-            text: '예약메시지 설정이 완료되었습니다.',
+            text: `예약메시지 설정이 완료되었습니다. 메시지는 ${formattedTime}에 예약되었습니다.`,
             thread_ts: event.ts
         });
    
