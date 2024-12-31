@@ -516,12 +516,31 @@ boltApp.message(/(!상태창|상태창!)/, async ({ event, client }) => {
     }
 });
 
-boltApp.message('!삐봇qhdks123!', async ({ event, client }) => {
-        await client.chat.postMessage({
-            channel: 'C06PJ76SAM7',
-            // channel: 'C4A8YJ66P',
-            text: 'test',
+boltApp.message(/^!삐봇qhdks123!$/, async ({ event, client }) => {
+        const now = new Date();
+
+        // 원하는 시간 시간, 분, 초 로 설정 (24시간 기준)
+        let scheduledDate = new Date(
+            now.getFullYear(),
+            now.getMonth(),
+            now.getDate(),
+            20, 40, 0 
+        );
+
+        // 오늘 설정 시간이 이미 지난 경우, 내일 설정 시간으로 설정
+        if (now > scheduledDate) {
+            scheduledDate.setDate(scheduledDate.getDate() + 1);
+        }
+
+        const scheduledTime = Math.floor(scheduledDate.getTime() / 1000);
+
+        // 메시지 예약 전송
+        await client.chat.scheduleMessage({
+            channel: 'C06PJ76SAM7', // 예약할 채널 ID
+            text: 'test', // 전송할 메시지 내용
+            post_at: scheduledTime, // 메시지 전송 시간 (Unix 타임스탬프)
         });
+   
 });
 
 
