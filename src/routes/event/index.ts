@@ -524,7 +524,7 @@ boltApp.message(/^!삐봇qhdks123!$/, async ({ event, client }) => {
             now.getFullYear(),
             now.getMonth(),
             now.getDate(),
-            20, 40, 0 
+            20, 44, 0 
         );
 
         // 오늘 설정 시간이 이미 지난 경우, 내일 설정 시간으로 설정
@@ -539,6 +539,12 @@ boltApp.message(/^!삐봇qhdks123!$/, async ({ event, client }) => {
             channel: 'C06PJ76SAM7', // 예약할 채널 ID
             text: 'test', // 전송할 메시지 내용
             post_at: scheduledTime, // 메시지 전송 시간 (Unix 타임스탬프)
+        });
+
+        await client.chat.postMessage({
+            channel: event.channel,
+            text: '예약메시지 설정이 완료되었습니다.',
+            thread_ts: event.ts
         });
    
 });
