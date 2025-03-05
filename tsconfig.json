@@ -1,13 +1,8 @@
 {
+  "extends": "./.nitro/types/tsconfig.json",
   "compilerOptions": {
-    "target": "es6", 
-    "module": "commonjs",
-    "outDir": "./.output",
-    "rootDir": ".",	
-    "strict": true,	
-    "moduleResolution": "node",
-    "esModuleInterop": true,
-  },
-  "include": ["src"],
-  "exclude": ["node_modules"]
+    "types": [
+      "./src/types/index.d.ts"
+    ]
+  }
 }

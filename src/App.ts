@@ -1,19 +1,19 @@
 import express from 'express';
-import eventRouter from './routes/event';
+import eventRouter from './old_route/event';
 import dotenv from 'dotenv';
-import lectureNoticeRouter from './routes/slash/lecture-notice';
-import slashTestRouter from './routes/slash/test';
-import slashMention from './routes/slash/slashMention'
-import {boltApp, expressApp} from './config/boltApp';
-import frontendReviewMentionRouter from './routes/api/review-request/frontend';
-import meetingRouter from './routes/slash/google-meet';
-import frontendPRMergedRouter from './routes/api/pr-merged/frontend';
-import frontendUpdatePackageRouter from './routes/api/update-package/frontend';
-import frontendErrorNoticeRouter from './routes/api/error-notice/frontend';
-import backendReviewMentionRouter from "./routes/api/review-request/backend";
-import backendPRMergedRouter from "./routes/api/pr-merged/backend";
-import './routes/slash/threadCheckMention';
-import './routes/slash/bbot-message';
+import lectureNoticeRouter from './old_route/slash/lecture-notice';
+import slashTestRouter from './old_route/slash/test';
+import slashMention from './old_route/slash/slashMention'
+import {boltApp, expressApp} from './config_old/boltApp';
+import frontendReviewMentionRouter from './old_route/api/review-request/frontend';
+import meetingRouter from './old_route/slash/google-meet';
+import frontendPRMergedRouter from './old_route/api/pr-merged/frontend';
+import frontendUpdatePackageRouter from './old_route/api/update-package/frontend';
+import frontendErrorNoticeRouter from './old_route/api/error-notice/frontend';
+import backendReviewMentionRouter from "./old_route/api/review-request/backend";
+import backendPRMergedRouter from "./old_route/api/pr-merged/backend";
+import './old_route/slash/threadCheckMention';
+import './old_route/slash/bbot-message';
 
 dotenv.config();  // Load environment variables from .env file
 // Express 앱 생성
@@ -38,7 +38,7 @@ expressApp.use('/api/pr-merged/backend', backendPRMergedRouter);
 */
 
 // 서버 시작
-const port = process.env.PORT || 3000;
+const port = import.meta.PORT || 3000;
 
 expressApp.listen(port, () => {
 });

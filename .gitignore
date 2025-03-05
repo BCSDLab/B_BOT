@@ -2,4 +2,8 @@
 /dist
 /.output
 .env
+.env*local
 .idea
+/.nitro
+.DS_Store
+/.data

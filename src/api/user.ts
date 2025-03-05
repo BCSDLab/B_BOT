@@ -1,4 +1,4 @@
-import {boltApp} from "../config/boltApp";
+import {boltApp} from "../config_old/boltApp";
 
 export const getClientUserList = async () => {
     return await boltApp.client.users.list()!;

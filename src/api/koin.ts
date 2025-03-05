@@ -1,4 +1,4 @@
-import {koinApiClient} from "../config/apiClient";
+import {koinApiClient} from "../config_old/apiClient";
 
 export const getKoinShops = () => {
     return koinApiClient.get<{

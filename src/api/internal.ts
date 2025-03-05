@@ -1,4 +1,4 @@
-import {internalApiClient} from "../config/apiClient";
+import {internalApiClient} from "../config_old/apiClient";
 
 interface PRThreadInfo {
     pullRequestLink: string,
