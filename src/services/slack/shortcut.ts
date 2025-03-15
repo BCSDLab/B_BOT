@@ -1,5 +1,5 @@
 import type { View } from "@slack/web-api";
-import type { ShortcutSetting } from "./type";
+import type { GroupMentionMetadata, ShortcutSetting } from "./type";
 import INTERACTION_MODAL from "@/constant/INTERACTION_MODAL.json";
 
 export const shortcuts: ShortcutSetting[] = [
@@ -118,8 +118,8 @@ ${mentionText}
           private_metadata: JSON.stringify({
             channel_id: channel.id,
             thread_ts: rootTs,
-            userId: user.id
-          })
+            user_id: user.id
+          } satisfies GroupMentionMetadata)
         },
       });
     }

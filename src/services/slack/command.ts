@@ -1,5 +1,5 @@
 import type { View } from "@slack/web-api";
-import type { CommandSetting } from "./type";
+import type { CommandSetting, GroupMentionMetadata } from "./type";
 import CHANNEL_ID from "@/constant/CHANNEL_ID.json";
 import INTERACTION_MODAL from "@/constant/INTERACTION_MODAL.json";
 import {
@@ -39,21 +39,24 @@ export const commands: CommandSetting[] = [
     command: "/멘션",
     async handler({
       client,
-      shortcut,
+      command,
     }) {
-      if (shortcut.type !== "message_action") return;
-      const { channel, message, user } = shortcut;
-      const { ts } = message;
-      const rootTs = ts;
+      const {
+        channel_id: channel,
+        // 없음
+        // message_ts,
+        user_id: user,
+        } = command;
+      const rootTs = undefined;
       await client.views.open({
-        trigger_id: shortcut.trigger_id,
+        trigger_id: command.trigger_id,
         view: {
           ...INTERACTION_MODAL.그룹멘션.view as View,
           private_metadata: JSON.stringify({
-            channel_id: channel.id,
+            channel_id: channel,
             thread_ts: rootTs,
-            userId: user.id
-          })
+            user_id: user
+          } satisfies GroupMentionMetadata)
         },
       });
     }

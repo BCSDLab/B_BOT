@@ -7,15 +7,7 @@ import { SpacesServiceClient } from "@google-apps/meet";
 
 const SCOPES: string[] = ["https://www.googleapis.com/auth/meetings.space.created"];
 
-
-async function refresh(
-  client: OAuth2Client
-) {
-  await client.refreshAccessToken();
-}
-
-async function createSpace(authClient: OAuth2Client) {
-  const jsonClient = auth.fromJSON(authClient.credentials);
+async function createSpace(jsonClient: OAuth2Client) {
   const meetClient = new SpacesServiceClient({
     jsonClient,
   });
@@ -31,8 +23,7 @@ async function createSpace(authClient: OAuth2Client) {
   // Run request
   return await meetClient.createSpace(request);
 }
-async function removeSpace(authClient: OAuth2Client, name: string) {
-  const jsonClient = auth.fromJSON(authClient.credentials);
+async function removeSpace(jsonClient: OAuth2Client, name: string) {
   const meetClient = new SpacesServiceClient({
     jsonClient,
   });
@@ -64,10 +55,10 @@ async function createMeeting({
   ts,
   channel,
 }: CreateMeetingParams) {
-  await refresh(googleClient);
   const storage = useStorage("kvStorage");
   const meetings = await storage.get<Meeting[]>("current-meeting");
   const [response] = await createSpace(googleClient);
+  console.log(response);
 
   const result = await sendSlackText({
     client,
@@ -78,7 +69,7 @@ async function createMeeting({
   });
   const meetingInfo = {
     meeting: response.meetingCode,
-    ts: ts || result.ts,
+    ts: ts //|| result.ts,
   };
   await storage.set<Meeting[]>("current-meeting", [
     ...meetings.filter((m) => m.timestamp + 1000 * 60 * 60 * 24 > Date.now()),
@@ -106,7 +97,6 @@ async function removeMeeting({
   channel,
   text,
 }: RemoveMeetingParams) {
-  await refresh(googleClient);
 
   const storage = useStorage("kvStorage");
   const meetings = await storage.get<Meeting[]>("current-meeting");
