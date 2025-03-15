@@ -1,4 +1,7 @@
 interface ImportMetaEnv {
+  // Vite
+  readonly DEV: boolean;
+
   readonly SLACK_BOT_TOKEN: string;
   readonly SLACK_BOT_SIGNING_SECRET: string;
   readonly SLACK_APP_TOKEN: string;
@@ -8,7 +11,7 @@ interface ImportMetaEnv {
   readonly DB_USER: string;
   readonly DB_PASSWORD: string;
   readonly DB_NAME: string;
-  readonly NITRO_APP_BASE_URL: string;
+  readonly APP_BASE_URL: string;
   readonly GOOGLE_CLIENT_ID: string;
   readonly GOOGLE_CLIENT_SECRET: string;
   readonly GOOGLE_REDIRECT_URI?: string;

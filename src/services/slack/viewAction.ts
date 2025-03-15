@@ -56,7 +56,7 @@ export const viewActions: ViewActionSetting[] = [
       const team = view['state']['values']['team']['team_select']['selected_option']?.value as Team;
       const memberType = view['state']['values']['member_type']['member_type_select']['selected_option']?.value as MemberType;
 
-      const { channel, thread_ts: threadTs, user_id } = JSON.parse(view['private_metadata']) as GroupMentionMetadata;
+      const { channel_id: channel, thread_ts: threadTs, user_id } = JSON.parse(view['private_metadata']) as GroupMentionMetadata;
       const connection = await (context.sqlPool as Pool).getConnection();
       const selectedMember = await getMentionTargetMembers({
         connection,

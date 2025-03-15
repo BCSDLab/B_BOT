@@ -75,7 +75,7 @@ interface Infomation {
   sessionsCount: number;
   sessionsWithMetricPercentage: number;
   sessionWithoutMetricPercentage: number;
-  pageViews: number;
+  pagesViews: number;
   subTotal: number;
   Url: string;
 }
@@ -110,9 +110,9 @@ function normalizeInfomation(infomations: Infomation[]) {
   for (const info of infomations) {
     const urlInstance = new URL(info.Url);
     const pathname = urlInstance.pathname;
-    const count = info.pageViews;
-    const totalSessionCount = info.subTotal;
-    const previousCount = map.has(pathname) ? map.get(pathname) : [0, 0];
+    const count = Number(info.pagesViews);
+    const totalSessionCount = Number(info.sessionsCount);
+    const previousCount = map.get(pathname) ?? [0, 0];
     map.set(pathname, [previousCount[0] + count, previousCount[1] + totalSessionCount]);
   }
 

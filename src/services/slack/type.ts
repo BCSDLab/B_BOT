@@ -79,7 +79,7 @@ export interface MentionMetadata {
   user_id: string;
 }
 export interface GroupMentionMetadata {
-  channel: string;
+  channel_id: string;
   thread_ts: string;
   user_id: string;
 }

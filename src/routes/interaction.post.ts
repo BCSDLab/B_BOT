@@ -15,7 +15,8 @@ export default defineEventHandler(async (event) => {
       statusMessage: "Bad Request",
     });
   }
-  const body = await readBody<Interaction>(event);
+  const stringfiedBody = await readBody<{ payload: string }>(event);
+  const body = JSON.parse(stringfiedBody.payload) as Interaction;
   if (body.type === "shortcut") {
     const targetShortcut = shortcuts.find((shortcut) => shortcut.key === body.callback_id);
 
@@ -25,7 +26,7 @@ export default defineEventHandler(async (event) => {
         statusMessage: "Bad Request",
       });
     }
-
+    console.log({key: targetShortcut.key});
     await targetShortcut.handler({
       client: event.context.slackWebClient,
       shortcut: body,

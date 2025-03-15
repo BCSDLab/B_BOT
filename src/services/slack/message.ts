@@ -34,7 +34,7 @@ export const messageFunctionList: MessageSetting[] = [
                 "emoji": true
               },
               "value": "click_link",
-              "url": `${import.meta.env.NITRO_APP_BASE_URL}/rule_2024.pdf`,
+              "url": `${import.meta.env.APP_BASE_URL}/rule_2024.pdf`,
               "action_id": "button-action"
             }
           }

@@ -50,6 +50,7 @@ export default defineEventHandler(async (event) => {
           ts: eventBody.thread_ts,
           user: eventBody.user,
           channel: eventBody.channel,
+          googleClient: event.context.googleClient,
         });
       }
     }
@@ -72,6 +73,7 @@ export default defineEventHandler(async (event) => {
           ts: message?.thread_ts,
           user: message.user,
           channel: message.channel,
+          googleClient: event.context.googleClient,
         });
       } else {
         const isMatched = messageFunction.regex.test(text);
@@ -84,6 +86,7 @@ export default defineEventHandler(async (event) => {
           ts: message?.thread_ts,
           user: message.user,
           channel: message.channel,
+          googleClient: event.context.googleClient,
         });
       }
     }
@@ -106,6 +109,7 @@ export default defineEventHandler(async (event) => {
           ts: message.thread_ts,
           user: message.user,
           channel: message.channel,
+          googleClient: event.context.googleClient,
         });
       } else {
         const isMatched = messageFunction.regex.test(text);
@@ -118,6 +122,7 @@ export default defineEventHandler(async (event) => {
           ts: message.thread_ts,
           user: message.user,
           channel: message.channel,
+          googleClient: event.context.googleClient,
         });
       }
     }

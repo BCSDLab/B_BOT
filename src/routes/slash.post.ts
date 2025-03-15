@@ -21,5 +21,6 @@ export default defineEventHandler(async (event) => {
   await targetCommand.handler({
     client: event.context.slackWebClient,
     command: body,
+    googleClient: event.context.googleClient,
   });
 });
