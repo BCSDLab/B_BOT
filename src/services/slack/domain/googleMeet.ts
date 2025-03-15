@@ -6,9 +6,9 @@ import { SpacesServiceClient } from "@google-apps/meet";
 
 const SCOPES: string[] = ["https://www.googleapis.com/auth/meetings.space.created"];
 
-async function createSpace(jsonClient: OAuth2Client) {
+async function createSpace(authClient: OAuth2Client) {
   const meetClient = new SpacesServiceClient({
-    jsonClient,
+    authClient: authClient as any,
   });
   // Construct request
   const request: any = {
@@ -22,9 +22,9 @@ async function createSpace(jsonClient: OAuth2Client) {
   // Run request
   return await meetClient.createSpace(request);
 }
-async function removeSpace(jsonClient: OAuth2Client, name: string) {
+async function removeSpace(authClient: OAuth2Client, name: string) {
   const meetClient = new SpacesServiceClient({
-    jsonClient,
+    authClient: authClient as any,
   });
   // Construct request
   const request: any = {
@@ -48,7 +48,7 @@ type Meeting = {
   timestamp: number;
 };
 
-async function createMeeting({
+export async function createMeeting({
   client,
   googleClient,
   ts,
@@ -58,7 +58,6 @@ async function createMeeting({
   const meetings = await storage.get<Meeting[]>("current-meeting");
   const [response] = await createSpace(googleClient);
   console.log(response);
-
   const result = await sendSlackText({
     client,
     threadTs: ts,
