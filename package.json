@@ -2,33 +2,27 @@
   "name": "b-bot",
   "version": "1.0.0",
   "description": "Slack Bot server for BCSD Lab",
-  "main": "./src/App.ts",
+  "type": "module",
   "scripts": {
-    "start": "node .output/src/App.js",
-    "build": "npm install && webpack --config webpack.config.js",
-    "dev": "nodemon --watch \"src/**/*.ts\" --exec \"ts-node\" ./src/App.ts"
+    "dev": "nitro dev",
+    "build": "nitro build",
+    "nitro": "nitro"
   },
   "devDependencies": {
-    "@types/express": "^4.17.21",
+    "@slack/bolt": "^4.2.1",
+    "@total-typescript/ts-reset": "^0.6.1",
     "@types/node": "^20.11.19",
-    "concurrently": "^8.2.2",
-    "express": "^4.18.2",
-    "nodemon": "^3.0.3",
-    "ts-loader": "^9.5.1",
-    "ts-node": "^10.9.2",
-    "typescript": "^5.3.3",
-    "webpack": "^5.90.2",
-    "webpack-cli": "^5.1.4"
+    "typescript": "^5.3.3"
   },
   "dependencies": {
     "@google-apps/meet": "^0.1.1",
     "@google-cloud/local-auth": "^2.1.0",
-    "@slack/bolt": "^3.17.1",
+    "@slack/socket-mode": "^2.0.3",
     "@slack/web-api": "^7.0.2",
-    "axios": "^1.6.8",
-    "dotenv": "^16.4.4",
-    "dotenv-webpack": "^8.0.1",
+    "google-auth-library": "^9.15.1",
     "mysql2": "^3.9.7",
+    "nitropack": "^2.11.0",
     "ts-pattern": "^5.0.8"
-  }
+  },
+  "packageManager": "pnpm@10.5.2+sha512.da9dc28cd3ff40d0592188235ab25d3202add8a207afbedc682220e4a0029ffbff4562102b9e6e46b4e3f9e8bd53e6d05de48544b0c57d4b0179e22c76d1199b"
 }
