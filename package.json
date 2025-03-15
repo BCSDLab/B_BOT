@@ -9,6 +9,8 @@
     "nitro": "nitro"
   },
   "devDependencies": {
+    "@slack/bolt": "^4.2.1",
+    "@total-typescript/ts-reset": "^0.6.1",
     "@types/node": "^20.11.19",
     "typescript": "^5.3.3"
   },
@@ -17,6 +19,7 @@
     "@google-cloud/local-auth": "^2.1.0",
     "@slack/socket-mode": "^2.0.3",
     "@slack/web-api": "^7.0.2",
+    "google-auth-library": "^9.15.1",
     "mysql2": "^3.9.7",
     "nitropack": "^2.11.0",
     "ts-pattern": "^5.0.8"

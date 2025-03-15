@@ -1,27 +1,13 @@
-import type { WebClient } from "@slack/web-api";
+import type { MessageSetting } from "./type";
 
 import ICEBRAKING_QUESTIONS from "@/constant/ICEBRAKING_QUESTIONS.json";
 import CHANNEL_ID from "@/constant/CHANNEL_ID.json";
 import BASE_URL from "@/constant/BASE_URL.json";
 
-interface MessageFunctionHandlerParams {
-  client: WebClient;
-  channel: string;
-  user: string;
-  ts: string;
-  text: string;
-}
-
-interface MessageFunction {
-  regex: string | RegExp;
-  handler: (
-    client: MessageFunctionHandlerParams,
-  ) => Promise<void>;
-}
 
 const USER_TEXT_REGEX = /<@([A-Z0-9]+)\|.+>/g;
 
-export const messageFunctionList: MessageFunction[] = [
+export const messageFunctionList: MessageSetting[] = [
   {
     regex: /^!회칙/,
     async handler({
@@ -87,7 +73,7 @@ export const messageFunctionList: MessageFunction[] = [
       await sendSlackText({
         client,
         channel,
-        threadTs,
+        threadTs: ts,
         text: `주사위 결과: ${주사위}`,
       })
     },
@@ -165,7 +151,7 @@ export const messageFunctionList: MessageFunction[] = [
 
       const storage = useStorage('kvStorage');
       const key = `roulette_${(new Date()).toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' }).replaceAll('. ', '-')}`;
-      const attemptCounts = await storage.getItem<Record<string, number>>(key);
+      const attemptCounts = await storage.getItem<Record<string, number>>(`roullet-${key}`);
       attemptCounts[userId] = (attemptCounts[userId] || 0) + 1;
 
       if (attemptCounts[userId] > 3) {
@@ -364,6 +350,12 @@ export const messageFunctionList: MessageFunction[] = [
       channel,
       ts,
     }) {
+      await sendSlackText({
+        client,
+        channel,
+        text: '상태창은 돌아올 예정이에요!',
+        threadTs: ts,
+      })
       // TODO: crawl.
       /*interface Channel {
     id: string;

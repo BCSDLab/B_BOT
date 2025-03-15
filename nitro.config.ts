@@ -9,5 +9,8 @@ export default defineNitroConfig({
       drive: 'fs',
       base: './.data/kv',
     }
-  }
+  },
+  scheduledTasks: {
+    "0 9,18 * * *": "crawl:clarity",
+  },
 });
