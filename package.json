@@ -11,19 +11,18 @@
   "devDependencies": {
     "@slack/bolt": "^4.2.1",
     "@total-typescript/ts-reset": "^0.6.1",
-    "@types/node": "^20.11.19",
-    "typescript": "^5.3.3"
+    "@types/node": "^22.13.10",
+    "typescript": "^5.8.2"
   },
   "dependencies": {
-    "@google-apps/meet": "^0.1.1",
-    "@google-cloud/local-auth": "^2.1.0",
+    "@google-apps/meet": "^0.4.0",
+    "@google-cloud/local-auth": "^3.0.1",
     "@slack/socket-mode": "^2.0.3",
-    "@slack/web-api": "^7.0.2",
+    "@slack/web-api": "^7.8.0",
     "google-auth-library": "^9.15.1",
-    "googleapis": "^146.0.0",
     "mysql2": "^3.9.7",
-    "nitropack": "^2.11.0",
-    "ts-pattern": "^5.0.8"
+    "nitropack": "^2.11.6",
+    "ts-pattern": "^5.6.2"
   },
-  "packageManager": "pnpm@10.5.2+sha512.da9dc28cd3ff40d0592188235ab25d3202add8a207afbedc682220e4a0029ffbff4562102b9e6e46b4e3f9e8bd53e6d05de48544b0c57d4b0179e22c76d1199b"
+  "packageManager": "pnpm@10.6.3"
 }
