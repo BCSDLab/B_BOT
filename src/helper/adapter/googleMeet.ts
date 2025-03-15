@@ -1,7 +1,7 @@
 import type { OAuth2Client } from 'google-auth-library';
 
 import fs from "node:fs/promises";
-import { auth } from "google-auth-library";
+import { auth, GoogleAuth } from "google-auth-library";
 import { authenticate } from '@google-cloud/local-auth';
 
 
@@ -49,5 +49,15 @@ export async function authorize() {
 }
 
 export async function initGoogleMeetClient() {
-  return authorize();
+  // return authorize();
+  const auth = new GoogleAuth({
+    keyFile: CREDENTIALS_PATH,
+    scopes: SCOPES,
+    clientOptions: {
+      clientId: import.meta.env.GOOGLE_CLIENT_ID,
+      clientSecret: import.meta.env.GOOGLE_CLIENT_SECRET,
+      scopes: SCOPES,
+    }
+  });
+  return auth.getClient();
 }
