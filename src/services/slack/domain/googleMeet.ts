@@ -2,7 +2,6 @@ import type { WebClient } from "@slack/web-api";
 import type { OAuth2Client } from "google-auth-library";
 import type { CommandSetting, MessageSetting } from "../type";
 
-import { auth } from "google-auth-library";
 import { SpacesServiceClient } from "@google-apps/meet";
 
 const SCOPES: string[] = ["https://www.googleapis.com/auth/meetings.space.created"];
