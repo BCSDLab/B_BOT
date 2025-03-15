@@ -11,7 +11,7 @@ interface ImportMetaEnv {
   readonly NITRO_APP_BASE_URL: string;
   readonly GOOGLE_CLIENT_ID: string;
   readonly GOOGLE_CLIENT_SECRET: string;
-  readonly GOOGLE_REDIRECT_URI?: string[];
+  readonly GOOGLE_REDIRECT_URI?: string;
   readonly GOOGLE_PROJECT_ID: string;
 }
 interface ImportMeta {

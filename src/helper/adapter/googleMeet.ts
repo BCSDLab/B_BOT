@@ -21,7 +21,7 @@ export async function initGoogleMeetClient() {
   if (client.credentials) {
     await saveToken(client);
   } else {
-    const redirectUri = new URL(import.meta.env.GOOGLE_REDIRECT_URI?.[0] ?? 'http://localhost');
+    const redirectUri = new URL(import.meta.env.GOOGLE_REDIRECT_URI ?? 'http://localhost');
     new Promise((resolve, reject) => {
       const server = createServer(async (req, res) => {
         try {
