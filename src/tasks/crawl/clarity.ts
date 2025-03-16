@@ -51,7 +51,7 @@ export default defineTask({
         channel: CHANNEL_ID.코인_오류_front_end,
         blocks: createMessageBlock(
           {
-            date: Number(scheduledTime),
+            date: Date.now(),
             result: normailzedResult,
           },
           data[data.length - 1]
@@ -154,7 +154,7 @@ function createMessageBlock(clarityInfo: ClarityData, previousClarityInfo: Clari
       "text": {
         "type": "mrkdwn",
         "text": `*${metricsKeyToKorean[key]}*: ${currentPercent}% ${previousClarityInfo ? valueDiffString : ""}\n
-        ${currentValue.slice(0, 3).map(([url, count], index) => `\t${index + 1}. *${url}*: ${count[0]}번`).join("\n")}
+        ${currentValue.slice(0, 3).map(([url, count], index) => `${index + 1}. *${url}*: ${count[0]}번`).join("\n")}
         `
       }
     });
