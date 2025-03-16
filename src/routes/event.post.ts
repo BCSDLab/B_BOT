@@ -6,25 +6,31 @@ import type {
 } from "@slack/web-api";
 import { messageFunctionList } from "~/services/slack/message";
 
-type Body = SlackEvent | {
+type Body = {
+  type: "event_callback";
+  event: SlackEvent;
+} | {
   type: "url_verification";
   challenge?: string;
 }
 
 export default defineEventHandler(async (event) => {
   const body = await readBody<Body>(event);
-  if (body.type === "url_verification" && body.challenge) {
-    return { challenge: body.challenge };
+  if (body.type === "url_verification") {
+    if (body.challenge) {
+      return { challenge: body.challenge };
+    }
+    return;
   }
 
-  if (body.type !== "message") {
+  if (body.event.type !== "message") {
     return "not Implemented";
   }
-  if (body.channel_type !== "channel") {
+  if (body.event.channel_type !== "channel") {
     return "not Implemented";
   }
-  if (body.subtype === undefined) {
-    const eventBody = body as GenericMessageEvent;
+  if (body.event.subtype === undefined) {
+    const eventBody = body.event as GenericMessageEvent;
     const text = eventBody.text;
     for(const messageFunction of messageFunctionList) {
       if (typeof messageFunction.regex === "string") {
@@ -54,8 +60,8 @@ export default defineEventHandler(async (event) => {
         });
       }
     }
-  } else if (body.subtype === "message_changed") {
-    const eventBody = body as MessageChangedEvent;
+  } else if (body.event.subtype === "message_changed") {
+    const eventBody = body.event as MessageChangedEvent;
     if (eventBody.message.subtype !== undefined) {
       return;
     }
@@ -90,8 +96,8 @@ export default defineEventHandler(async (event) => {
         });
       }
     }
-  } else if (body.subtype === "message_replied") {
-    const eventBody = body as MessageRepliedEvent;
+  } else if (body.event.subtype === "message_replied") {
+    const eventBody = body.event as MessageRepliedEvent;
     if (eventBody.message.subtype !== undefined) {
       return;
     }

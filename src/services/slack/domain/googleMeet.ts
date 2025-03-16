@@ -1,5 +1,4 @@
 import type { WebClient } from "@slack/web-api";
-import type { OAuth2Client } from "google-auth-library";
 import type { CommandSetting, MessageSetting } from "../type";
 
 import { auth } from "google-auth-library";
@@ -28,9 +27,14 @@ export async function createSpace(refreshToken: string) {
   // Run request
   return await meetClient.createSpace(request);
 }
-async function removeSpace(jsonClient: OAuth2Client, name: string) {
+async function removeSpace(refreshToken: string, name: string) {
   const meetClient = new SpacesServiceClient({
-    jsonClient,
+    authClient: auth.fromJSON({
+      type: 'authorized_user',
+      client_id: import.meta.env.GOOGLE_CLIENT_ID,
+      client_secret: import.meta.env.GOOGLE_CLIENT_SECRET,
+      refresh_token: refreshToken,
+    }),
   });
   // Construct request
   const request: any = {
@@ -43,7 +47,6 @@ async function removeSpace(jsonClient: OAuth2Client, name: string) {
 
 interface CreateMeetingParams {
   client: WebClient;
-  googleClient: OAuth2Client;
   ts?: string;
   channel: string;
 }
@@ -60,7 +63,7 @@ async function createMeeting({
   channel,
 }: CreateMeetingParams) {
   const storage = useStorage("kvStorage");
-  const meetings = await storage.get<Meeting[]>("current-meeting");
+  const meetings = await storage.get<Meeting[] | undefined>("current-meeting");
   const refreshToken = await storage.get<string>(GOOGLE_MEET_KEY);
   const [response] = await createSpace(refreshToken);
 
@@ -76,7 +79,7 @@ async function createMeeting({
     ts: ts || result.ts,
   };
   await storage.set<Meeting[]>("current-meeting", [
-    ...meetings.filter((m) => m.timestamp + 1000 * 60 * 60 * 24 > Date.now()),
+    ...(meetings ?? []).filter((m) => m.timestamp + 1000 * 60 * 60 * 24 > Date.now()),
     {
       ...meetingInfo,
       timestamp: Date.now(),
@@ -87,7 +90,6 @@ async function createMeeting({
 
 interface RemoveMeetingParams {
   client: WebClient;
-  googleClient: OAuth2Client;
   ts?: string;
   channel: string;
   text: string;
@@ -97,18 +99,18 @@ const MEET_NAME_REGEX = /{[a-z0-9]{3}-[a-z0-9]{4}-[a-z0-9]{3}}/g;
 
 async function removeMeeting({
   client,
-  googleClient,
   channel,
   text,
 }: RemoveMeetingParams) {
 
   const storage = useStorage("kvStorage");
   const meetings = await storage.get<Meeting[]>("current-meeting");
+  const refreshToken = await storage.get<string>(GOOGLE_MEET_KEY);
   const meetName = text.match(MEET_NAME_REGEX);
   if (!meetName) {
     return;
   }
-  await removeSpace(googleClient, meetName[0]);
+  await removeSpace(refreshToken, meetName[0]);
   const meetInfo = meetings.find((m) => m.meeting === meetName[0]);
   if (!meetInfo) {
     return;
@@ -122,19 +124,16 @@ async function removeMeeting({
   await storage.set<Meeting[]>("current-meeting", meetings.filter((m) => m.meeting !== meetName[0]));
 }
 
-export const message: MessageSetting[] = [
+export const messages: MessageSetting[] = [
   {
     regex: /(!회의생성|회의생성!|!회의 생성|회의 생성!|생성!)/,
     async handler({
       client,
-      text,
       ts,
       channel,
-      googleClient,
     }) {
       await createMeeting({
         client,
-        googleClient,
         ts,
         channel,
       });
@@ -146,11 +145,9 @@ export const message: MessageSetting[] = [
       client,
       text,
       channel,
-      googleClient,
     }) {
       await removeMeeting({
         client,
-        googleClient,
         channel,
         text,
       });
@@ -164,11 +161,10 @@ export const command: CommandSetting[] = [
     async handler({
       client,
       command,
-      googleClient,
+      text,
     }) {
       await createMeeting({
         client,
-        googleClient,
         channel: command.channel_id,
       });
     },
@@ -182,7 +178,6 @@ export const command: CommandSetting[] = [
     }) {
       await removeMeeting({
         client,
-        googleClient,
         text: command.text,
         channel: command.channel_id,
       });

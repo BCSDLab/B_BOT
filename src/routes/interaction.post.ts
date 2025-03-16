@@ -17,7 +17,7 @@ export default defineEventHandler(async (event) => {
   }
   const stringfiedBody = await readBody<{ payload: string }>(event);
   const body = JSON.parse(stringfiedBody.payload) as Interaction;
-  if (body.type === "shortcut") {
+  if (body.type === "message_action") {
     const targetShortcut = shortcuts.find((shortcut) => shortcut.key === body.callback_id);
 
     if (!targetShortcut) {

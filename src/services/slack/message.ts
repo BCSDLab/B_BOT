@@ -3,6 +3,7 @@ import type { MessageSetting } from "./type";
 import ICEBRAKING_QUESTIONS from "@/constant/ICEBRAKING_QUESTIONS.json";
 import CHANNEL_ID from "@/constant/CHANNEL_ID.json";
 import BASE_URL from "@/constant/BASE_URL.json";
+import { messages as googleMeetMessages } from "./domain/googleMeet";
 
 
 const USER_TEXT_REGEX = /<@([A-Z0-9]+)\|.+>/g;
@@ -34,7 +35,7 @@ export const messageFunctionList: MessageSetting[] = [
                 "emoji": true
               },
               "value": "click_link",
-              "url": `${import.meta.env.APP_BASE_URL}/rule_2024.pdf`,
+              "url": `${import.meta.env.APP_BASE_URL}rule_2024.pdf`,
               "action_id": "button-action"
             }
           }
@@ -581,7 +582,8 @@ interface RepliesResponse {
         threadTs: ts
       });
     }
-  }
+  },
+  ...googleMeetMessages,
 ];
 
 interface Shop {
