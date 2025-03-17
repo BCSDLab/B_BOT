@@ -96,7 +96,7 @@ function normalizeMetrics(metrics: Metrics[]): ClarityData["result"] {
     }
 
     if (metric.metricName === "RageClickCount") {
-      result.scriptErrorCount = normalizeInfomation(metric.information);
+      result.rageClickCount = normalizeInfomation(metric.information);
     }
 
     if (metric.metricName === "ScriptErrorCount") {
@@ -153,7 +153,7 @@ function createMessageBlock(clarityInfo: ClarityData, previousClarityInfo: Clari
       "type": "section",
       "text": {
         "type": "mrkdwn",
-        "text": `*${metricsKeyToKorean[key]}*: ${currentPercent}% ${previousClarityInfo ? valueDiffString : ""}\n
+        "text": `*${metricsKeyToKorean[key]}*: ${currentPercent.toFixed(2)}% ${previousClarityInfo ? valueDiffString : ""}\n
         ${currentValue.slice(0, 3).map(([url, count], index) => `${index + 1}. *${url}*: ${count[0]}번`).join("\n")}
         `
       }
