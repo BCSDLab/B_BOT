@@ -22,8 +22,9 @@ export interface ResultSet {
   fields: any;
 }
 
-export async function query (connection: mysql.PoolConnection, query: string, values?: any): Promise<ResultSet> {
-    const [rows, fields] = await connection.query(query, values);
-    connection.release();
-    return {rows, fields};
+export async function query(pool: mysql.Pool, query: string, values?: any): Promise<ResultSet> {
+  const connection = await pool.getConnection();
+  const [rows, fields] = await connection.query(query, values);
+  connection.release();
+  return { rows, fields };
 }

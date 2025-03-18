@@ -1,4 +1,4 @@
-import type { PoolConnection } from "mysql2/promise";
+import type { Pool } from "mysql2/promise";
 import { query } from "~/helper/adapter/mysql";
 
 export type Track =
@@ -27,7 +27,7 @@ export interface BcsdMember {
   member_type: MemberType;
 }
 export type TrackMember = Omit<BcsdMember, 'team_name'>;
-export async function getAllMembers(connection: PoolConnection): Promise<BcsdMember[]> {
+export async function getAllMembers(pool: Pool): Promise<BcsdMember[]> {
   let sql = `SELECT m.name        AS name,
                        m.slack_id    AS slack_id,
                        t.name        AS team_name,
@@ -39,10 +39,10 @@ export async function getAllMembers(connection: PoolConnection): Promise<BcsdMem
                          LEFT JOIN track tr ON m.track_id = tr.id
                 WHERE m.slack_id IS NOT NULL
                   AND m.is_deleted = 0;`
-  return await query(connection, sql).then((result) => result.rows);
+  return await query(pool, sql).then((result) => result.rows);
 }
 
-export async function getAllDistinctMembers(connection: PoolConnection): Promise<TrackMember[]> {
+export async function getAllDistinctMembers(connection): Promise<TrackMember[]> {
   let members: BcsdMember[] = await getAllMembers(connection);
   const n = new Set<string>();
   let distinctMembers: TrackMember[] = members.map(member => {
@@ -60,19 +60,19 @@ export async function getAllDistinctMembers(connection: PoolConnection): Promise
 }
 
 interface GetMentionTargetMembers {
-  connection: PoolConnection;
+  pool: Pool;
   team: Team;
   track: Track;
   memberType: MemberType;
 }
 
 export async function getMentionTargetMembers({
-  connection,
+  pool,
   team,
   track,
   memberType,
 }: GetMentionTargetMembers): Promise<string[]> {
-  let members: BcsdMember[] = await getAllMembers(connection);
+  let members: BcsdMember[] = await getAllMembers(pool);
 
 
   let tracks: string[] = [];
