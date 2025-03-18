@@ -1,4 +1,4 @@
-import { GOOGLE_MEET_KEY } from "~/services/slack/domain/googleMeet";
+import { GOOGLE_MEET_KEY } from "~/services/google/googleMeet";
 
 interface Token {
   access_token: string;
