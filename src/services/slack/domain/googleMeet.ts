@@ -1,128 +1,5 @@
-import type { WebClient } from "@slack/web-api";
-import type { CommandSetting, MessageSetting } from "../type";
-
-import { auth } from "google-auth-library";
-import { SpacesServiceClient } from "@google-apps/meet";
-
-export const GOOGLE_MEET_KEY = "google-meet-refresh-token";
-
-export async function createSpace(refreshToken: string) {
-  const meetClient = new SpacesServiceClient({
-    authClient: auth.fromJSON({
-      type: 'authorized_user',
-      client_id: import.meta.env.GOOGLE_CLIENT_ID,
-      client_secret: import.meta.env.GOOGLE_CLIENT_SECRET,
-      refresh_token: refreshToken,
-    }),
-  });
-  // Construct request
-  const request: any = {
-    space: {
-      config: {
-        accessType: "OPEN",
-      }
-    }
-  };
-
-  // Run request
-  return await meetClient.createSpace(request);
-}
-async function removeSpace(refreshToken: string, name: string) {
-  const meetClient = new SpacesServiceClient({
-    authClient: auth.fromJSON({
-      type: 'authorized_user',
-      client_id: import.meta.env.GOOGLE_CLIENT_ID,
-      client_secret: import.meta.env.GOOGLE_CLIENT_SECRET,
-      refresh_token: refreshToken,
-    }),
-  });
-  // Construct request
-  const request: any = {
-    name,
-  };
-
-  // Run request
-  return await meetClient.endActiveConference(request);
-}
-
-interface CreateMeetingParams {
-  client: WebClient;
-  ts?: string;
-  channel: string;
-}
-
-type Meeting = {
-  meeting: string;
-  ts: string;
-  timestamp: number;
-};
-
-async function createMeeting({
-  client,
-  ts,
-  channel,
-}: CreateMeetingParams) {
-  const storage = useStorage("kvStorage");
-  const meetings = await storage.get<Meeting[] | undefined>("current-meeting");
-  const refreshToken = await storage.get<string>(GOOGLE_MEET_KEY);
-  const [response] = await createSpace(refreshToken);
-
-  const result = await sendSlackText({
-    client,
-    threadTs: ts,
-    channel,
-    text: `회의를 생성하였습니다. ${response.meetingUri} 확인해주세요!`,
-    unfurl_links: true,
-  });
-  const meetingInfo = {
-    meeting: response.meetingCode,
-    ts: ts || result.ts,
-  };
-  await storage.set<Meeting[]>("current-meeting", [
-    ...(meetings ?? []).filter((m) => m.timestamp + 1000 * 60 * 60 * 24 > Date.now()),
-    {
-      ...meetingInfo,
-      timestamp: Date.now(),
-    }
-  ])
-  return meetingInfo;
-}
-
-interface RemoveMeetingParams {
-  client: WebClient;
-  ts?: string;
-  channel: string;
-  text: string;
-}
-
-const MEET_NAME_REGEX = /{[a-z0-9]{3}-[a-z0-9]{4}-[a-z0-9]{3}}/g;
-
-async function removeMeeting({
-  client,
-  channel,
-  text,
-}: RemoveMeetingParams) {
-
-  const storage = useStorage("kvStorage");
-  const meetings = await storage.get<Meeting[]>("current-meeting");
-  const refreshToken = await storage.get<string>(GOOGLE_MEET_KEY);
-  const meetName = text.match(MEET_NAME_REGEX);
-  if (!meetName) {
-    return;
-  }
-  await removeSpace(refreshToken, meetName[0]);
-  const meetInfo = meetings.find((m) => m.meeting === meetName[0]);
-  if (!meetInfo) {
-    return;
-  }
-  await updateSlack({
-    client,
-    ts: meetInfo.ts,
-    channel,
-    text: "회의가 종료되었습니다. 다음에 만나요!",
-  });
-  await storage.set<Meeting[]>("current-meeting", meetings.filter((m) => m.meeting !== meetName[0]));
-}
+import { createMeeting, removeMeeting, saveMeeting } from "~/services/google/googleMeet";
+import { CommandSetting, MessageSetting } from "../type";
 
 export const messages: MessageSetting[] = [
   {
@@ -132,10 +9,17 @@ export const messages: MessageSetting[] = [
       ts,
       channel,
     }) {
-      await createMeeting({
+      const meetingInfo = await createMeeting();
+      const result = await sendSlackText({
         client,
-        ts,
+        threadTs: ts,
         channel,
+        text: `회의를 생성하였습니다. ${meetingInfo.meetingUri} 확인해주세요!`,
+        unfurl_links: true,
+      });
+      await saveMeeting({
+        meeting: meetingInfo.meetingCode,
+        ts: ts || result.ts,
       });
     }
   },
@@ -143,13 +27,17 @@ export const messages: MessageSetting[] = [
     regex: /(!회의종료|회의종료!|!회의 종료|회의 종료!|종료!)/,
     async handler({
       client,
-      text,
       channel,
+      text,
     }) {
-      await removeMeeting({
-        client,
-        channel,
+      const meetingInfo = await removeMeeting({
         text,
+      });
+      await updateSlack({
+        client,
+        ts: meetingInfo.ts,
+        channel: channel,
+        text: "회의가 종료되었습니다. 다음에 만나요!",
       });
     }
   },
@@ -163,9 +51,15 @@ export const command: CommandSetting[] = [
       command,
       text,
     }) {
-      await createMeeting({
+      const meetingInfo = await createMeeting();
+      const result = await sendSlackText({
         client,
         channel: command.channel_id,
+        text: `회의를 생성하였습니다. ${meetingInfo.meetingUri} 확인해주세요!`,
+      });
+      await saveMeeting({
+        meeting: meetingInfo.meetingCode,
+        ts: result.ts,
       });
     },
   },
@@ -174,12 +68,16 @@ export const command: CommandSetting[] = [
     async handler({
       client,
       command,
-      googleClient,
     }) {
-      await removeMeeting({
-        client,
+      const meetingInfo = await removeMeeting({
         text: command.text,
+      });
+
+      await updateSlack({
+        client,
+        ts: meetingInfo.ts,
         channel: command.channel_id,
+        text: "회의가 종료되었습니다. 다음에 만나요!",
       });
     }
   },

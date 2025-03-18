@@ -29,108 +29,57 @@ export default defineEventHandler(async (event) => {
   if (body.event.channel_type !== "channel") {
     return "not Implemented";
   }
+  let text = "";
+  let threadTs = "";
+  let userId = "";
+  let channelId = "";
+
   if (body.event.subtype === undefined) {
     const eventBody = body.event as GenericMessageEvent;
-    const text = eventBody.text;
-    for(const messageFunction of messageFunctionList) {
-      if (typeof messageFunction.regex === "string") {
-        const isIncluded = text.includes(messageFunction.regex);
-        if (!isIncluded) {
-          continue;
-        }
-        await messageFunction.handler({
-          client: event.context.slackWebClient,
-          text,
-          ts: eventBody.thread_ts,
-          user: eventBody.user,
-          channel: eventBody.channel,
-        });
-      } else {
-        const isMatched = messageFunction.regex.test(text);
-        if (!isMatched) {
-          continue;
-        }
-        await messageFunction.handler({
-          client: event.context.slackWebClient,
-          text,
-          ts: eventBody.thread_ts,
-          user: eventBody.user,
-          channel: eventBody.channel,
-          googleClient: event.context.googleClient,
-        });
-      }
-    }
+    text = eventBody.text;
+    channelId = eventBody.channel;
+    userId = eventBody.user;
+
   } else if (body.event.subtype === "message_changed") {
     const eventBody = body.event as MessageChangedEvent;
     if (eventBody.message.subtype !== undefined) {
       return;
     }
     const message = eventBody.message as GenericMessageEvent;
-    const text = message.text;
-    for(const messageFunction of messageFunctionList) {
-      if (typeof messageFunction.regex === "string") {
-        const isIncluded = text.includes(messageFunction.regex);
-        if (!isIncluded) {
-          continue;
-        }
-        await messageFunction.handler({
-          client: event.context.slackWebClient,
-          text,
-          ts: message?.thread_ts,
-          user: message.user,
-          channel: message.channel,
-          googleClient: event.context.googleClient,
-        });
-      } else {
-        const isMatched = messageFunction.regex.test(text);
-        if (!isMatched) {
-          continue;
-        }
-        await messageFunction.handler({
-          client: event.context.slackWebClient,
-          text,
-          ts: message?.thread_ts,
-          user: message.user,
-          channel: message.channel,
-          googleClient: event.context.googleClient,
-        });
-      }
-    }
+    text = message.text;
+    channelId = message.channel;
+    userId = message.user;
+    threadTs = message.thread_ts;
+
   } else if (body.event.subtype === "message_replied") {
     const eventBody = body.event as MessageRepliedEvent;
     if (eventBody.message.subtype !== undefined) {
       return;
     }
     const message = eventBody.message as GenericMessageEvent;
-    const text = message.text;
-    for(const messageFunction of messageFunctionList) {
-      if (typeof messageFunction.regex === "string") {
-        const isIncluded = text.includes(messageFunction.regex);
-        if (!isIncluded) {
-          continue;
-        }
-        await messageFunction.handler({
-          client: event.context.slackWebClient,
-          text,
-          ts: message.thread_ts,
-          user: message.user,
-          channel: message.channel,
-          googleClient: event.context.googleClient,
-        });
-      } else {
-        const isMatched = messageFunction.regex.test(text);
-        if (!isMatched) {
-          continue;
-        }
-        await messageFunction.handler({
-          client: event.context.slackWebClient,
-          text,
-          ts: message.thread_ts,
-          user: message.user,
-          channel: message.channel,
-          googleClient: event.context.googleClient,
-        });
+    text = message.text;
+    channelId = message.channel;
+    userId = message.user;
+    threadTs = message.thread_ts;
+  }
+  for (const messageFunction of messageFunctionList) {
+    if (typeof messageFunction.regex === "string") {
+      const isIncluded = text.includes(messageFunction.regex);
+      if (!isIncluded) {
+        continue;
+      }
+    } else {
+      const isMatched = messageFunction.regex.test(text);
+      if (!isMatched) {
+        continue;
       }
     }
+    await messageFunction.handler({
+      client: event.context.slackWebClient,
+      text,
+      ts: threadTs,
+      user: userId,
+      channel: channelId,
+    });
   }
 });
