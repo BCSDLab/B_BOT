@@ -24,6 +24,7 @@ export interface ResultSet {
 
 export async function query(pool: mysql.Pool, query: string, values?: any): Promise<ResultSet> {
   const connection = await pool.getConnection();
+  console.log(connection);
   const [rows, fields] = await connection.query(query, values);
   connection.release();
   return { rows, fields };
