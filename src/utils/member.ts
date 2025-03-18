@@ -42,8 +42,8 @@ export async function getAllMembers(pool: Pool): Promise<BcsdMember[]> {
   return await query(pool, sql).then((result) => result.rows);
 }
 
-export async function getAllDistinctMembers(connection): Promise<TrackMember[]> {
-  let members: BcsdMember[] = await getAllMembers(connection);
+export async function getAllDistinctMembers(pool: Pool): Promise<TrackMember[]> {
+  let members: BcsdMember[] = await getAllMembers(pool);
   const n = new Set<string>();
   let distinctMembers: TrackMember[] = members.map(member => {
     if (!n.has(member.slack_id)) {

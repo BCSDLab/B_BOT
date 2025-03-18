@@ -14,7 +14,7 @@ export default defineEventHandler(async (event) => {
     writer
   } = await readBody<RequestBody>(event);
 
-  const userList: TrackMember[] = await getAllDistinctMembers(event.context.pool);
+  const userList: TrackMember[] = await getAllDistinctMembers(event.context.sqlPool);
   const mentionList = userList.filter((member) => reviewers.some((reviewer) => member.name == reviewer && member.track_name === "FrontEnd"));
   const writerMember = userList.find((member) => member.name === writer && member.track_name === "FrontEnd");
   if (mentionList.length === 0) {
