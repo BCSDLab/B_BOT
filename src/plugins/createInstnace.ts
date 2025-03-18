@@ -4,11 +4,10 @@ import { createPool } from "~/helper/adapter/mysql";
 export default defineNitroPlugin(async (nitroApp) => {
   const webClient = new WebClient(import.meta.env.SLACK_BOT_TOKEN);
   const pool = createPool();
-  console.log(pool);
   nitroApp.hooks.hook(
     'request',
     (event) => {
-      console.log(pool.config);
+      console.log(pool);
       event.context = {
         ...event.context,
         slackWebClient: webClient,

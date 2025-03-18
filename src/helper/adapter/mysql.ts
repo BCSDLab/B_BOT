@@ -1,4 +1,4 @@
-import mysql from "mysql2/promise";
+import mysql from "mysql2";
 
 export function createPool() {
   console.log({
@@ -14,7 +14,7 @@ export function createPool() {
     user: import.meta.env.DB_USER,
     password: import.meta.env.DB_PASSWORD,
     database: import.meta.env.DB_NAME
-  });
+  }).promise();
 }
 
 export interface ResultSet {
