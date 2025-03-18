@@ -1,6 +1,6 @@
 import mysql from "mysql2/promise";
 
-export async function createPool() {
+export function createPool() {
   console.log({
     host: import.meta.env.DB_HOST,
     port: Number(<string>import.meta.env.DB_PORT),
