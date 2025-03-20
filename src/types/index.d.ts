@@ -17,6 +17,7 @@ interface ImportMetaEnv {
   readonly GOOGLE_REDIRECT_URI?: string;
   readonly GOOGLE_PROJECT_ID: string;
   readonly CREDENTIALS_PATH: string;
+  readonly ADMIN_NAME: string;
 }
 interface ImportMeta {
   env: ImportMetaEnv;

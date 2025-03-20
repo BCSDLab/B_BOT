@@ -1,10 +1,15 @@
 import { WebClient } from "@slack/web-api";
 import CHANNEL_ID from "@/constant/CHANNEL_ID.json";
 
-const CLARITY_DATA_KEY = "CLARITY_DATA";
+const CLARITY_DATA_KEY = "CLARITY_LIST";
+const CLARITY_DATA_PREFIX = "CLARITY_DATA_";
 
 interface ClarityData {
   date: number;
+  /**
+   * @example { deadClickCount: { "/" : [ 1, 2 ] }
+   * "/"에서 두 세션 중 한 번 "빠른 클릭"이 감지됨.
+  */
   result: Record<string, [string, [number, number]][]>;
 }
 
@@ -20,6 +25,7 @@ export default defineTask({
     context,
   }) {
     console.log("Crawl Clarity Data");
+    const now = Date.now();
     // https://github.com/nitrojs/nitro/issues/1974
     // Task Hook is not implemented.
     const slackWebClient = new WebClient(import.meta.env.SLACK_BOT_TOKEN);
@@ -38,26 +44,40 @@ export default defineTask({
         }
       );
       const normailzedResult = normalizeMetrics(result);
-      const data = await storage.get<ClarityData[]>(CLARITY_DATA_KEY);
+      const data = await storage.get<number[]>(CLARITY_DATA_KEY);
       await storage.set(CLARITY_DATA_KEY, [
         ...(data ?? []),
+        now
+      ]);
+      await storage.set(`${CLARITY_DATA_PREFIX}${now}`, {
+        date: now,
+        result: normailzedResult
+      } satisfies ClarityData);
+      const previousData = await storage.get<ClarityData | null>(`${CLARITY_DATA_PREFIX}${data[data.length -1]}`);
+      if (!previousData) {
+        return {
+          result: "success"
+        };
+      }
+      const blocks = createScriptErrorMessageText(
         {
-          date: scheduledTime,
+          date: now,
           result: normailzedResult,
         },
-      ]);
+        previousData
+      );
+      if (blocks.length === 0) {
+        return {
+          result: "success"
+        };
+      
+      }
       await sendSlackBlock({
         client: slackWebClient,
         channel: CHANNEL_ID.코인_오류_front_end,
-        blocks: createMessageBlock(
-          {
-            date: Date.now(),
-            result: normailzedResult,
-          },
-          data[data.length - 1]
-        ),
+        blocks,
         unfurl_links: false,
-      })
+      });
     } catch (e) {
       console.error(e);
       return {
@@ -133,7 +153,7 @@ function createMessageBlock(clarityInfo: ClarityData, previousClarityInfo: Clari
 			"type": "section",
 			"text": {
 				"type": "mrkdwn",
-				"text": `${(new Date(date)).toLocaleString("ko-kr")}의 *코인 웹사이트 측정치*입니다!`
+				"text": `${(new Date(date)).toLocaleString("ko-kr")}의 *코인 웹사이트 측정치*입니다! [참고](https://learn.microsoft.com/en-us/clarity/insights/semantic-metrics)`
 			}
 		},
 		{
@@ -159,5 +179,44 @@ function createMessageBlock(clarityInfo: ClarityData, previousClarityInfo: Clari
       }
     });
   }
+  return blocks;
+}
+
+function createScriptErrorMessageText(clarityInfo: ClarityData, previousClarityInfo: ClarityData) {
+  const { date, result } = clarityInfo;
+  const blocks = [];
+  const scriptErrorResult = result.scriptErrorCount;
+  for (const scriptErrorCountInfo of scriptErrorResult) {
+    const errorCount = scriptErrorCountInfo[1][1];
+    if (errorCount === 0) {
+      continue;
+    }
+    const previousErrorCount = previousClarityInfo.result.scriptErrorCount.find((info) => info[0] === scriptErrorCountInfo[0])?.[1][1] ?? 0;
+    const errorCountDiff = errorCount - previousErrorCount;
+    if (errorCountDiff > 0) {
+      blocks.push({
+        "type": "section",
+        "text": {
+          "type": "mrkdwn",
+          "text": `*\`${scriptErrorCountInfo[0]}\`*에서 ${errorCountDiff}번이 증가했습니다.\n`
+        }
+      });
+    }
+  }
+  if (blocks.length === 0) {
+    return [];
+  }
+  blocks.unshift(
+		{
+			"type": "section",
+			"text": {
+				"type": "mrkdwn",
+				"text": `코인에 새로운 에러가 발생했습니다! 만약 세션을 보고 싶으시다면 관리자를 불러주세요(현 관리자 이름: ${import.meta.env.ADMIN_NAME}).`
+			}
+		},
+		{
+			"type": "divider"
+		},
+  )
   return blocks;
 }
