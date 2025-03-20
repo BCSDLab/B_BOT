@@ -49,7 +49,7 @@ export default defineEventHandler(async (event) => {
     text = message.text;
     channelId = message.channel;
     userId = message.user;
-    threadTs = message.thread_ts;
+    threadTs = message.ts;
 
   } else if (body.event.subtype === "message_replied") {
     const eventBody = body.event as MessageRepliedEvent;
