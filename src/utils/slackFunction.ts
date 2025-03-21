@@ -18,10 +18,10 @@ export async function sendSlackText({
   unfurlLinks: unfurl_links,
 }: SendSlackTextParams) {
   return client.chat.postMessage({
-      channel,
-      text,
-      thread_ts,
-      unfurl_links,
+    channel,
+    text,
+    thread_ts,
+    unfurl_links,
   });
 }
 
@@ -37,10 +37,10 @@ export async function sendSlackBlock({
   unfurlLinks: unfurl_links,
 }: SendSlackBlockParams) {
   return client.chat.postMessage({
-      channel,
-      blocks,
-      thread_ts,
-      unfurl_links,
+    channel,
+    blocks,
+    thread_ts,
+    unfurl_links,
   });
 }
 interface UpdateSlackBlockParams extends Omit<SendSlackBlockParams, "thread_ts" | "blocks"> {

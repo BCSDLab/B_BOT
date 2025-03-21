@@ -12,8 +12,9 @@ interface ErrorInfo {
   url: string;
 }
 
-export default defineEventHandler(async (event) => {
+const FRONTEND_ERROR_PREFIX = "FRONTEND_ERROR";
 
+export default defineEventHandler(async (event) => {
   try {
     const {
       url,
@@ -26,7 +27,7 @@ export default defineEventHandler(async (event) => {
       channel = CHANNEL_ID.코인_오류_front_end_stage;
     }
     const storage = useStorage("kvStorage");
-    const key = `roulette_${(new Date()).toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' }).replaceAll('. ', '-')}`;
+    const key = `${FRONTEND_ERROR_PREFIX}_${(new Date()).toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' }).replaceAll('. ', '-').replace('.', '')}`;
     const errorString = JSON.stringify(error);
     const hasSameError = await storage.get<ErrorInfo[]>(`frontend-error-${key}`);
     const threadTs = hasSameError?.find((item) => item.url === url || item.error === errorString)?.ts ?? undefined;
