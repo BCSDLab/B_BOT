@@ -187,11 +187,11 @@ function createScriptErrorMessageText(clarityInfo: ClarityData, previousClarityI
   const blocks = [];
   const scriptErrorResult = result.scriptErrorCount;
   for (const scriptErrorCountInfo of scriptErrorResult) {
-    const errorCount = scriptErrorCountInfo[1][1];
+    const errorCount = scriptErrorCountInfo[1][0];
     if (errorCount === 0) {
       continue;
     }
-    const previousErrorCount = previousClarityInfo.result.scriptErrorCount.find((info) => info[0] === scriptErrorCountInfo[0])?.[1][1] ?? 0;
+    const previousErrorCount = previousClarityInfo.result.scriptErrorCount.find((info) => info[0] === scriptErrorCountInfo[0])?.[1][0] ?? 0;
     const errorCountDiff = errorCount - previousErrorCount;
     if (errorCountDiff > 0) {
       blocks.push({
