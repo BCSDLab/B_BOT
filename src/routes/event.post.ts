@@ -39,6 +39,7 @@ export default defineEventHandler(async (event) => {
     text = eventBody.text;
     channelId = eventBody.channel;
     userId = eventBody.user;
+    threadTs = eventBody.ts ?? eventBody.thread_ts ?? undefined;
 
   } else if (body.event.subtype === "message_changed") {
     const eventBody = body.event as MessageChangedEvent;
@@ -50,17 +51,6 @@ export default defineEventHandler(async (event) => {
     channelId = message.channel;
     userId = message.user;
     threadTs = message.ts;
-
-  } else if (body.event.subtype === "message_replied") {
-    const eventBody = body.event as MessageRepliedEvent;
-    if (eventBody.message.subtype !== undefined) {
-      return;
-    }
-    const message = eventBody.message as GenericMessageEvent;
-    text = message.text;
-    channelId = message.channel;
-    userId = message.user;
-    threadTs = message.thread_ts;
   }
   for (const messageFunction of messageFunctionList) {
     if (typeof messageFunction.regex === "string") {
