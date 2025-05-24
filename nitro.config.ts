@@ -18,6 +18,6 @@ export default defineNitroConfig({
     }
   },
   scheduledTasks: {
-    "0 9,18 * * *": "crawl:clarity",
+    // "0 9 * * *": "crawl:clarity",
   },
 });
