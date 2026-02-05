@@ -262,6 +262,48 @@
               }
             ]
           }
+        },
+        {
+          "type": "section",
+          "block_id": "is_active",
+          "text": {
+            "type": "mrkdwn",
+            "text": "활동 상태를 선택해주세요"
+          },
+          "accessory": {
+            "action_id": "is_active_select",
+            "type": "static_select",
+            "initial_option": {
+              "text": {
+                "type": "plain_text",
+                "text": "활동중인 사람만"
+              },
+              "value": "active"
+            },
+            "options": [
+              {
+                "text": {
+                  "type": "plain_text",
+                  "text": "활동중인 사람만"
+                },
+                "value": "active"
+              },
+              {
+                "text": {
+                  "type": "plain_text",
+                  "text": "비활동중인 사람만"
+                },
+                "value": "inactive"
+              },
+              {
+                "text": {
+                  "type": "plain_text",
+                  "text": "전체"
+                },
+                "value": "all"
+              }
+            ]
+          }
         }
       ],
       "submit": {

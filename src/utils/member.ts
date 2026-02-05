@@ -19,21 +19,25 @@ export type Team = 'Business' | 'Campus' | 'User' | 'TrackLeader' | 'Branding' |
 
 export type MemberType = 'BEGINNER' | 'REGULAR' | 'MENTOR' | 'all';
 
+export type ActiveStatus = 'active' | 'inactive' | 'all';
+
 export interface BcsdMember {
   name: string;
   slack_id: string;
   team_name: Team;
   track_name: Track;
   member_type: MemberType;
+  is_active?: number;
 }
 export type TrackMember = Omit<BcsdMember, 'team_name'>;
 export async function getAllMembers(pool: Pool): Promise<BcsdMember[]> {
   let sql = `SELECT m.name        AS name,
-                       m.slack_id    AS slack_id,
-                       t.name        AS team_name,
-                       tr.name       AS track_name,
-                       m.member_type AS member_type
-                FROM member m
+                        m.slack_id    AS slack_id,
+                        t.name        AS team_name,
+                        tr.name       AS track_name,
+                        m.member_type AS member_type,
+                        m.is_active   AS is_active
+                 FROM member m
                          LEFT JOIN team_map tm ON m.id = tm.member_id
                          LEFT JOIN team t ON tm.team_id = t.id
                          LEFT JOIN track tr ON m.track_id = tr.id
@@ -64,6 +68,7 @@ interface GetMentionTargetMembers {
   team: Team;
   track: Track;
   memberType: MemberType;
+  isActive: ActiveStatus;
 }
 
 export async function getMentionTargetMembers({
@@ -71,6 +76,7 @@ export async function getMentionTargetMembers({
   team,
   track,
   memberType,
+  isActive,
 }: GetMentionTargetMembers): Promise<string[]> {
   let members: BcsdMember[] = await getAllMembers(pool);
 
@@ -83,10 +89,11 @@ export async function getMentionTargetMembers({
   const setForFilter = new Set<string>();
   const result: string[] = [];
   for (const member of members) {
-    if (
+     if (
       !((team === 'all' || member.team_name === team) &&
         (track === 'all' || (track === 'client' ? tracks.includes(member.track_name) : member.track_name === track)) &&
-        (memberType === 'all' || member.member_type === memberType))
+        (memberType === 'all' || member.member_type === memberType) &&
+        (isActive === 'all' || (isActive === 'active' ? member.is_active === 1 : member.is_active !== 1)))
     ) {
       continue;
     }
