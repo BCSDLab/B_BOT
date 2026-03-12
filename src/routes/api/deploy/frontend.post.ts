@@ -3,6 +3,7 @@ import CHANNEL_ID from "@/constant/CHANNEL_ID.json";
 interface RequestBody {
   status: 'success' | 'failure';
   environment: 'Production' | 'Stage';
+  repository: string;
   branch: string;
   actor: string;
   commitMessage: string;
@@ -13,11 +14,16 @@ export default defineEventHandler(async (event) => {
   const {
     status,
     environment,
+    repository,
     branch,
     actor,
     commitMessage,
     runUrl,
   } = await readBody<RequestBody>(event);
+
+  const userList: TrackMember[] = await getAllDistinctMembers(event.context.sqlPool);
+  const actorMember = userList.find((member) => member.name === actor && member.track_name === 'FrontEnd');
+  const actorMentionString = actorMember ? `<@${actorMember.slack_id}>` : actor;
 
   const isSuccess = status === 'success';
   const icon = isSuccess ? ':white_check_mark:' : ':x:';
@@ -32,7 +38,7 @@ export default defineEventHandler(async (event) => {
         type: 'section',
         text: {
           type: 'mrkdwn',
-          text: `${icon} *[${environment}] ${statusText}*\n• Branch: \`${branch}\`\n• Author: ${actor}\n• Commit: ${commitMessage}\n• <${runUrl}|Actions 보기>`,
+          text: `${icon} *[${environment}] ${statusText}*\n• Repo: \`${repository}\`\n• Branch: \`${branch}\`\n• Author: ${actorMentionString}\n• Commit: ${commitMessage}\n• <${runUrl}|Actions 보기>`,
         },
       },
     ],
