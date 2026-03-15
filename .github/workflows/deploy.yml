@@ -1,0 +1,114 @@
+name: Deploy
+
+on:
+  push:
+    branches:
+      - main
+  schedule:
+    - cron: "26 21 * * *" # 매일 06:26 KST (21:26 UTC)
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.6.3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "pnpm"
+
+      - name: Create .env
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+          SLACK_BOT_SIGNING_SECRET: ${{ secrets.SLACK_BOT_SIGNING_SECRET }}
+          SLACK_BOT_CLIENT_SECRET: ${{ secrets.SLACK_BOT_CLIENT_SECRET }}
+          SLACK_APP_TOKEN: ${{ secrets.SLACK_APP_TOKEN }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          GOOGLE_PROJECT_ID: ${{ secrets.GOOGLE_PROJECT_ID }}
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS }}
+          TOKEN_PATH: ${{ secrets.TOKEN_PATH }}
+          CREDENTIALS_PATH: ${{ secrets.CREDENTIALS_PATH }}
+          DB_NAME: ${{ secrets.DB_NAME }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PORT: ${{ secrets.DB_PORT }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          DB_HOST: ${{ secrets.DB_HOST }}
+          CLARITY_TOKEN: ${{ secrets.CLARITY_TOKEN }}
+          NITRO_APP_BASE_URL: ${{ secrets.NITRO_APP_BASE_URL }}
+        run: |
+          cat <<EOF > .env
+          SLACK_BOT_TOKEN=$SLACK_BOT_TOKEN
+          SLACK_BOT_SIGNING_SECRET=$SLACK_BOT_SIGNING_SECRET
+          SLACK_BOT_CLIENT_SECRET=$SLACK_BOT_CLIENT_SECRET
+          SLACK_APP_TOKEN=$SLACK_APP_TOKEN
+          GOOGLE_CLIENT_ID=$GOOGLE_CLIENT_ID
+          GOOGLE_CLIENT_SECRET=$GOOGLE_CLIENT_SECRET
+          GOOGLE_PROJECT_ID=$GOOGLE_PROJECT_ID
+          GOOGLE_APPLICATION_CREDENTIALS=$GOOGLE_APPLICATION_CREDENTIALS
+          TOKEN_PATH=$TOKEN_PATH
+          CREDENTIALS_PATH=$CREDENTIALS_PATH
+          DB_NAME=$DB_NAME
+          DB_USER=$DB_USER
+          DB_PORT=$DB_PORT
+          DB_PASSWORD=$DB_PASSWORD
+          DB_HOST=$DB_HOST
+          CLARITY_TOKEN=$CLARITY_TOKEN
+          NITRO_APP_BASE_URL=$NITRO_APP_BASE_URL
+          EOF
+
+      - name: Create credentials.json
+        env:
+          CREDENTIALS_JSON: ${{ secrets.CREDENTIALS_JSON }}
+        run: echo "$CREDENTIALS_JSON" > credentials.json
+
+      - name: Create token.json
+        env:
+          TOKEN_JSON: ${{ secrets.TOKEN_JSON }}
+        run: echo "$TOKEN_JSON" > token.json
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm run build
+
+      - name: Create deploy package
+        run: cd .output && tar -cvzf ../output.tar.gz *
+
+      - name: Setup SSH agent
+        uses: webfactory/ssh-agent@v0.10.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Add SSH known hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -p ${{ secrets.SSH_PORT }} ${{ secrets.DEPLOY_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Upload archive
+        run: |
+          scp -o ConnectTimeout=30 -P ${{ secrets.SSH_PORT }} \
+            output.tar.gz \
+            ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:/home/ubuntu/bcsdlab/bot/
+
+      - name: Deploy on server
+        run: |
+          ssh -o ConnectTimeout=30 -p ${{ secrets.SSH_PORT }} \
+            ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
+            "tar -xvzf /home/ubuntu/bcsdlab/bot/output.tar.gz -C /home/ubuntu/bbot && sleep 2 && ./bbot_deploy.sh"
