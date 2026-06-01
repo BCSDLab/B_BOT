@@ -91,12 +91,6 @@ jobs:
       - name: Create deploy package
         run: cd .output && tar -cvzf ../output.tar.gz *
 
-      - name: Test connectivity
-        run: |
-          echo "DEPLOY_HOST=${{ secrets.DEPLOY_HOST }}"
-          echo "SSH_PORT=${{ secrets.SSH_PORT }}"
-          nc -zv -w 10 ${{ secrets.DEPLOY_HOST }} ${{ secrets.SSH_PORT }} && echo "SECRET OK" || echo "SECRET FAILED"
-
       - name: Setup SSH agent
         uses: webfactory/ssh-agent@v0.10.0
         with:
