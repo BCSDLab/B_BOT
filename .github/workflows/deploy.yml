@@ -91,6 +91,11 @@ jobs:
       - name: Create deploy package
         run: cd .output && tar -cvzf ../output.tar.gz *
 
+      - name: Test connectivity
+        run: |
+          nc -zv -w 10 220.68.91.183 22222 && echo "22222 OK" || echo "22222 FAILED"
+          nc -zv -w 10 220.68.91.183 22223 && echo "22223 OK" || echo "22223 FAILED"
+
       - name: Setup SSH agent
         uses: webfactory/ssh-agent@v0.10.0
         with:
