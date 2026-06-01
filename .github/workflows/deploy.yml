@@ -93,8 +93,9 @@ jobs:
 
       - name: Test connectivity
         run: |
-          nc -zv -w 10 220.68.91.183 22222 && echo "22222 OK" || echo "22222 FAILED"
-          nc -zv -w 10 220.68.91.183 22223 && echo "22223 OK" || echo "22223 FAILED"
+          echo "DEPLOY_HOST=${{ secrets.DEPLOY_HOST }}"
+          echo "SSH_PORT=${{ secrets.SSH_PORT }}"
+          nc -zv -w 10 ${{ secrets.DEPLOY_HOST }} ${{ secrets.SSH_PORT }} && echo "SECRET OK" || echo "SECRET FAILED"
 
       - name: Setup SSH agent
         uses: webfactory/ssh-agent@v0.10.0
