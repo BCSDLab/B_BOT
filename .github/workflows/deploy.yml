@@ -102,14 +102,8 @@ jobs:
           echo "${{ secrets.KNOWN_HOSTS }}" >> ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
 
-      - name: Upload archive
+      - name: Upload and deploy
         run: |
-          scp -o ConnectTimeout=30 -P ${{ secrets.SSH_PORT }} \
-            output.tar.gz \
-            ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:/home/ubuntu/bcsdlab/bot/
-
-      - name: Deploy on server
-        run: |
-          ssh -o ConnectTimeout=30 -p ${{ secrets.SSH_PORT }} \
+          cat output.tar.gz | ssh -o ConnectTimeout=60 -p ${{ secrets.SSH_PORT }} \
             ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
-            "tar -xvzf /home/ubuntu/bcsdlab/bot/output.tar.gz -C /home/ubuntu/bbot && sleep 2 && ./bbot_deploy.sh"
+            "cat > /home/ubuntu/bcsdlab/bot/output.tar.gz && tar -xvzf /home/ubuntu/bcsdlab/bot/output.tar.gz -C /home/ubuntu/bbot && sleep 2 && ./bbot_deploy.sh"
