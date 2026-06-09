@@ -104,6 +104,10 @@ jobs:
 
       - name: Upload and deploy
         run: |
-          cat output.tar.gz | ssh -o ConnectTimeout=60 -p ${{ secrets.SSH_PORT }} \
-            ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
+          cat output.tar.gz | ssh \
+            -o ConnectTimeout=60 \
+            -o StrictHostKeyChecking=accept-new \
+            -o "ProxyJump=${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:${{ secrets.JUMP_SSH_PORT }}" \
+            -p ${{ secrets.SSH_PORT }} \
+            ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_TARGET_HOST }} \
             "cat > /home/ubuntu/bcsdlab/bot/output.tar.gz && tar -xvzf /home/ubuntu/bcsdlab/bot/output.tar.gz -C /home/ubuntu/bbot && sleep 2 && ./bbot_deploy.sh"
