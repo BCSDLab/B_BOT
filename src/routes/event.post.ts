@@ -1,11 +1,10 @@
 import type {
   GenericMessageEvent,
   MessageChangedEvent,
-  MessageRepliedEvent,
   SlackEvent,
   WebClient,
 } from "@slack/web-api";
-import { messageFunctionList } from "~/services/slack/message";
+import { processSlackMessage } from "~/services/slack/processMessage";
 
 type Body = {
   type: "event_callback";
@@ -76,7 +75,7 @@ export default defineEventHandler(async (event) => {
     return { ok: true };
   }
 
-  processMessage({
+  processSlackMessage({
     client: context.slackWebClient,
     text,
     ts: threadTs,
@@ -86,49 +85,3 @@ export default defineEventHandler(async (event) => {
 
   return { ok: true };
 });
-
-async function processMessage({
-  client,
-  text,
-  ts,
-  user,
-  channel,
-}: {
-  client: WebClient;
-  text: string;
-  ts: string;
-  user: string;
-  channel: string;
-}) {
-  for (const messageFunction of messageFunctionList) {
-    if (typeof messageFunction.regex === "string") {
-      const isIncluded = text.includes(messageFunction.regex);
-      if (!isIncluded) {
-        continue;
-      }
-    } else {
-      const isMatched = messageFunction.regex.test(text);
-      if (!isMatched) {
-        continue;
-      }
-    }
-
-    try {
-      await messageFunction.handler({
-        client,
-        text,
-        ts,
-        user,
-        channel,
-      });
-    } catch (error) {
-      console.error('Handler error:', error);
-      await sendSlackText({
-        client,
-        channel,
-        threadTs: ts,
-        text: `오류가 발생했어요: ${error instanceof Error ? error.message : '알 수 없는 오류입니다'}`,
-      });
-    }
-  }
-}
