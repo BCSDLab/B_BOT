@@ -1,5 +1,5 @@
 import "@total-typescript/ts-reset/fetch";
-import type { Pool } from "mysql2/promise";
+import type { Pool } from "pg";
 import type {
   GroupMentionMetadata,
   MentionMetadata,

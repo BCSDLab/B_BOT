@@ -1,5 +1,5 @@
-import type { Pool } from "mysql2/promise";
-import { query } from "~/helper/adapter/mysql";
+import type { Pool } from "pg";
+import { query } from "~/helper/adapter/postgres";
 
 export type Track =
   'FrontEnd'
@@ -27,7 +27,7 @@ export interface BcsdMember {
   team_name: Team;
   track_name: Track;
   member_type: MemberType;
-  is_active?: number;
+  is_active?: boolean;
 }
 export type TrackMember = Omit<BcsdMember, 'team_name'>;
 export async function getAllMembers(pool: Pool): Promise<BcsdMember[]> {
@@ -42,7 +42,7 @@ export async function getAllMembers(pool: Pool): Promise<BcsdMember[]> {
                          LEFT JOIN team t ON tm.team_id = t.id
                          LEFT JOIN track tr ON m.track_id = tr.id
                 WHERE m.slack_id IS NOT NULL
-                  AND m.is_deleted = 0;`
+                  AND m.is_deleted = false;`
   return await query(pool, sql).then((result) => result.rows);
 }
 
@@ -93,7 +93,7 @@ export async function getMentionTargetMembers({
       !((team === 'all' || member.team_name === team) &&
         (track === 'all' || (track === 'client' ? tracks.includes(member.track_name) : member.track_name === track)) &&
         (memberType === 'all' || member.member_type === memberType) &&
-        (isActive === 'all' || (isActive === 'active' ? member.is_active === 1 : member.is_active !== 1)))
+        (isActive === 'all' || (isActive === 'active' ? member.is_active === true : member.is_active !== true)))
     ) {
       continue;
     }
