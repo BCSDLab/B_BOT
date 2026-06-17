@@ -11,4 +11,4 @@
 
 # DB dumps (멤버 PII 포함 — 절대 커밋 금지)
 /backup
-*.sql
+backup/*.sql

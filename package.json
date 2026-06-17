@@ -12,6 +12,7 @@
     "@slack/bolt": "^4.2.1",
     "@total-typescript/ts-reset": "^0.6.1",
     "@types/node": "^22.13.10",
+    "@types/pg": "^8.20.0",
     "typescript": "^5.8.2"
   },
   "dependencies": {
@@ -21,6 +22,7 @@
     "google-auth-library": "^9.15.1",
     "mysql2": "^3.9.7",
     "nitropack": "^2.11.6",
+    "pg": "^8.21.0",
     "ts-pattern": "^5.6.2"
   },
   "packageManager": "pnpm@10.6.3"
