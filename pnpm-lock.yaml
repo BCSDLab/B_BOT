@@ -14,9 +14,6 @@ importers:
       '@google-cloud/local-auth':
         specifier: ^3.0.1
         version: 3.0.1
-      '@slack/socket-mode':
-        specifier: ^2.0.3
-        version: 2.0.3
       '@slack/web-api':
         specifier: ^7.8.0
         version: 7.8.0

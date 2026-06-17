@@ -4,7 +4,6 @@ interface ImportMetaEnv {
 
   readonly SLACK_BOT_TOKEN: string;
   readonly SLACK_BOT_SIGNING_SECRET: string;
-  readonly SLACK_APP_TOKEN: string;
   readonly CLARITY_TOKEN: string;
   readonly DB_HOST: string;
   readonly DB_PORT: string;
