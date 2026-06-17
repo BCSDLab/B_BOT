@@ -19,5 +19,6 @@ export default defineNitroConfig({
   },
   scheduledTasks: {
     // "0 9 * * *": "crawl:clarity",
+    "0 18 * * *": "sync:github", // 매일 03:00 KST GitHub README 재색인
   },
 });

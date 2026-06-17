@@ -1,0 +1,25 @@
+{
+  "owner": "BCSDLab",
+  "repos": [
+    "KOIN_API",
+    "KOIN_API_V2",
+    "KOIN_WEB_RECODE",
+    "KOIN_ANDROID",
+    "KOIN_iOS",
+    "KOIN_ADMIN_V2",
+    "KOIN_OWNER_WEB",
+    "KOIN_COOP_WEB",
+    "KOIN_BATCH_V2",
+    "KOIN_PAYMENT_API",
+    "KOIN_CHAT_API",
+    "KONECT_BACK_END",
+    "KONECT_FRONT_END",
+    "KONECT_ANDROID",
+    "BCSD_HOMEPAGE_RECODE",
+    "BCSD_BLOG",
+    "BCSD_API",
+    "BCSD_INTERNAL_API",
+    "BCSD_INTERNAL_RECODE",
+    "B_BOT"
+  ]
+}

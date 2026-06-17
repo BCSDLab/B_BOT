@@ -30,7 +30,10 @@ export const messageFunctionList: MessageSetting[] = [
           client.chat.update({ channel, ts: msgTs, text: partial + " ▍" }).catch(() => {});
         });
         const sourceText = sources.length
-          ? "\n\n📎 출처:\n" + sources.map((s) => `• ${s.title}`).join("\n")
+          ? "\n\n📎 출처:\n" +
+            sources
+              .map((s) => `• ${s.source_url.startsWith("http") ? `<${s.source_url}|${s.title}>` : s.title}`)
+              .join("\n")
           : "";
         await client.chat.update({ channel, ts: msgTs, text: `${body}${sourceText}` });
       } catch (error) {
