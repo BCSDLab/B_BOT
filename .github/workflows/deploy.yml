@@ -50,7 +50,9 @@ jobs:
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
           DB_HOST: ${{ secrets.DB_HOST }}
           CLARITY_TOKEN: ${{ secrets.CLARITY_TOKEN }}
-          NITRO_APP_BASE_URL: ${{ secrets.NITRO_APP_BASE_URL }}
+          APP_BASE_URL: ${{ secrets.APP_BASE_URL }}
+          ADMIN_NAME: ${{ secrets.ADMIN_NAME }}
+          GOOGLE_REDIRECT_URI: ${{ secrets.GOOGLE_REDIRECT_URI }}
         run: |
           cat <<EOF > .env
           SLACK_BOT_TOKEN=$SLACK_BOT_TOKEN
@@ -69,7 +71,9 @@ jobs:
           DB_PASSWORD=$DB_PASSWORD
           DB_HOST=$DB_HOST
           CLARITY_TOKEN=$CLARITY_TOKEN
-          NITRO_APP_BASE_URL=$NITRO_APP_BASE_URL
+          APP_BASE_URL=$APP_BASE_URL
+          ADMIN_NAME=$ADMIN_NAME
+          GOOGLE_REDIRECT_URI=$GOOGLE_REDIRECT_URI
           EOF
 
       - name: Create credentials.json
@@ -106,4 +110,4 @@ jobs:
         run: |
           cat output.tar.gz | ssh -o ConnectTimeout=60 -p ${{ secrets.SSH_PORT }} \
             ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
-            "cat > /home/ubuntu/bcsdlab/bot/output.tar.gz && tar -xvzf /home/ubuntu/bcsdlab/bot/output.tar.gz -C /home/ubuntu/bbot && sleep 2 && ./bbot_deploy.sh"
+            "cat > /home/ubuntu/bbot/output.tar.gz && rm -rf /home/ubuntu/bbot/server /home/ubuntu/bbot/public /home/ubuntu/bbot/nitro.json && tar -xzf /home/ubuntu/bbot/output.tar.gz -C /home/ubuntu/bbot && rm -f /home/ubuntu/bbot/output.tar.gz && sudo systemctl restart bbot"
