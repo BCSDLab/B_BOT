@@ -28,23 +28,40 @@ async function retrieve(question: string) {
   const vecLiteral = `[${vec.join(",")}]`;
   const { rows } = await query(
     getPool(),
-    `SELECT title, source_url, content, 1 - (embedding <=> $1::vector) AS score
+    `SELECT source, project, title, source_url, content, 1 - (embedding <=> $1::vector) AS score
      FROM document_chunk
      ORDER BY embedding <=> $1::vector
      LIMIT ${TOP_K}`,
     [vecLiteral],
   );
-  return rows as Array<{ title: string; source_url: string; content: string; score: number }>;
+  return rows as Array<{
+    source: string;
+    project: string;
+    title: string;
+    source_url: string;
+    content: string;
+    score: number;
+  }>;
+}
+
+// 출처를 사람이 읽을 수 있는 라벨로(프로젝트·종류 명시 → 모델이 도메인 구분).
+function label(r: Awaited<ReturnType<typeof retrieve>>[number]): string {
+  if (r.source === "github") return `프로젝트 ${r.project} (GitHub README)`;
+  return `B-BOT 봇 내부 기획/문서: ${r.title}`;
 }
 
 function buildPrompt(question: string, rows: Awaited<ReturnType<typeof retrieve>>) {
   const context = rows
-    .map((r, i) => `[${i + 1}] (출처: ${r.source_url})\n${r.content}`)
+    .map((r, i) => `[출처 ${i + 1} — ${label(r)}]\n${r.content}`)
     .join("\n\n");
   return (
-    `당신은 BCSD 동아리의 도우미 봇입니다. 아래 [문서]만 근거로 질문에 한국어로 간결히 답하세요.\n` +
-    `- 구체적인 명령어·경로·파일명이 문서에 있으면 그대로 포함하세요.\n` +
-    `- 문서에 단서가 조금이라도 있으면 그것으로 최대한 답하고, 핵심 정보가 전혀 없을 때만 "문서에서 찾지 못했어요"라고 하세요.\n\n` +
+    `당신은 BCSD 동아리의 도우미 봇입니다. 아래 [문서]만 근거로 한국어로 답하세요.\n` +
+    `규칙:\n` +
+    `- 질문이 특정 프로젝트/레포에 관한 것이면 **그 프로젝트 출처만** 사용하세요. 다른 프로젝트나 B-BOT 봇 내부 문서의 내용을 절대 섞지 마세요.\n` +
+    `- 서로 다른 출처의 내용을 합쳐 하나의 답으로 지어내지 마세요.\n` +
+    `- 어느 프로젝트를 묻는지 출처에서 확신할 수 없으면, 추측하지 말고 "어느 프로젝트(레포)를 말하는지 알려주세요"라고 되물으세요.\n` +
+    `- 구체적인 기술명·명령어·경로는 출처에 있는 그대로 쓰세요.\n` +
+    `- 해당 프로젝트 출처에 핵심 정보가 없으면 "문서에서 찾지 못했어요"라고 하세요.\n\n` +
     `[문서]\n${context}\n\n[질문] ${question}\n\n[답변]`
   );
 }
