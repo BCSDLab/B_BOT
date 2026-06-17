@@ -17,6 +17,8 @@ interface ImportMetaEnv {
   readonly GOOGLE_PROJECT_ID: string;
   readonly CREDENTIALS_PATH: string;
   readonly ADMIN_NAME: string;
+  readonly OLLAMA_BASE_URL?: string;
+  readonly OLLAMA_GEN_MODEL?: string;
 }
 interface ImportMeta {
   env: ImportMetaEnv;

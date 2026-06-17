@@ -4,11 +4,41 @@ import ICEBRAKING_QUESTIONS from "@/constant/ICEBRAKING_QUESTIONS.json";
 import CHANNEL_ID from "@/constant/CHANNEL_ID.json";
 import BASE_URL from "@/constant/BASE_URL.json";
 import { messages as googleMeetMessages } from "./domain/googleMeet";
+import { answer } from "~/services/rag";
 
 
 const USER_TEXT_REGEX = /<@([A-Z0-9]+)\|.+>/g;
 
 export const messageFunctionList: MessageSetting[] = [
+  {
+    regex: /^!질문\s+/,
+    async handler({ client, channel, ts, text }) {
+      const question = text.replace(/^!질문\s+/, "").trim();
+      if (!question) return;
+      const placeholder = await client.chat.postMessage({
+        channel,
+        thread_ts: ts,
+        text: "🔍 문서를 찾아보는 중이에요… (최대 1분)",
+      });
+      try {
+        const { text: body, sources } = await answer(question);
+        const sourceText = sources.length
+          ? "\n\n📎 출처:\n" + sources.map((s) => `• ${s.title}`).join("\n")
+          : "";
+        await client.chat.update({
+          channel,
+          ts: placeholder.ts as string,
+          text: `${body}${sourceText}`,
+        });
+      } catch (error) {
+        await client.chat.update({
+          channel,
+          ts: placeholder.ts as string,
+          text: `검색 중 오류가 발생했어요: ${error instanceof Error ? error.message : "알 수 없는 오류"}`,
+        });
+      }
+    },
+  },
   {
     regex: /^!회칙/,
     async handler({
