@@ -93,7 +93,9 @@ jobs:
         run: pnpm run build
 
       - name: Create deploy package
-        run: cd .output && tar -cvzf ../output.tar.gz *
+        run: |
+          cp .env .output/.env
+          cd .output && tar -czf ../output.tar.gz .
 
       - name: Setup SSH agent
         uses: webfactory/ssh-agent@v0.10.0
