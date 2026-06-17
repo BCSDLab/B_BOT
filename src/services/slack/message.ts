@@ -4,7 +4,7 @@ import ICEBRAKING_QUESTIONS from "@/constant/ICEBRAKING_QUESTIONS.json";
 import CHANNEL_ID from "@/constant/CHANNEL_ID.json";
 import BASE_URL from "@/constant/BASE_URL.json";
 import { messages as googleMeetMessages } from "./domain/googleMeet";
-import { answer } from "~/services/rag";
+import { answerStream } from "~/services/rag";
 
 
 const USER_TEXT_REGEX = /<@([A-Z0-9]+)\|.+>/g;
@@ -18,22 +18,25 @@ export const messageFunctionList: MessageSetting[] = [
       const placeholder = await client.chat.postMessage({
         channel,
         thread_ts: ts,
-        text: "🔍 문서를 찾아보는 중이에요… (최대 1분)",
+        text: "🔍 문서를 찾아보는 중이에요…",
       });
+      const msgTs = placeholder.ts as string;
+      let lastUpdate = 0;
       try {
-        const { text: body, sources } = await answer(question);
+        const { text: body, sources } = await answerStream(question, (partial) => {
+          const now = Date.now();
+          if (!partial || now - lastUpdate < 1500) return; // 슬랙 rate limit 고려(~1.5s)
+          lastUpdate = now;
+          client.chat.update({ channel, ts: msgTs, text: partial + " ▍" }).catch(() => {});
+        });
         const sourceText = sources.length
           ? "\n\n📎 출처:\n" + sources.map((s) => `• ${s.title}`).join("\n")
           : "";
-        await client.chat.update({
-          channel,
-          ts: placeholder.ts as string,
-          text: `${body}${sourceText}`,
-        });
+        await client.chat.update({ channel, ts: msgTs, text: `${body}${sourceText}` });
       } catch (error) {
         await client.chat.update({
           channel,
-          ts: placeholder.ts as string,
+          ts: msgTs,
           text: `검색 중 오류가 발생했어요: ${error instanceof Error ? error.message : "알 수 없는 오류"}`,
         });
       }

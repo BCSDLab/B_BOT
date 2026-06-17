@@ -12,3 +12,5 @@
 # DB dumps (멤버 PII 포함 — 절대 커밋 금지)
 /backup
 backup/*.sql
+# 기술 회고(개인 포트폴리오·블로깅용 — 레포 비추적)
+docs/기술회고.md
