@@ -22,6 +22,21 @@ const PG = {
   database: process.env.PGDATABASE ?? "bbot",
 };
 
+function cleanMarkdown(md) {
+  return md
+    .replace(/!\[([^\]]*)\]\([^)]*\)/g, (_m, alt) =>
+      /^(image|img|screenshot|배너|이미지)?$/i.test((alt || "").trim()) ? " " : ` ${alt} `)
+    .replace(/<img[^>]*>/gi, " ")
+    .replace(/<\/?[a-zA-Z][^>]*>/g, " ")
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
+    .replace(/^\s*\|?[\s:|-]+\|?\s*$/gm, "")
+    .replace(/\|/g, " ")
+    .replace(/^\s*>+\s?/gm, "")
+    .replace(/`{1,3}/g, "")
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/\n{3,}/g, "\n\n");
+}
+
 // 긴 세그먼트를 size 창으로 오버랩 분할
 function windows(s, size, overlap) {
   if (s.length <= size) return [s];
@@ -32,7 +47,7 @@ function windows(s, size, overlap) {
 
 // 마크다운을 ~350자 청크로(문단 경계 + 긴 단락은 오버랩 분할)
 function chunk(text, size = 350, overlap = 80) {
-  const segs = text.split(/\n\s*\n/).map((x) => x.trim()).filter(Boolean);
+  const segs = cleanMarkdown(text).split(/\n\s*\n/).map((x) => x.trim()).filter(Boolean);
   const chunks = [];
   let cur = "";
   for (const seg of segs) {
