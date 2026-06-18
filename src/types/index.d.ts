@@ -19,6 +19,7 @@ interface ImportMetaEnv {
   readonly ADMIN_NAME: string;
   readonly OLLAMA_BASE_URL?: string;
   readonly OLLAMA_GEN_MODEL?: string;
+  readonly NOTION_TOKEN?: string;
 }
 interface ImportMeta {
   env: ImportMetaEnv;

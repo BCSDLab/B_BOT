@@ -20,5 +20,6 @@ export default defineNitroConfig({
   scheduledTasks: {
     // "0 9 * * *": "crawl:clarity",
     "0 18 * * *": "sync:github", // 매일 03:00 KST GitHub README 재색인
+    "30 18 * * 1": "sync:notion", // 매주 월 03:30 KST Notion 루트 트리 크롤(인수인계 문서)
   },
 });

@@ -110,6 +110,7 @@ async function retrieve(question: string): Promise<Chunk[]> {
 // 출처를 사람이 읽을 수 있는 라벨로(프로젝트·종류 명시 → 모델이 도메인 구분).
 function label(r: Awaited<ReturnType<typeof retrieve>>[number]): string {
   if (r.source === "github") return `프로젝트 ${r.project} (GitHub README)`;
+  if (r.source === "notion") return `노션 문서: ${r.title}`;
   return `B-BOT 봇 내부 기획/문서: ${r.title}`;
 }
 

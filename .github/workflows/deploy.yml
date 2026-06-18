@@ -53,6 +53,7 @@ jobs:
           APP_BASE_URL: ${{ secrets.APP_BASE_URL }}
           ADMIN_NAME: ${{ secrets.ADMIN_NAME }}
           GOOGLE_REDIRECT_URI: ${{ secrets.GOOGLE_REDIRECT_URI }}
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
         run: |
           cat <<EOF > .env
           SLACK_BOT_TOKEN=$SLACK_BOT_TOKEN
@@ -74,6 +75,7 @@ jobs:
           APP_BASE_URL=$APP_BASE_URL
           ADMIN_NAME=$ADMIN_NAME
           GOOGLE_REDIRECT_URI=$GOOGLE_REDIRECT_URI
+          NOTION_TOKEN=$NOTION_TOKEN
           EOF
 
       - name: Create credentials.json
