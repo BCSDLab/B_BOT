@@ -1,5 +1,5 @@
-// ingest-github.mjs — GitHub 공개 레포 README → 청킹 → bge-m3 임베딩 → document_chunk
-// 즉시 적재용(로컬에서 SSH 터널 전제: Ollama 11434, Postgres 5544). 봇 TS 커넥터와 동일 로직.
+// ingest-github.mjs — GitHub 공개 레포 README + 언어 구성 → 청킹 → bge-m3 → document_chunk
+// 즉시 적재용(로컬에서 SSH 터널 전제: Ollama 11434/11500, Postgres 5544). 봇 TS 커넥터와 동일 로직.
 //   OLLAMA_BASE_URL=http://localhost:11434 PGPORT=5544 PGPASSWORD=... PGDATABASE=bbot \
 //     node db/rag/ingest-github.mjs
 import pg from "pg";
@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
-const { owner, repos } = JSON.parse(readFileSync(join(ROOT, "src/constant/RAG_REPOS.json"), "utf8"));
+const { owner, repos, desc } = JSON.parse(readFileSync(join(ROOT, "src/constant/RAG_REPOS.json"), "utf8"));
 const OLLAMA = process.env.OLLAMA_BASE_URL ?? "http://localhost:11434";
 
 const PG = {
@@ -19,8 +19,12 @@ const PG = {
   database: process.env.PGDATABASE ?? "bbot",
 };
 
+// chunk.ts와 동일 로직(헤딩 breadcrumb 인식)
 function cleanMarkdown(md) {
   return md
+    .replace(/<summary[^>]*>\s*<h([1-6])[^>]*>([\s\S]*?)<\/h\1>\s*<\/summary>/gi, "\n### $2\n")
+    .replace(/<h([1-6])[^>]*>([\s\S]*?)<\/h\1>/gi, "\n### $2\n")
+    .replace(/<summary[^>]*>([\s\S]*?)<\/summary>/gi, "\n### $1\n")
     .replace(/!\[([^\]]*)\]\([^)]*\)/g, (_m, alt) =>
       /^(image|img|screenshot|배너|이미지)?$/i.test((alt || "").trim()) ? " " : ` ${alt} `)
     .replace(/<img[^>]*>/gi, " ")
@@ -40,17 +44,41 @@ function windows(s, size, overlap) {
   return out;
 }
 function chunk(text, size = 350, overlap = 80) {
-  const segs = cleanMarkdown(text).split(/\n\s*\n/).map((x) => x.trim()).filter(Boolean);
-  const chunks = [];
-  let cur = "";
-  for (const seg of segs) {
-    for (const piece of windows(seg, size, overlap)) {
-      if (cur && (cur + "\n" + piece).length > size) { chunks.push(cur); cur = piece; }
-      else cur = cur ? cur + "\n" + piece : piece;
+  const lines = cleanMarkdown(text).split("\n");
+  const out = [];
+  const crumb = [];
+  let buf = [];
+  let head = "";
+  const breadcrumb = () => crumb.filter(Boolean).join(" › ");
+  const flush = () => {
+    const body = buf.join("\n").trim();
+    buf = [];
+    if (!body) return;
+    const prefix = head ? head + "\n" : "";
+    let cur = "";
+    for (const seg of body.split(/\n\s*\n/).map((x) => x.trim()).filter(Boolean)) {
+      for (const piece of windows(seg, size, overlap)) {
+        if (cur && (cur + "\n" + piece).length > size) { out.push(prefix + cur); cur = piece; }
+        else cur = cur ? cur + "\n" + piece : piece;
+      }
     }
+    if (cur) out.push(prefix + cur);
+  };
+  for (const line of lines) {
+    const m = /^(#{1,6})\s+(.*)$/.exec(line.trim());
+    if (m) {
+      flush();
+      const lvl = m[1].length;
+      crumb.length = lvl - 1;
+      crumb[lvl - 1] = m[2].trim();
+      head = breadcrumb();
+      continue;
+    }
+    if (buf.length === 0) head = breadcrumb();
+    buf.push(line);
   }
-  if (cur) chunks.push(cur);
-  return chunks.map((c) => c.trim()).filter((c) => c.length > 15);
+  flush();
+  return out.map((c) => c.trim()).filter((c) => c.length > 15);
 }
 
 async function embed(text) {
@@ -69,6 +97,22 @@ async function fetchReadme(repo) {
   if (!j.content) return null;
   return { text: Buffer.from(j.content, "base64").toString("utf8"), url: j.html_url };
 }
+async function fetchLanguages(repo) {
+  const r = await fetch(`https://api.github.com/repos/${owner}/${repo}/languages`, {
+    headers: { "User-Agent": "b-bot", Accept: "application/vnd.github+json" },
+  }).catch(() => null);
+  if (!r || !r.ok) return null;
+  return await r.json();
+}
+function languageChunk(langs) {
+  if (!langs) return null;
+  const entries = Object.entries(langs).sort((a, b) => b[1] - a[1]);
+  if (entries.length === 0) return null;
+  const total = entries.reduce((s, [, v]) => s + v, 0) || 1;
+  const list = entries.map(([k, v]) => `${k} ${Math.round((v / total) * 100)}%`).join(", ");
+  // prefix(프로젝트 X — desc)는 적재 시 붙으므로 여기선 본문만.
+  return `기술스택 / 사용 언어 구성(GitHub 기준): ${list}`;
+}
 
 async function main() {
   const pc = new pg.Client(PG);
@@ -78,17 +122,21 @@ async function main() {
     const r = await fetchReadme(repo).catch(() => null);
     if (!r || !r.text.trim()) { skipped.push(repo); continue; }
     await pc.query("DELETE FROM document_chunk WHERE source='github' AND project=$1", [repo]);
-    const chunks = chunk(r.text);
-    for (const c of chunks) {
-      const vec = await embed(c);
+    const d = desc?.[repo] ?? repo;
+    const pre = `프로젝트 ${repo} — ${d}\n`;
+    const langChunk = languageChunk(await fetchLanguages(repo));
+    const pieces = [...chunk(r.text), ...(langChunk ? [langChunk] : [])];
+    for (const c of pieces) {
+      const body = pre + c;
+      const vec = await embed(body);
       await pc.query(
         `INSERT INTO document_chunk(source, source_url, project, title, content, embedding)
          VALUES('github', $1, $2, $3, $4, $5::vector)`,
-        [r.url, repo, `${repo} README`, c, `[${vec.join(",")}]`],
+        [r.url, repo, `${repo} README`, body, `[${vec.join(",")}]`],
       );
     }
-    okRepos++; totalChunks += chunks.length;
-    console.log(`✓ ${repo}: ${chunks.length} 청크`);
+    okRepos++; totalChunks += pieces.length;
+    console.log(`✓ ${repo}: ${pieces.length} 청크`);
   }
   await pc.query(
     `INSERT INTO sync_cursor(connector, last_edited_at, updated_at) VALUES('github', now(), now())

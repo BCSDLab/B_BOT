@@ -1,15 +1,56 @@
-// RAG: 질문 → 임베딩 → pgvector top-k 검색 → 컨텍스트 → 소형 LLM 생성 → 답+출처
+// RAG: 질문 → 임베딩 → (레포 라우팅) → pgvector top-k 검색 → 컨텍스트 → 소형 LLM 생성 → 답+출처
 import { createPool, query } from "~/helper/adapter/postgres";
 import { embed, generate, generateStream } from "~/helper/adapter/ollama";
 import type { Pool } from "pg";
+import RAG_REPOS from "@/constant/RAG_REPOS.json";
 
-const TOP_K = 5;
+const TOP_K = 8;
 const NUM_PREDICT = 160;
+
+// 레포 라우팅 임계: 질문이 특정 레포를 충분히 강하게 가리킬 때만 그 레포로 한정.
+// (그래야 소형 모델이 다른 레포 청크를 아예 못 봐서 섞임/오귀속이 원천 차단됨)
+const ROUTE_MIN_SCORE = 0.5; // 1위 레포와의 최소 유사도
+const ROUTE_MIN_MARGIN = 0.03; // 1위-2위 유사도 차(모호하면 폴백)
 
 // 봇 메시지 핸들러엔 pool이 주입되지 않으므로 RAG 전용 싱글톤 풀 사용.
 let _pool: Pool | undefined;
 function getPool(): Pool {
   return (_pool ??= createPool());
+}
+
+// 레포 식별 문구("이름 + 설명")를 한 번 임베딩해 캐시 → 질문과의 유사도로 라우팅.
+let _repoVecs: Array<{ project: string; vec: number[] }> | undefined;
+async function repoVectors() {
+  if (_repoVecs) return _repoVecs;
+  const { repos, desc, alias } = RAG_REPOS as {
+    repos: string[];
+    desc: Record<string, string>;
+    alias: Record<string, string>;
+  };
+  const out: Array<{ project: string; vec: number[] }> = [];
+  for (const r of repos) {
+    out.push({ project: r, vec: await embed(`${r} ${desc[r] ?? ""} ${alias?.[r] ?? ""}`) });
+  }
+  _repoVecs = out;
+  return out;
+}
+
+function cosine(a: number[], b: number[]): number {
+  let dot = 0, na = 0, nb = 0;
+  for (let i = 0; i < a.length; i++) { dot += a[i] * b[i]; na += a[i] * a[i]; nb += b[i] * b[i]; }
+  return dot / (Math.sqrt(na) * Math.sqrt(nb) || 1);
+}
+
+// 질문이 특정 레포를 강하게 가리키면 검색을 한정할 project 집합 반환(아니면 null=전체).
+// B_BOT(봇 자신)으로 라우팅되면 manual 내부 문서(project='bbot')까지 포함.
+async function routeProjects(queryVec: number[]): Promise<string[] | null> {
+  const scored = (await repoVectors())
+    .map((x) => ({ project: x.project, s: cosine(queryVec, x.vec) }))
+    .sort((a, b) => b.s - a.s);
+  const [first, second] = scored;
+  if (!first || first.s < ROUTE_MIN_SCORE) return null;
+  if (second && first.s - second.s < ROUTE_MIN_MARGIN) return null;
+  return first.project === "B_BOT" ? ["B_BOT", "bbot"] : [first.project];
 }
 
 export interface RagSource {
@@ -22,26 +63,48 @@ export interface RagAnswer {
   sources: RagSource[];
 }
 
-// 질문 임베딩 → 상위 청크 검색
-async function retrieve(question: string) {
+type Chunk = {
+  source: string;
+  project: string;
+  title: string;
+  source_url: string;
+  content: string;
+  score: number;
+};
+
+// 질문 임베딩 → (1) desc 기반 사전 라우팅 → 없으면 (2) 전체 검색 후 사후 보정
+// (상위를 장악한 단일 레포로 한정해 소형 모델이 다른 레포와 섞지 못하게).
+async function retrieve(question: string): Promise<Chunk[]> {
   const vec = await embed(question);
   const vecLiteral = `[${vec.join(",")}]`;
+  const projects = await routeProjects(vec);
+
+  const fetchN = projects ? TOP_K : 14;
+  const params: unknown[] = [vecLiteral];
+  let where = "";
+  if (projects) {
+    params.push(projects);
+    where = `WHERE project = ANY($2)`;
+  }
   const { rows } = await query(
     getPool(),
     `SELECT source, project, title, source_url, content, 1 - (embedding <=> $1::vector) AS score
      FROM document_chunk
+     ${where}
      ORDER BY embedding <=> $1::vector
-     LIMIT ${TOP_K}`,
-    [vecLiteral],
+     LIMIT ${fetchN}`,
+    params,
   );
-  return rows as Array<{
-    source: string;
-    project: string;
-    title: string;
-    source_url: string;
-    content: string;
-    score: number;
-  }>;
+  let chunks = rows as Chunk[];
+
+  // 사후 보정: 사전 라우팅이 폴백된 경우, 1위 청크의 레포가 상위 결과를 장악하면(≥2개)
+  // 그 레포로 한정 → "코인 백엔드 참여자"처럼 라우팅은 모호하나 청크는 한 레포에 쏠린 질문 처리.
+  if (!projects && chunks.length > 0) {
+    const dom = chunks[0].project;
+    const same = chunks.filter((c) => c.project === dom);
+    if (same.length >= 2) chunks = same;
+  }
+  return chunks.slice(0, TOP_K);
 }
 
 // 출처를 사람이 읽을 수 있는 라벨로(프로젝트·종류 명시 → 모델이 도메인 구분).

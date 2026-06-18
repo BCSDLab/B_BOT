@@ -22,8 +22,12 @@ const PG = {
   database: process.env.PGDATABASE ?? "bbot",
 };
 
+// chunk.ts와 동일 로직(헤딩 breadcrumb 인식)
 function cleanMarkdown(md) {
   return md
+    .replace(/<summary[^>]*>\s*<h([1-6])[^>]*>([\s\S]*?)<\/h\1>\s*<\/summary>/gi, "\n### $2\n")
+    .replace(/<h([1-6])[^>]*>([\s\S]*?)<\/h\1>/gi, "\n### $2\n")
+    .replace(/<summary[^>]*>([\s\S]*?)<\/summary>/gi, "\n### $1\n")
     .replace(/!\[([^\]]*)\]\([^)]*\)/g, (_m, alt) =>
       /^(image|img|screenshot|배너|이미지)?$/i.test((alt || "").trim()) ? " " : ` ${alt} `)
     .replace(/<img[^>]*>/gi, " ")
@@ -45,19 +49,43 @@ function windows(s, size, overlap) {
   return out;
 }
 
-// 마크다운을 ~350자 청크로(문단 경계 + 긴 단락은 오버랩 분할)
+// 헤딩 경로를 추적하며 청크 앞에 breadcrumb를 붙임
 function chunk(text, size = 350, overlap = 80) {
-  const segs = cleanMarkdown(text).split(/\n\s*\n/).map((x) => x.trim()).filter(Boolean);
-  const chunks = [];
-  let cur = "";
-  for (const seg of segs) {
-    for (const piece of windows(seg, size, overlap)) {
-      if (cur && (cur + "\n" + piece).length > size) { chunks.push(cur); cur = piece; }
-      else cur = cur ? cur + "\n" + piece : piece;
+  const lines = cleanMarkdown(text).split("\n");
+  const out = [];
+  const crumb = [];
+  let buf = [];
+  let head = "";
+  const breadcrumb = () => crumb.filter(Boolean).join(" › ");
+  const flush = () => {
+    const body = buf.join("\n").trim();
+    buf = [];
+    if (!body) return;
+    const prefix = head ? head + "\n" : "";
+    let cur = "";
+    for (const seg of body.split(/\n\s*\n/).map((x) => x.trim()).filter(Boolean)) {
+      for (const piece of windows(seg, size, overlap)) {
+        if (cur && (cur + "\n" + piece).length > size) { out.push(prefix + cur); cur = piece; }
+        else cur = cur ? cur + "\n" + piece : piece;
+      }
     }
+    if (cur) out.push(prefix + cur);
+  };
+  for (const line of lines) {
+    const m = /^(#{1,6})\s+(.*)$/.exec(line.trim());
+    if (m) {
+      flush();
+      const lvl = m[1].length;
+      crumb.length = lvl - 1;
+      crumb[lvl - 1] = m[2].trim();
+      head = breadcrumb();
+      continue;
+    }
+    if (buf.length === 0) head = breadcrumb();
+    buf.push(line);
   }
-  if (cur) chunks.push(cur);
-  return chunks.map((c) => c.trim()).filter((c) => c.length > 15);
+  flush();
+  return out.map((c) => c.trim()).filter((c) => c.length > 15);
 }
 
 async function embed(text) {

@@ -1,0 +1,103 @@
+// diag.mjs — 검색/라우팅 진단.
+//   node db/rag/diag.mjs "질문" [K]          → 라우팅 결정 + 상위 K 청크
+//   node db/rag/diag.mjs --route             → 여러 질문의 라우팅만 일괄 확인
+import pg from "pg";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
+
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
+const { repos, desc, alias } = JSON.parse(readFileSync(join(ROOT, "src/constant/RAG_REPOS.json"), "utf8"));
+const OLLAMA = process.env.OLLAMA_BASE_URL ?? "http://localhost:11434";
+const ROUTE_MIN_SCORE = 0.5;
+const ROUTE_MIN_MARGIN = 0.03;
+const PG = {
+  host: process.env.PGHOST ?? "127.0.0.1", port: Number(process.env.PGPORT ?? 5544),
+  user: process.env.PGUSER ?? "postgres", password: process.env.PGPASSWORD,
+  database: process.env.PGDATABASE ?? "bbot",
+};
+async function embed(t) {
+  const r = await fetch(`${OLLAMA}/api/embeddings`, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ model: "bge-m3", prompt: t }),
+  });
+  return (await r.json()).embedding;
+}
+function cosine(a, b) {
+  let dot = 0, na = 0, nb = 0;
+  for (let i = 0; i < a.length; i++) { dot += a[i] * b[i]; na += a[i] * a[i]; nb += b[i] * b[i]; }
+  return dot / (Math.sqrt(na) * Math.sqrt(nb) || 1);
+}
+let _rv;
+async function repoVectors() {
+  if (_rv) return _rv;
+  _rv = [];
+  for (const r of repos) _rv.push({ project: r, vec: await embed(`${r} ${desc?.[r] ?? ""} ${alias?.[r] ?? ""}`) });
+  return _rv;
+}
+async function route(qVec) {
+  const scored = (await repoVectors())
+    .map((x) => ({ project: x.project, s: cosine(qVec, x.vec) })).sort((a, b) => b.s - a.s);
+  const [f, s] = scored;
+  const decided = !f || f.s < ROUTE_MIN_SCORE ? null
+    : s && f.s - s.s < ROUTE_MIN_MARGIN ? null
+    : f.project === "B_BOT" ? ["B_BOT", "bbot"] : [f.project];
+  return { decided, top: scored.slice(0, 3) };
+}
+
+async function generate(prompt) {
+  const r = await fetch(`${OLLAMA}/api/generate`, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ model: "qwen2.5:3b", prompt, stream: false, options: { num_predict: 160 } }),
+  });
+  return (await r.json()).response?.trim();
+}
+function buildPrompt(question, chunks) {
+  const ctx = chunks.map((r, i) => {
+    const lbl = r.project === "bbot" ? `B-BOT 봇 내부 기획/문서` : `프로젝트 ${r.project} (GitHub README)`;
+    return `[출처 ${i + 1} — ${lbl}]\n${r.content}`;
+  }).join("\n\n");
+  return `당신은 BCSD 동아리의 도우미 봇입니다. 아래 [문서]만 근거로 한국어로 답하세요.\n` +
+    `규칙:\n- 질문이 특정 프로젝트/레포에 관한 것이면 그 프로젝트 출처만 사용하세요. 다른 프로젝트 내용을 절대 섞지 마세요.\n` +
+    `- 서로 다른 출처의 내용을 합쳐 지어내지 마세요.\n- 구체적인 기술명·이름은 출처에 있는 그대로 쓰세요.\n` +
+    `- 핵심 정보가 없으면 "문서에서 찾지 못했어요"라고 하세요.\n\n[문서]\n${ctx}\n\n[질문] ${question}\n\n[답변]`;
+}
+
+async function main() {
+  const pc = new pg.Client(PG); await pc.connect();
+  const args = process.argv.slice(2);
+  const GEN = args.includes("--gen");
+  const arg = args.filter((a) => a !== "--gen")[0];
+  const ROUTE_ONLY = arg === "--route";
+  const queries = ROUTE_ONLY
+    ? ["코인 백엔드 v2 기술스택 알려줘", "코인 백엔드 작업에 참여한 사람들은 누가 있어",
+       "코인 어드민 기술스택", "코인 안드로이드 만든 사람", "환경변수는 어디에 있나요",
+       "삐봇 기능 뭐가 있어", "코인 기술스택"]
+    : [arg];
+  const K = Number(args.filter((a) => a !== "--gen" && a !== "--route")[1] ?? 8);
+  for (const q of queries) {
+    const qVec = await embed(q);
+    const { decided, top } = await route(qVec);
+    console.log(`\nQ: ${q}`);
+    console.log(`   라우팅: ${decided ? decided.join("+") : "전체(폴백)"}  | 상위: ` +
+      top.map((t) => `${t.project}=${t.s.toFixed(3)}`).join(", "));
+    if (ROUTE_ONLY) continue;
+    const vec = `[${qVec.join(",")}]`;
+    const params = [vec]; let where = "";
+    if (decided) { params.push(decided); where = "WHERE project = ANY($2)"; }
+    const { rows } = await pc.query(
+      `SELECT project, 1-(embedding<=>$1::vector) score, content, left(replace(content,E'\n',' '),85) prev
+       FROM document_chunk ${where} ORDER BY embedding<=>$1::vector LIMIT ${decided ? K : 14}`, params);
+    let chunks = rows;
+    if (!decided && chunks.length > 0) {
+      const dom = chunks[0].project;
+      const same = chunks.filter((c) => c.project === dom);
+      if (same.length >= 2) { chunks = same; console.log(`   사후보정 → ${dom} (${same.length}개 장악)`); }
+    }
+    chunks = chunks.slice(0, K);
+    chunks.forEach((r, i) => console.log(`  ${String(i + 1).padStart(2)}. ${r.score.toFixed(3)} [${r.project}] ${r.prev}`));
+    if (GEN) console.log(`\n  💬 답변:\n${(await generate(buildPrompt(q, chunks))) ?? "(생성 실패)"}\n`);
+  }
+  await pc.end();
+}
+main().catch((e) => { console.error("✗", e); process.exit(1); });
