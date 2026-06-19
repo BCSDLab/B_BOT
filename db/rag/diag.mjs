@@ -11,6 +11,12 @@ const { repos, desc, alias } = JSON.parse(readFileSync(join(ROOT, "src/constant/
 const OLLAMA = process.env.OLLAMA_BASE_URL ?? "http://localhost:11434";
 const ROUTE_MIN_SCORE = 0.5;
 const ROUTE_MIN_MARGIN = 0.03;
+const CANDIDATES = 20; // index.ts와 동일 후보 풀
+// classify.ts의 TYPE_WEIGHT 미러(튜닝 시 함께 맞출 것)
+const TYPE_WEIGHT = {
+  readme: 0.1, guide: 0.1, handover: 0.08, doc: 0,
+  meeting: -0.08, personal_work: -0.1, finance: -0.12,
+};
 const PG = {
   host: process.env.PGHOST ?? "127.0.0.1", port: Number(process.env.PGPORT ?? 5544),
   user: process.env.PGUSER ?? "postgres", password: process.env.PGPASSWORD,
@@ -85,17 +91,25 @@ async function main() {
     const vec = `[${qVec.join(",")}]`;
     const params = [vec]; let where = "";
     if (decided) { params.push(decided); where = "WHERE project = ANY($2)"; }
+    // index.ts와 동일: 후보 CANDIDATES개 → 타입 가중치 재랭킹 → 사후보정 → TOP_K
     const { rows } = await pc.query(
-      `SELECT project, 1-(embedding<=>$1::vector) score, content, left(replace(content,E'\n',' '),85) prev
-       FROM document_chunk ${where} ORDER BY embedding<=>$1::vector LIMIT ${decided ? K : 14}`, params);
-    let chunks = rows;
+      `SELECT project, doc_type, 1-(embedding<=>$1::vector) score, content, left(replace(content,E'\n',' '),70) prev
+       FROM document_chunk ${where} ORDER BY embedding<=>$1::vector LIMIT ${CANDIDATES}`, params);
+    const adj = (r) => r.score + (TYPE_WEIGHT[r.doc_type] ?? 0);
+    let chunks = rows.map((r) => ({ ...r, vrank: 0 }));
+    chunks.forEach((r, i) => { r.vrank = i + 1; }); // 유사도 순 원래 등수
+    chunks.sort((a, b) => adj(b) - adj(a));
     if (!decided && chunks.length > 0) {
       const dom = chunks[0].project;
       const same = chunks.filter((c) => c.project === dom);
       if (same.length >= 2) { chunks = same; console.log(`   사후보정 → ${dom} (${same.length}개 장악)`); }
     }
     chunks = chunks.slice(0, K);
-    chunks.forEach((r, i) => console.log(`  ${String(i + 1).padStart(2)}. ${r.score.toFixed(3)} [${r.project}] ${r.prev}`));
+    console.log("  재랭킹 후 (보정 | 원점수 | 타입(가중치) | v순위 | 내용)");
+    chunks.forEach((r, i) => {
+      const w = TYPE_WEIGHT[r.doc_type] ?? 0;
+      console.log(`  ${String(i + 1).padStart(2)}. ${adj(r).toFixed(3)} | ${r.score.toFixed(3)} | ${(r.doc_type || "?").padEnd(13)}(${w >= 0 ? "+" : ""}${w}) | v${r.vrank} | [${r.project}] ${r.prev}`);
+    });
     if (GEN) console.log(`\n  💬 답변:\n${(await generate(buildPrompt(q, chunks))) ?? "(생성 실패)"}\n`);
   }
   await pc.end();
