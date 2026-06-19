@@ -54,9 +54,17 @@ async function route(qVec) {
 async function generate(prompt) {
   const r = await fetch(`${OLLAMA}/api/generate`, {
     method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ model: "qwen2.5:3b", prompt, stream: false, options: { num_predict: 160 } }),
+    body: JSON.stringify({ model: "qwen2.5:3b", prompt, stream: false, keep_alive: "30m", options: { num_predict: 280 } }),
   });
-  return (await r.json()).response?.trim();
+  const d = await r.json();
+  const ms = (n) => (n ?? 0) / 1e6;
+  const tps = (cnt, dur) => (cnt && dur ? (cnt / (dur / 1e9)).toFixed(1) : "?");
+  const timing =
+    `  ⏱  load ${ms(d.load_duration).toFixed(0)}ms | ` +
+    `prefill ${(ms(d.prompt_eval_duration) / 1000).toFixed(1)}s (${d.prompt_eval_count}tok, ${tps(d.prompt_eval_count, d.prompt_eval_duration)}tok/s) | ` +
+    `생성 ${(ms(d.eval_duration) / 1000).toFixed(1)}s (${d.eval_count}tok, ${tps(d.eval_count, d.eval_duration)}tok/s) | ` +
+    `총 ${(ms(d.total_duration) / 1000).toFixed(1)}s`;
+  return { text: d.response?.trim(), timing };
 }
 function buildPrompt(question, chunks) {
   const ctx = chunks.map((r, i) => {
@@ -110,7 +118,11 @@ async function main() {
       const w = TYPE_WEIGHT[r.doc_type] ?? 0;
       console.log(`  ${String(i + 1).padStart(2)}. ${adj(r).toFixed(3)} | ${r.score.toFixed(3)} | ${(r.doc_type || "?").padEnd(13)}(${w >= 0 ? "+" : ""}${w}) | v${r.vrank} | [${r.project}] ${r.prev}`);
     });
-    if (GEN) console.log(`\n  💬 답변:\n${(await generate(buildPrompt(q, chunks))) ?? "(생성 실패)"}\n`);
+    if (GEN) {
+      const g = await generate(buildPrompt(q, chunks));
+      console.log(g.timing);
+      console.log(`  💬 ${g.text ?? "(생성 실패)"}\n`);
+    }
   }
   await pc.end();
 }
