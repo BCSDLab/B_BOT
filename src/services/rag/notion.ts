@@ -4,6 +4,7 @@
 import { createPool, query } from "~/helper/adapter/postgres";
 import { embed } from "~/helper/adapter/ollama";
 import { chunk } from "./chunk";
+import { classifyDocType } from "./classify";
 import type { Pool } from "pg";
 
 const NOTION_VERSION = "2022-06-28";
@@ -169,15 +170,17 @@ export async function ingestNotion(): Promise<{ scanned: number; docs: number; c
       const changed = !cursor || new Date(page.last_edited_time).getTime() > cursor;
       if (changed) {
         await query(pool, `DELETE FROM document_chunk WHERE source = 'notion' AND source_url = $1`, [page.url]);
-        const prefix = `노션 문서 — ${pageTitle(page)}\n`;
+        const title = pageTitle(page);
+        const docType = classifyDocType("notion", title);
+        const prefix = `노션 문서 — ${title}\n`;
         for (const c of chunk(prose)) {
           const body = prefix + c;
           const vec = await embed(body);
           await query(
             pool,
-            `INSERT INTO document_chunk(source, source_url, project, title, content, embedding)
-             VALUES('notion', $1, 'notion', $2, $3, $4::vector)`,
-            [page.url, pageTitle(page), body, `[${vec.join(",")}]`],
+            `INSERT INTO document_chunk(source, source_url, project, title, content, embedding, doc_type, updated_at)
+             VALUES('notion', $1, 'notion', $2, $3, $4::vector, $5, $6)`,
+            [page.url, title, body, `[${vec.join(",")}]`, docType, page.last_edited_time],
           );
           totalChunks++;
         }

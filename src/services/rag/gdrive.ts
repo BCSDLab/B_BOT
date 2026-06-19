@@ -4,6 +4,7 @@
 import { createPool, query } from "~/helper/adapter/postgres";
 import { embed } from "~/helper/adapter/ollama";
 import { chunk } from "./chunk";
+import { classifyDocType } from "./classify";
 import { auth } from "google-auth-library";
 import { GOOGLE_MEET_KEY } from "~/services/google/googleMeet";
 import type { Pool } from "pg";
@@ -128,15 +129,16 @@ export async function ingestGdrive(): Promise<{ docs: number; changed: number; c
     const md = await exportDoc(token, f.id);
     await query(pool, `DELETE FROM document_chunk WHERE source = 'gdrive' AND source_url = $1`, [url]);
     if (!md.trim()) continue;
+    const docType = classifyDocType("gdrive", f.name);
     const prefix = `구글 문서 — ${f.name}\n`;
     for (const c of chunk(md)) {
       const body = prefix + c;
       const vec = await embed(body);
       await query(
         pool,
-        `INSERT INTO document_chunk(source, source_url, project, title, content, embedding)
-         VALUES('gdrive', $1, 'gdrive', $2, $3, $4::vector)`,
-        [url, f.name, body, `[${vec.join(",")}]`],
+        `INSERT INTO document_chunk(source, source_url, project, title, content, embedding, doc_type, updated_at)
+         VALUES('gdrive', $1, 'gdrive', $2, $3, $4::vector, $5, $6)`,
+        [url, f.name, body, `[${vec.join(",")}]`, docType, f.modifiedTime],
       );
       totalChunks++;
     }

@@ -3,6 +3,10 @@ import { createPool, query } from "~/helper/adapter/postgres";
 import { embed, generate, generateStream } from "~/helper/adapter/ollama";
 import type { Pool } from "pg";
 import RAG_REPOS from "@/constant/RAG_REPOS.json";
+import { TYPE_WEIGHT, type DocType } from "./classify";
+
+const SOURCE_MAX = 4; // 답변에 표시할 출처 최대 개수(노이즈 컷)
+const CANDIDATES = 20; // 타입 재랭킹용 후보 풀(이후 TOP_K로 좁힘)
 
 const TOP_K = 8;
 const NUM_PREDICT = 280; // 답변이 중간에 잘리지 않도록(스트리밍이라 체감 대기는 완화).
@@ -70,32 +74,38 @@ type Chunk = {
   source_url: string;
   content: string;
   score: number;
+  doc_type: DocType | null;
 };
 
 // 질문 임베딩 → (1) desc 기반 사전 라우팅 → 없으면 (2) 전체 검색 후 사후 보정
-// (상위를 장악한 단일 레포로 한정해 소형 모델이 다른 레포와 섞지 못하게).
+// → (3) 문서 타입 가중치로 재랭킹(회의록·재무 down-rank, 가이드·readme 우선).
 async function retrieve(question: string): Promise<Chunk[]> {
   const vec = await embed(question);
   const vecLiteral = `[${vec.join(",")}]`;
   const projects = await routeProjects(vec);
 
-  const fetchN = projects ? TOP_K : 14;
   const params: unknown[] = [vecLiteral];
   let where = "";
   if (projects) {
     params.push(projects);
     where = `WHERE project = ANY($2)`;
   }
+  // 타입 재랭킹이 하위 후보를 끌어올릴 수 있게 넉넉한 후보 풀을 가져옴.
   const { rows } = await query(
     getPool(),
-    `SELECT source, project, title, source_url, content, 1 - (embedding <=> $1::vector) AS score
+    `SELECT source, project, title, source_url, content, doc_type,
+            1 - (embedding <=> $1::vector) AS score
      FROM document_chunk
      ${where}
      ORDER BY embedding <=> $1::vector
-     LIMIT ${fetchN}`,
+     LIMIT ${CANDIDATES}`,
     params,
   );
   let chunks = rows as Chunk[];
+
+  // (3) 타입 가중치 재랭킹: 유사도 + TYPE_WEIGHT[doc_type]로 정렬.
+  const adj = (c: Chunk) => Number(c.score) + (c.doc_type ? TYPE_WEIGHT[c.doc_type] ?? 0 : 0);
+  chunks.sort((a, b) => adj(b) - adj(a));
 
   // 사후 보정: 사전 라우팅이 폴백된 경우, 1위 청크의 레포가 상위 결과를 장악하면(≥2개)
   // 그 레포로 한정 → "코인 백엔드 참여자"처럼 라우팅은 모호하나 청크는 한 레포에 쏠린 질문 처리.
@@ -142,7 +152,7 @@ function dedupSources(rows: Awaited<ReturnType<typeof retrieve>>): RagSource[] {
     seen.add(r.source_url);
     out.push({ title: r.title, source_url: r.source_url, score: Number(r.score) });
   }
-  return out;
+  return out.slice(0, SOURCE_MAX); // 상위 출처만(노이즈 컷)
 }
 
 const EMPTY: RagAnswer = {

@@ -2,6 +2,7 @@
 import { createPool, query } from "~/helper/adapter/postgres";
 import { embed } from "~/helper/adapter/ollama";
 import { chunk } from "./chunk";
+import { classifyDocType } from "./classify";
 import type { Pool } from "pg";
 import RAG_REPOS from "@/constant/RAG_REPOS.json";
 
@@ -28,15 +29,16 @@ export async function upsertDocument(opts: {
     opts.project,
   ]);
   const pre = opts.prefix ? opts.prefix + "\n" : "";
+  const docType = classifyDocType(opts.source, opts.title);
   const pieces = [...chunk(opts.content), ...(opts.extraChunks ?? [])];
   for (const c of pieces) {
     const body = pre + c;
     const vec = await embed(body);
     await query(
       pool,
-      `INSERT INTO document_chunk(source, source_url, project, title, content, embedding)
-       VALUES($1, $2, $3, $4, $5, $6::vector)`,
-      [opts.source, opts.sourceUrl, opts.project, opts.title, body, `[${vec.join(",")}]`],
+      `INSERT INTO document_chunk(source, source_url, project, title, content, embedding, doc_type)
+       VALUES($1, $2, $3, $4, $5, $6::vector, $7)`,
+      [opts.source, opts.sourceUrl, opts.project, opts.title, body, `[${vec.join(",")}]`, docType],
     );
   }
   return pieces.length;
