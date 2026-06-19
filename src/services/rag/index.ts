@@ -111,6 +111,7 @@ async function retrieve(question: string): Promise<Chunk[]> {
 function label(r: Awaited<ReturnType<typeof retrieve>>[number]): string {
   if (r.source === "github") return `프로젝트 ${r.project} (GitHub README)`;
   if (r.source === "notion") return `노션 문서: ${r.title}`;
+  if (r.source === "gdrive") return `구글 문서: ${r.title}`;
   return `B-BOT 봇 내부 기획/문서: ${r.title}`;
 }
 

@@ -20,6 +20,7 @@ interface ImportMetaEnv {
   readonly OLLAMA_BASE_URL?: string;
   readonly OLLAMA_GEN_MODEL?: string;
   readonly NOTION_TOKEN?: string;
+  readonly GDRIVE_FOLDER_IDS?: string;
 }
 interface ImportMeta {
   env: ImportMetaEnv;

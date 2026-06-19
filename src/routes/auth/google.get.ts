@@ -6,7 +6,7 @@ export default defineEventHandler(async (event) => {
   authorizationUrl.searchParams.set("redirect_uri", import.meta.env.GOOGLE_REDIRECT_URI);
   authorizationUrl.searchParams.set("prompt", "consent")
   authorizationUrl.searchParams.set("response_type", "code")
-  authorizationUrl.searchParams.set("scope", "https://www.googleapis.com/auth/meetings.space.created email profile")
+  authorizationUrl.searchParams.set("scope", "https://www.googleapis.com/auth/meetings.space.created https://www.googleapis.com/auth/drive.readonly email profile")
   authorizationUrl.searchParams.set("access_type", "offline")
   setResponseStatus(event, 302);
   appendHeader(event, "Location", authorizationUrl.toString());
