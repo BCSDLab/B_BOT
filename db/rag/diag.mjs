@@ -51,10 +51,12 @@ async function route(qVec) {
   return { decided, top: scored.slice(0, 3) };
 }
 
+const NUM_PREDICT = Number(process.env.DIAG_NP ?? 280); // 측정 스윕용
+const TRIM = Number(process.env.DIAG_TRIM ?? 0); // 청크 내용 상한(0=무제한)
 async function generate(prompt) {
   const r = await fetch(`${OLLAMA}/api/generate`, {
     method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ model: "qwen2.5:3b", prompt, stream: false, keep_alive: "30m", options: { num_predict: 280 } }),
+    body: JSON.stringify({ model: "qwen2.5:3b", prompt, stream: false, keep_alive: "30m", options: { num_predict: NUM_PREDICT } }),
   });
   const d = await r.json();
   const ms = (n) => (n ?? 0) / 1e6;
@@ -69,7 +71,8 @@ async function generate(prompt) {
 function buildPrompt(question, chunks) {
   const ctx = chunks.map((r, i) => {
     const lbl = r.project === "bbot" ? `B-BOT 봇 내부 기획/문서` : `프로젝트 ${r.project} (GitHub README)`;
-    return `[출처 ${i + 1} — ${lbl}]\n${r.content}`;
+    const content = TRIM > 0 ? r.content.slice(0, TRIM) : r.content;
+    return `[출처 ${i + 1} — ${lbl}]\n${content}`;
   }).join("\n\n");
   return `당신은 BCSD 동아리의 도우미 봇입니다. 아래 [문서]만 근거로 한국어로 답하세요.\n` +
     `규칙:\n- 질문이 특정 프로젝트/레포에 관한 것이면 그 프로젝트 출처만 사용하세요. 다른 프로젝트 내용을 절대 섞지 마세요.\n` +

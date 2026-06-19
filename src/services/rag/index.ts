@@ -8,7 +8,7 @@ import { TYPE_WEIGHT, type DocType } from "./classify";
 const SOURCE_MAX = 4; // 답변에 표시할 출처 최대 개수(노이즈 컷)
 const CANDIDATES = 20; // 타입 재랭킹용 후보 풀(이후 TOP_K로 좁힘)
 
-const TOP_K = 8;
+const TOP_K = 5; // 8→5: prefill(지연 지배 구간) ~36%↓. 타입 재랭킹이 상위 청크를 채워 recall 보전.
 const NUM_PREDICT = 280; // 답변이 중간에 잘리지 않도록(스트리밍이라 체감 대기는 완화).
 
 // 레포 라우팅 임계: 질문이 특정 레포를 충분히 강하게 가리킬 때만 그 레포로 한정.
