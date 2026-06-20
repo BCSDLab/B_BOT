@@ -13,7 +13,7 @@ const API = "https://api.notion.com/v1";
 // 색인 루트(프로젝트·트랙이 전부 하위에 있는 Regular 페이지). 추가 스페이스가 생기면 여기 추가.
 const ROOTS = ["396654620b1b4cbd9fcd6bdf93fdceb9"];
 // 안전장치: 한 번에 스캔할 최대 페이지 수(폭주 방지).
-const MAX_SCAN = 12000;
+const MAX_SCAN = 30000; // 트리 + 접근가능 DB 전체(추적DB는 12개 표본 후 스킵).
 
 let _pool: Pool | undefined;
 function getPool(): Pool {
@@ -77,6 +77,22 @@ async function nfetch<T>(path: string, init?: Record<string, unknown>): Promise<
   } finally {
     release();
   }
+}
+
+// 통합에 접근 가능한 모든 데이터베이스 id 열거(트리-walk가 못 닿는 DB까지 자동 발견).
+async function searchDatabases(): Promise<string[]> {
+  const ids: string[] = [];
+  let cursor: string | undefined;
+  do {
+    const res = await nfetch<{ results: Array<{ id: string }>; next_cursor?: string; has_more: boolean }>(
+      `/search`,
+      { method: "POST", body: { filter: { value: "database", property: "object" }, page_size: 100, ...(cursor ? { start_cursor: cursor } : {}) } },
+    );
+    if (!res) break;
+    ids.push(...res.results.map((d) => d.id));
+    cursor = res.has_more ? res.next_cursor : undefined;
+  } while (cursor);
+  return ids;
 }
 
 function pageTitle(page: Page): string {
@@ -148,6 +164,10 @@ export async function ingestNotion(): Promise<{ scanned: number; docs: number; c
   const cur = await query(pool, `SELECT last_edited_at FROM sync_cursor WHERE connector = 'notion'`);
   const cursor = cur.rows[0]?.last_edited_at ? new Date(cur.rows[0].last_edited_at).getTime() : 0;
 
+  // 이미 색인된 source_url 집합 → 신규(미색인) 또는 변경된 페이지만 임베딩(기존 23K 재임베딩 방지).
+  const idxRes = await query(pool, `SELECT DISTINCT source_url FROM document_chunk WHERE source = 'notion'`);
+  const indexed = new Set<string>(idxRes.rows.map((r: { source_url: string }) => r.source_url));
+
   const visited = new Set<string>();
   const seenUrls: string[] = [];
   let scanned = 0;
@@ -167,7 +187,8 @@ export async function ingestNotion(): Promise<{ scanned: number; docs: number; c
     if (prose.trim()) {
       hadBody = true;
       seenUrls.push(page.url);
-      const changed = !cursor || new Date(page.last_edited_time).getTime() > cursor;
+      // 신규(미색인) 이거나 마지막 동기화 이후 수정됐으면 (재)임베딩.
+      const changed = !indexed.has(page.url) || (cursor > 0 && new Date(page.last_edited_time).getTime() > cursor);
       if (changed) {
         await query(pool, `DELETE FROM document_chunk WHERE source = 'notion' AND source_url = $1`, [page.url]);
         const title = pageTitle(page);
@@ -226,10 +247,14 @@ export async function ingestNotion(): Promise<{ scanned: number; docs: number; c
     } while (cursor2);
   }
 
+  // 1) 루트 트리 크롤(페이지)
   for (const root of ROOTS) await crawlPage(root);
+  // 2) 접근 가능한 모든 DB 자동 발견·크롤(트리가 못 닿는 DB까지). visited가 중복 방지.
+  for (const dbId of await searchDatabases()) await crawlDatabase(dbId);
 
+  // 사라진(공유 해제·삭제) 페이지 정리 — 단, MAX_SCAN에 걸려 크롤이 미완료면 스킵(오삭제 방지).
   let removed = 0;
-  if (seenUrls.length > 0) {
+  if (seenUrls.length > 0 && scanned < MAX_SCAN) {
     const del = await query(
       pool,
       `DELETE FROM document_chunk WHERE source = 'notion' AND source_url <> ALL($1) RETURNING 1`,
