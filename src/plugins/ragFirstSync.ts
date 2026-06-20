@@ -10,7 +10,7 @@ export default defineNitroPlugin(() => {
         if (!(await isNotionIndexed())) {
           console.log("[notion:first-sync] 최초 색인 시작(배포 직후)…");
           const r = await ingestNotion();
-          console.log(`[notion:first-sync] 완료 scanned=${r.scanned} docs=${r.docs} chunks=${r.chunks} removed=${r.removed}`);
+          console.log(`[notion:first-sync] 완료 scanned=${r.scanned} docs=${r.docs} chunks=${r.chunks} removed=${r.removed} errors=${r.errors}`);
         }
       } catch (e) {
         console.error("[notion:first-sync] 실패", e);

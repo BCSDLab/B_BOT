@@ -8,7 +8,7 @@ export default defineTask({
     const { ingestNotion } = await import("~/services/rag/notion");
     const res = await ingestNotion();
     console.log(
-      `[sync:notion] scanned=${res.scanned} docs=${res.docs} chunks=${res.chunks} removed=${res.removed}`,
+      `[sync:notion] scanned=${res.scanned} docs=${res.docs} chunks=${res.chunks} removed=${res.removed} errors=${res.errors}`,
     );
     return { result: res };
   },

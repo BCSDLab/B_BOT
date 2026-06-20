@@ -61,18 +61,24 @@ interface Page { id: string; url: string; last_edited_time: string; properties?:
 
 const rt = (arr: RT[] | undefined) => (arr ?? []).map((t) => t.plain_text ?? "").join("");
 
+// 일시 실패(429/5xx/네트워크)는 재시도, 영구 실패(404/403=미공유/없음)는 즉시 null(정상 케이스).
+// 재시도 다 실패하면 nfetchErrors++ → 불완전 크롤 신호(삭제 안전 가드에서 사용).
+let nfetchErrors = 0;
 async function nfetch<T>(path: string, init?: Record<string, unknown>): Promise<T | null> {
   await acquire();
   try {
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 5; i++) {
       try {
         return await $fetch<T>(`${API}${path}`, { headers: headers(), ...init });
       } catch (e) {
         const status = (e as { response?: { status?: number } })?.response?.status;
-        if (status === 429) { await new Promise((s) => setTimeout(s, 1000 * (i + 1))); continue; }
-        return null;
+        // 404/403/400 등 영구 클라이언트 에러(429 제외) = 접근불가/없음 → 즉시 null, 에러로 안 침.
+        if (status && status >= 400 && status < 500 && status !== 429) return null;
+        // 429/5xx/네트워크 = 일시 → 백오프 후 재시도.
+        await new Promise((s) => setTimeout(s, 1000 * (i + 1)));
       }
     }
+    nfetchErrors++; // 재시도 소진 = 진짜 실패(크롤 불완전).
     return null;
   } finally {
     release();
@@ -156,10 +162,11 @@ async function readBlocks(blockId: string, depth = 0): Promise<{ prose: string; 
   return { prose: lines.join("\n"), pageIds, dbIds };
 }
 
-// 지정 루트에서 트리 재귀 크롤. 본문 있는 페이지만 증분 색인.
-export async function ingestNotion(): Promise<{ scanned: number; docs: number; chunks: number; removed: number }> {
-  if (!token()) return { scanned: 0, docs: 0, chunks: 0, removed: 0 };
+// 지정 루트에서 트리 재귀 크롤 + 접근가능 DB 자동발견. 본문 있는 페이지만 증분 색인.
+export async function ingestNotion(): Promise<{ scanned: number; docs: number; chunks: number; removed: number; errors: number }> {
+  if (!token()) return { scanned: 0, docs: 0, chunks: 0, removed: 0, errors: 0 };
   const pool = getPool();
+  nfetchErrors = 0; // 이번 실행 에러 카운트 리셋
   const runStart = new Date().toISOString();
   const cur = await query(pool, `SELECT last_edited_at FROM sync_cursor WHERE connector = 'notion'`);
   const cursor = cur.rows[0]?.last_edited_at ? new Date(cur.rows[0].last_edited_at).getTime() : 0;
@@ -252,15 +259,19 @@ export async function ingestNotion(): Promise<{ scanned: number; docs: number; c
   // 2) 접근 가능한 모든 DB 자동 발견·크롤(트리가 못 닿는 DB까지). visited가 중복 방지.
   for (const dbId of await searchDatabases()) await crawlDatabase(dbId);
 
-  // 사라진(공유 해제·삭제) 페이지 정리 — 단, MAX_SCAN에 걸려 크롤이 미완료면 스킵(오삭제 방지).
+  // 사라진(공유 해제·삭제) 페이지 정리 — **완전한 크롤일 때만**(불완전하면 멀쩡한 콘텐츠 오삭제).
+  // 안전 조건: 일시 실패 0 + MAX_SCAN 미도달 + 충분히 큰 크롤(전체 트리 닿음).
   let removed = 0;
-  if (seenUrls.length > 0 && scanned < MAX_SCAN) {
+  const cleanComplete = nfetchErrors === 0 && scanned < MAX_SCAN && seenUrls.length > 0;
+  if (cleanComplete) {
     const del = await query(
       pool,
       `DELETE FROM document_chunk WHERE source = 'notion' AND source_url <> ALL($1) RETURNING 1`,
       [seenUrls],
     );
     removed = del.rows.length;
+  } else if (nfetchErrors > 0) {
+    console.log(`[notion] 크롤 불완전(에러 ${nfetchErrors}건) → 삭제 정리 건너뜀(오삭제 방지)`);
   }
   await query(
     pool,
@@ -269,5 +280,5 @@ export async function ingestNotion(): Promise<{ scanned: number; docs: number; c
      ON CONFLICT (connector) DO UPDATE SET last_edited_at = $1, updated_at = now()`,
     [runStart],
   );
-  return { scanned, docs, chunks: totalChunks, removed };
+  return { scanned, docs, chunks: totalChunks, removed, errors: nfetchErrors };
 }
