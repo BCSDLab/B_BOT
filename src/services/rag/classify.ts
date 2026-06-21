@@ -29,7 +29,7 @@ export function classifyDocType(source: string, title: string): DocType {
   if (/인수인계/.test(t)) return "handover";
   if (/영수증|결제|서버비|사용비|지원|회비|거래내역|사업자|환급|정산|과금|비용|납부|결산/.test(t)) return "finance";
   if (/역기획서|기획서|차시|주차|보고서|과제|제출|템플릿/.test(t)) return "personal_work";
-  if (/커리큘럼|온보딩|가이드|시작하기|문서화|컨벤션|규칙|회칙|셋업|setup|환경\s*설정|아키텍처|명세/i.test(t)) return "guide";
+  if (/커리큘럼|온보딩|가이드|시작하기|문서화|컨벤션|규약|규칙|회칙|셋업|setup|환경\s*설정|아키텍처|명세|convention|guide|onboarding|architecture|getting\s*started/i.test(t)) return "guide";
   if (DATE_RE.test(t) || /회의|주간\s*공유|월간\s*공유|미팅|회고|standup|스크럼|monthly|weekly/i.test(t)) return "meeting";
   return "doc";
 }
