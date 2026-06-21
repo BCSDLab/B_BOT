@@ -28,7 +28,9 @@ function token(): string | undefined {
 let _notion: Client | undefined;
 function notion(): Client {
   // SDK 내장 재시도(429는 항상, 멱등 메서드의 5xx). 추가 안전망은 call()이 담당.
-  return (_notion ??= new Client({ auth: token(), notionVersion: NOTION_VERSION, retry: { maxRetries: 3 } }));
+  // timeoutMs 필수: 없으면 죽은 연결(서버 무응답) 하나가 전체 크롤을 무한정 멈춤(실제 3h+ 행 발생).
+  // 30s 초과 시 요청 중단 → 던짐 → call()이 재시도/에러카운트.
+  return (_notion ??= new Client({ auth: token(), notionVersion: NOTION_VERSION, timeoutMs: 30000, retry: { maxRetries: 3 } }));
 }
 
 // 이미 한 번 색인됐는지(커서 존재). 배포 시점 최초 1회 자동 색인 가드에 사용.
