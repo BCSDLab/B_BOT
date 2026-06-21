@@ -75,7 +75,21 @@ type Chunk = {
   content: string;
   score: number;
   doc_type: DocType | null;
+  updated_at: string | null;
 };
+
+// 최신성 보너스(보조 신호): 같은 타입·유사도면 최신 문서 우선. 의미·타입을 뒤집지 않게 작게.
+// 반감기 180일, 최대 +0.05(타입 가중치 ≤0.1보다 작음). updated_at 없으면 0(중립, 페널티 아님).
+const RECENCY_MAX = 0.05;
+const RECENCY_HALFLIFE_DAYS = 180;
+function recencyBonus(updatedAt: string | null): number {
+  if (!updatedAt) return 0;
+  const t = new Date(updatedAt).getTime();
+  if (!t || Number.isNaN(t)) return 0;
+  const ageDays = (Date.now() - t) / 86_400_000;
+  if (ageDays <= 0) return RECENCY_MAX;
+  return RECENCY_MAX * Math.pow(0.5, ageDays / RECENCY_HALFLIFE_DAYS);
+}
 
 // 질문 임베딩 → (1) desc 기반 사전 라우팅 → 없으면 (2) 전체 검색 후 사후 보정
 // → (3) 문서 타입 가중치로 재랭킹(회의록·재무 down-rank, 가이드·readme 우선).
@@ -93,7 +107,7 @@ async function retrieve(question: string): Promise<Chunk[]> {
   // 타입 재랭킹이 하위 후보를 끌어올릴 수 있게 넉넉한 후보 풀을 가져옴.
   const { rows } = await query(
     getPool(),
-    `SELECT source, project, title, source_url, content, doc_type,
+    `SELECT source, project, title, source_url, content, doc_type, updated_at,
             1 - (embedding <=> $1::vector) AS score
      FROM document_chunk
      ${where}
@@ -103,8 +117,9 @@ async function retrieve(question: string): Promise<Chunk[]> {
   );
   let chunks = rows as Chunk[];
 
-  // (3) 타입 가중치 재랭킹: 유사도 + TYPE_WEIGHT[doc_type]로 정렬.
-  const adj = (c: Chunk) => Number(c.score) + (c.doc_type ? TYPE_WEIGHT[c.doc_type] ?? 0 : 0);
+  // (3) 재랭킹: 유사도 + TYPE_WEIGHT[doc_type] + 최신성 보너스로 정렬.
+  const adj = (c: Chunk) =>
+    Number(c.score) + (c.doc_type ? TYPE_WEIGHT[c.doc_type] ?? 0 : 0) + recencyBonus(c.updated_at);
   chunks.sort((a, b) => adj(b) - adj(a));
 
   // 사후 보정: 사전 라우팅이 폴백된 경우, 1위 청크의 레포가 상위 결과를 장악하면(≥2개)
