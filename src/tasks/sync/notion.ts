@@ -6,9 +6,11 @@ export default defineTask({
   },
   async run() {
     const { ingestNotion } = await import("~/services/rag/notion");
-    const res = await ingestNotion();
+    // 매주 월요일: 증분(빠름). 매월 첫 월요일(날짜<=7)은 전체 크롤로 삭제분까지 정리(증분은 삭제 미반영).
+    const full = new Date().getDate() <= 7;
+    const res = await ingestNotion({ full });
     console.log(
-      `[sync:notion] scanned=${res.scanned} docs=${res.docs} chunks=${res.chunks} removed=${res.removed} errors=${res.errors}`,
+      `[sync:notion] mode=${res.mode} scanned=${res.scanned} docs=${res.docs} chunks=${res.chunks} removed=${res.removed} errors=${res.errors}`,
     );
     return { result: res };
   },
