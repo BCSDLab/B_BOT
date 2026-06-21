@@ -1,19 +1,21 @@
-// Notion 커넥터: 지정한 루트에서 트리를 재귀 크롤해 본문 있는 페이지/DB항목만 색인.
+// Notion 커넥터: 지정한 루트에서 트리를 재귀 크롤해 본문 있는 페이지/DB행만 색인.
 // 컬럼·토글·링크(link_to_page)·child_database(쿼리)까지 추적. 본문 없는 페이지(출석부 등 DB 행)는
 // 0청크로 자동 스킵 → 흩어진 문서화를 루트 몇 개로 자동 발견하면서 노이즈는 안 들어옴.
+// 공식 SDK(@notionhq/client, 신모델 data_sources) 사용 — 타입·내장 재시도·보일러플레이트↓.
+import { Client } from "@notionhq/client";
 import { createPool, query } from "~/helper/adapter/postgres";
 import { embed } from "~/helper/adapter/ollama";
 import { chunk } from "./chunk";
 import { classifyDocType } from "./classify";
 import type { Pool } from "pg";
 
-const NOTION_VERSION = "2022-06-28";
-const API = "https://api.notion.com/v1";
+// 신모델(데이터소스). DB는 databases.retrieve → data_sources[].id → dataSources.query로 읽는다.
+const NOTION_VERSION = "2025-09-03";
 
 // 색인 루트(프로젝트·트랙이 전부 하위에 있는 Regular 페이지). 추가 스페이스가 생기면 여기 추가.
 const ROOTS = ["396654620b1b4cbd9fcd6bdf93fdceb9"];
 // 안전장치: 한 번에 스캔할 최대 페이지 수(폭주 방지).
-const MAX_SCAN = 30000; // 트리 + 접근가능 DB 전체(추적DB는 12개 표본 후 스킵).
+const MAX_SCAN = 30000; // 트리 + 접근가능 데이터소스 전체(추적DB는 12개 표본 후 스킵).
 
 let _pool: Pool | undefined;
 function getPool(): Pool {
@@ -23,17 +25,16 @@ function token(): string | undefined {
   return import.meta.env.NOTION_TOKEN;
 }
 
+let _notion: Client | undefined;
+function notion(): Client {
+  // SDK 내장 재시도(429는 항상, 멱등 메서드의 5xx). 추가 안전망은 call()이 담당.
+  return (_notion ??= new Client({ auth: token(), notionVersion: NOTION_VERSION, retry: { maxRetries: 3 } }));
+}
+
 // 이미 한 번 색인됐는지(커서 존재). 배포 시점 최초 1회 자동 색인 가드에 사용.
 export async function isNotionIndexed(): Promise<boolean> {
   const r = await query(getPool(), `SELECT 1 FROM sync_cursor WHERE connector = 'notion'`);
   return r.rows.length > 0;
-}
-function headers() {
-  return {
-    Authorization: `Bearer ${token()}`,
-    "Notion-Version": NOTION_VERSION,
-    "Content-Type": "application/json",
-  };
 }
 const norm = (id: string) => (id || "").replace(/-/g, "");
 
@@ -61,21 +62,20 @@ interface Page { id: string; url: string; last_edited_time: string; properties?:
 
 const rt = (arr: RT[] | undefined) => (arr ?? []).map((t) => t.plain_text ?? "").join("");
 
-// 일시 실패(429/5xx/네트워크)는 재시도, 영구 실패(404/403=미공유/없음)는 즉시 null(정상 케이스).
-// 재시도 다 실패하면 nfetchErrors++ → 불완전 크롤 신호(삭제 안전 가드에서 사용).
+// SDK 호출 래퍼: 세마포어 + 에러카운트(삭제 안전 가드 입력).
+// 4xx(429 제외)=접근불가/없음/잘못된 요청 → 즉시 null(정상 케이스, 에러 아님).
+// 429/5xx/네트워크/타임아웃 → 백오프 재시도(SDK 재시도 위 안전망), 소진 시 nfetchErrors++ → 불완전 크롤 신호.
 let nfetchErrors = 0;
-async function nfetch<T>(path: string, init?: Record<string, unknown>): Promise<T | null> {
+async function call<T>(fn: () => Promise<T>): Promise<T | null> {
   await acquire();
   try {
-    for (let i = 0; i < 5; i++) {
+    for (let attempt = 0; attempt < 4; attempt++) {
       try {
-        return await $fetch<T>(`${API}${path}`, { headers: headers(), ...init });
+        return await fn();
       } catch (e) {
-        const status = (e as { response?: { status?: number } })?.response?.status;
-        // 404/403/400 등 영구 클라이언트 에러(429 제외) = 접근불가/없음 → 즉시 null, 에러로 안 침.
+        const status = (e as { status?: number })?.status;
         if (status && status >= 400 && status < 500 && status !== 429) return null;
-        // 429/5xx/네트워크 = 일시 → 백오프 후 재시도.
-        await new Promise((s) => setTimeout(s, 1000 * (i + 1)));
+        await new Promise((s) => setTimeout(s, 800 * (attempt + 1)));
       }
     }
     nfetchErrors++; // 재시도 소진 = 진짜 실패(크롤 불완전).
@@ -85,18 +85,21 @@ async function nfetch<T>(path: string, init?: Record<string, unknown>): Promise<
   }
 }
 
-// 통합에 접근 가능한 모든 데이터베이스 id 열거(트리-walk가 못 닿는 DB까지 자동 발견).
-async function searchDatabases(): Promise<string[]> {
+// 통합에 접근 가능한 모든 데이터소스 id 열거(트리-walk가 못 닿는 DB까지 자동 발견).
+async function searchDataSources(): Promise<string[]> {
   const ids: string[] = [];
   let cursor: string | undefined;
   do {
-    const res = await nfetch<{ results: Array<{ id: string }>; next_cursor?: string; has_more: boolean }>(
-      `/search`,
-      { method: "POST", body: { filter: { value: "database", property: "object" }, page_size: 100, ...(cursor ? { start_cursor: cursor } : {}) } },
+    const res = await call(() =>
+      notion().search({
+        filter: { property: "object", value: "data_source" },
+        page_size: 100,
+        ...(cursor ? { start_cursor: cursor } : {}),
+      }),
     );
     if (!res) break;
-    ids.push(...res.results.map((d) => d.id));
-    cursor = res.has_more ? res.next_cursor : undefined;
+    for (const d of res.results as Array<{ id: string }>) ids.push(d.id);
+    cursor = res.has_more ? (res.next_cursor ?? undefined) : undefined;
   } while (cursor);
   return ids;
 }
@@ -135,11 +138,11 @@ async function readBlocks(blockId: string, depth = 0): Promise<{ prose: string; 
   if (depth > 8) return { prose: "", pageIds, dbIds };
   let cursor: string | undefined;
   do {
-    const res = await nfetch<{ results: Block[]; next_cursor?: string; has_more: boolean }>(
-      `/blocks/${blockId}/children?page_size=100${cursor ? `&start_cursor=${cursor}` : ""}`,
+    const res = await call(() =>
+      notion().blocks.children.list({ block_id: blockId, page_size: 100, ...(cursor ? { start_cursor: cursor } : {}) }),
     );
     if (!res) break;
-    for (const b of res.results) {
+    for (const b of res.results as Block[]) {
       if (b.type === "child_page") { pageIds.push(b.id); continue; }
       if (b.type === "child_database") { dbIds.push(b.id); continue; }
       if (b.type === "link_to_page") {
@@ -157,7 +160,7 @@ async function readBlocks(blockId: string, depth = 0): Promise<{ prose: string; 
         dbIds.push(...sub.dbIds);
       }
     }
-    cursor = res.has_more ? res.next_cursor : undefined;
+    cursor = res.has_more ? (res.next_cursor ?? undefined) : undefined;
   } while (cursor);
   return { prose: lines.join("\n"), pageIds, dbIds };
 }
@@ -184,7 +187,7 @@ async function writeChunks(pool: Pool, page: Page, prose: string): Promise<numbe
 }
 
 // Notion 색인. 두 모드:
-//   full=true (첫 실행·월간): 루트 트리 + 접근가능 DB 전수 크롤 + 사라진 문서 정리(3~5h).
+//   full=true (첫 실행·월간): 루트 트리 + 접근가능 데이터소스 전수 크롤 + 사라진 문서 정리(3~5h).
 //   full=false (주간 증분): /search를 last_edited_time 내림차순으로 훑어 커서 이후 변경분만 재색인(~수 분).
 //                           삭제 정리는 안 함(변경분만 보므로 전수 비교 불가) → 월간 full이 삭제분 담당.
 export async function ingestNotion(opts?: { full?: boolean }): Promise<{ scanned: number; docs: number; chunks: number; removed: number; errors: number; mode: "full" | "incremental" }> {
@@ -208,12 +211,12 @@ export async function ingestNotion(opts?: { full?: boolean }): Promise<{ scanned
     const visited = new Set<string>();
     const seenUrls: string[] = [];
 
-    // prefetched: DB 쿼리 결과의 페이지 객체(있으면 GET /pages 생략 → 요청 절반↓).
+    // prefetched: DB 쿼리 결과의 페이지 객체(전체 객체면 GET /pages 생략 → 요청 절반↓).
     const crawlPage = async (pageId: string, prefetched?: Page): Promise<boolean> => {
       const key = norm(pageId);
       if (visited.has(key) || scanned >= MAX_SCAN) return false;
       visited.add(key);
-      const page = prefetched ?? (await nfetch<Page>(`/pages/${pageId}`));
+      const page = prefetched?.url ? prefetched : ((await call(() => notion().pages.retrieve({ page_id: pageId }))) as Page | null);
       if (!page) return false;
       scanned++;
       const { prose, pageIds, dbIds } = await readBlocks(pageId);
@@ -231,9 +234,19 @@ export async function ingestNotion(opts?: { full?: boolean }): Promise<{ scanned
       return hadBody;
     };
 
-    // DB 항목들을 크롤하되, 앞 SAMPLE개가 전부 빈 본문이면 추적용 DB(출석부 등)로 보고 중단.
-    const crawlDatabase = async (dbId: string): Promise<void> => {
-      const key = "db:" + norm(dbId);
+    // child_database/링크로 만난 데이터베이스 → 그 데이터소스들로 분해해 크롤(신모델).
+    const crawlDatabase = async (databaseId: string): Promise<void> => {
+      const key = "db:" + norm(databaseId);
+      if (visited.has(key) || scanned >= MAX_SCAN) return;
+      visited.add(key);
+      const db = await call(() => notion().databases.retrieve({ database_id: databaseId }));
+      if (!db) return;
+      for (const ds of (db as { data_sources?: Array<{ id: string }> }).data_sources ?? []) await crawlDataSource(ds.id);
+    };
+
+    // 데이터소스 행들을 크롤하되, 앞 SAMPLE개가 전부 빈 본문이면 추적용 DB(출석부 등)로 보고 중단.
+    const crawlDataSource = async (dsId: string): Promise<void> => {
+      const key = "ds:" + norm(dsId);
       if (visited.has(key) || scanned >= MAX_SCAN) return;
       visited.add(key);
       const SAMPLE = 12;
@@ -242,33 +255,32 @@ export async function ingestNotion(opts?: { full?: boolean }): Promise<{ scanned
       let cursor2: string | undefined;
       let firstBatch = true;
       do {
-        const res = await nfetch<{ results: Page[]; next_cursor?: string; has_more: boolean }>(
-          `/databases/${dbId}/query`,
-          { method: "POST", body: { page_size: 100, ...(cursor2 ? { start_cursor: cursor2 } : {}) } },
+        const res = await call(() =>
+          notion().dataSources.query({ data_source_id: dsId, page_size: 100, ...(cursor2 ? { start_cursor: cursor2 } : {}) }),
         );
         if (!res) break;
-        // 표본(앞 SAMPLE개)은 순차 — 추적 DB 조기 판단용. 쿼리 결과 객체를 그대로 넘겨 GET 생략(②).
+        const rows = res.results as Page[];
+        // 표본(앞 SAMPLE개)은 순차 — 추적 DB 조기 판단용. 쿼리 결과 객체를 그대로 넘겨 GET 생략.
         if (firstBatch) {
-          const sample = res.results.slice(0, SAMPLE);
+          const sample = rows.slice(0, SAMPLE);
           for (const entry of sample) {
             if (await crawlPage(entry.id, entry)) withBody++;
             seen++;
           }
           if (seen >= SAMPLE && withBody === 0) return; // 추적 DB → 중단
-          // 나머지는 동시성(①)으로.
-          await mapLimit(res.results.slice(SAMPLE), MAX_INFLIGHT, async (e) => { await crawlPage(e.id, e); });
+          await mapLimit(rows.slice(SAMPLE), MAX_INFLIGHT, async (e) => { await crawlPage(e.id, e); });
           firstBatch = false;
         } else {
-          await mapLimit(res.results, MAX_INFLIGHT, async (e) => { await crawlPage(e.id, e); });
+          await mapLimit(rows, MAX_INFLIGHT, async (e) => { await crawlPage(e.id, e); });
         }
-        cursor2 = res.has_more ? res.next_cursor : undefined;
+        cursor2 = res.has_more ? (res.next_cursor ?? undefined) : undefined;
       } while (cursor2);
     };
 
     // 1) 루트 트리 크롤(페이지)
     for (const root of ROOTS) await crawlPage(root);
-    // 2) 접근 가능한 모든 DB 자동 발견·크롤(트리가 못 닿는 DB까지). visited가 중복 방지.
-    for (const dbId of await searchDatabases()) await crawlDatabase(dbId);
+    // 2) 접근 가능한 모든 데이터소스 자동 발견·크롤(트리가 못 닿는 DB까지). visited가 중복 방지.
+    for (const dsId of await searchDataSources()) await crawlDataSource(dsId);
 
     // 사라진(공유 해제·삭제) 페이지 정리 — **완전한 크롤일 때만**(불완전하면 멀쩡한 콘텐츠 오삭제).
     // 안전 조건: 일시 실패 0 + MAX_SCAN 미도달 + 충분히 큰 크롤(전체 트리 닿음).
@@ -289,20 +301,16 @@ export async function ingestNotion(opts?: { full?: boolean }): Promise<{ scanned
     let cursor2: string | undefined;
     let stop = false;
     do {
-      const res = await nfetch<{ results: Page[]; next_cursor?: string; has_more: boolean }>(
-        `/search`,
-        {
-          method: "POST",
-          body: {
-            filter: { value: "page", property: "object" },
-            sort: { direction: "descending", timestamp: "last_edited_time" },
-            page_size: 100,
-            ...(cursor2 ? { start_cursor: cursor2 } : {}),
-          },
-        },
+      const res = await call(() =>
+        notion().search({
+          filter: { property: "object", value: "page" },
+          sort: { direction: "descending", timestamp: "last_edited_time" },
+          page_size: 100,
+          ...(cursor2 ? { start_cursor: cursor2 } : {}),
+        }),
       );
       if (!res) break;
-      for (const page of res.results) {
+      for (const page of res.results as Page[]) {
         if (new Date(page.last_edited_time).getTime() <= cursor || scanned >= MAX_SCAN) { stop = true; break; }
         scanned++;
         const { prose } = await readBlocks(page.id);
@@ -311,7 +319,7 @@ export async function ingestNotion(opts?: { full?: boolean }): Promise<{ scanned
           docs++;
         }
       }
-      cursor2 = !stop && res.has_more ? res.next_cursor : undefined;
+      cursor2 = !stop && res.has_more ? (res.next_cursor ?? undefined) : undefined;
     } while (cursor2);
   }
 
