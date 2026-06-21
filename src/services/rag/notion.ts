@@ -221,6 +221,7 @@ export async function ingestNotion(opts?: { full?: boolean }): Promise<{ scanned
       const page = prefetched?.url ? prefetched : ((await call(() => notion().pages.retrieve({ page_id: pageId }))) as Page | null);
       if (!page) return false;
       scanned++;
+      if (scanned % 250 === 0) console.log(`[notion] 진행 scanned=${scanned} docs=${docs} chunks=${totalChunks} errors=${nfetchErrors}`);
       const { prose, pageIds, dbIds } = await readBlocks(pageId);
       let hadBody = false;
       if (prose.trim()) {
@@ -280,9 +281,18 @@ export async function ingestNotion(opts?: { full?: boolean }): Promise<{ scanned
     };
 
     // 1) 루트 트리 크롤(페이지)
+    console.log(`[notion] 루트 트리 크롤 시작`);
     for (const root of ROOTS) await crawlPage(root);
+    console.log(`[notion] 루트 트리 끝 scanned=${scanned} docs=${docs} chunks=${totalChunks} errors=${nfetchErrors}`);
     // 2) 접근 가능한 모든 데이터소스 자동 발견·크롤(트리가 못 닿는 DB까지). visited가 중복 방지.
-    for (const dsId of await searchDataSources()) await crawlDataSource(dsId);
+    const dsIds = await searchDataSources();
+    console.log(`[notion] 데이터소스 발견 ${dsIds.length}개 — 크롤 시작`);
+    let dsDone = 0;
+    for (const dsId of dsIds) {
+      await crawlDataSource(dsId);
+      if (++dsDone % 50 === 0) console.log(`[notion] DS ${dsDone}/${dsIds.length} scanned=${scanned} chunks=${totalChunks} errors=${nfetchErrors}`);
+    }
+    console.log(`[notion] 데이터소스 크롤 끝 scanned=${scanned} docs=${docs} chunks=${totalChunks} errors=${nfetchErrors}`);
 
     // 사라진(공유 해제·삭제) 페이지 정리 — **완전한 크롤일 때만**(불완전하면 멀쩡한 콘텐츠 오삭제).
     // 안전 조건: 일시 실패 0 + MAX_SCAN 미도달 + 충분히 큰 크롤(전체 트리 닿음).
