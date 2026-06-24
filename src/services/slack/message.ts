@@ -4,7 +4,7 @@ import ICEBRAKING_QUESTIONS from "@/constant/ICEBRAKING_QUESTIONS.json";
 import CHANNEL_ID from "@/constant/CHANNEL_ID.json";
 import BASE_URL from "@/constant/BASE_URL.json";
 import { messages as googleMeetMessages } from "./domain/googleMeet";
-import { answerStream } from "~/services/rag";
+import { answerStream, logQuery } from "~/services/rag";
 
 
 const USER_TEXT_REGEX = /<@([A-Z0-9]+)\|.+>/g;
@@ -12,7 +12,7 @@ const USER_TEXT_REGEX = /<@([A-Z0-9]+)\|.+>/g;
 export const messageFunctionList: MessageSetting[] = [
   {
     regex: /^!질문\s+/,
-    async handler({ client, channel, ts, text }) {
+    async handler({ client, channel, ts, text, user }) {
       const question = text.replace(/^!질문\s+/, "").trim();
       if (!question) return;
       const placeholder = await client.chat.postMessage({
@@ -22,6 +22,7 @@ export const messageFunctionList: MessageSetting[] = [
       });
       const msgTs = placeholder.ts as string;
       let lastUpdate = 0;
+      const startedAt = Date.now();
       try {
         const { text: body, sources } = await answerStream(question, (partial) => {
           const now = Date.now();
@@ -36,11 +37,24 @@ export const messageFunctionList: MessageSetting[] = [
               .join("\n")
           : "";
         await client.chat.update({ channel, ts: msgTs, text: `${body}${sourceText}` });
+        await logQuery({
+          channel, msgTs, user, question, answer: body,
+          found: sources.length > 0,
+          sourceUrls: sources.map((s) => s.source_url),
+          latencyMs: Date.now() - startedAt,
+        });
+        // 한 번 탭으로 피드백하도록 봇이 👍👎 선제공(reaction_added로 만족도 집계)
+        await client.reactions.add({ channel, timestamp: msgTs, name: "+1" }).catch(() => {});
+        await client.reactions.add({ channel, timestamp: msgTs, name: "-1" }).catch(() => {});
       } catch (error) {
         await client.chat.update({
           channel,
           ts: msgTs,
           text: `검색 중 오류가 발생했어요: ${error instanceof Error ? error.message : "알 수 없는 오류"}`,
+        });
+        await logQuery({
+          channel, msgTs, user, question, answer: "",
+          found: false, sourceUrls: [], latencyMs: Date.now() - startedAt,
         });
       }
     },

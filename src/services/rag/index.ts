@@ -1,4 +1,5 @@
 // RAG: 질문 → 임베딩 → (레포 라우팅) → pgvector top-k 검색 → 컨텍스트 → 소형 LLM 생성 → 답+출처
+import { createHash } from "node:crypto";
 import { createPool, query } from "~/helper/adapter/postgres";
 import { embed, generate, generateStream } from "~/helper/adapter/ollama";
 import type { Pool } from "pg";
@@ -180,6 +181,43 @@ export async function answer(question: string): Promise<RagAnswer> {
   if (rows.length === 0) return EMPTY;
   const text = await generate(buildPrompt(question, rows), NUM_PREDICT);
   return { text, sources: dedupSources(rows) };
+}
+
+// 질의 로그(실사용량·응답시간·해결률 측정). 로깅 실패가 사용자 답변을 막지 않도록 자체 흡수.
+// user는 해시만 저장(PII 비보관). 표시용이 아니라 집계용.
+export interface QueryLogEntry {
+  channel: string;
+  msgTs: string;
+  user: string;
+  question: string;
+  answer: string;
+  found: boolean;
+  sourceUrls: string[];
+  latencyMs: number;
+}
+export async function logQuery(entry: QueryLogEntry): Promise<void> {
+  try {
+    const userHash = createHash("sha256").update(entry.user).digest("hex").slice(0, 16);
+    await query(
+      getPool(),
+      `INSERT INTO rag_query_log
+         (channel, msg_ts, user_hash, question, answer, found, source_urls, latency_ms)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [entry.channel, entry.msgTs, userHash, entry.question, entry.answer, entry.found, entry.sourceUrls, entry.latencyMs],
+    );
+  } catch (e) {
+    console.error("[rag] 질의 로그 기록 실패:", e);
+  }
+}
+
+// 👍/👎 만족도. msg_ts로 질의 로그 행을 찾아 feedback 갱신(+1/−1/null=취소).
+// 매칭 행이 없으면 no-op이라, RAG 답변 메시지에만 자연스럽게 스코프됨.
+export async function setFeedback(msgTs: string, value: number | null): Promise<void> {
+  try {
+    await query(getPool(), `UPDATE rag_query_log SET feedback = $1 WHERE msg_ts = $2`, [value, msgTs]);
+  } catch (e) {
+    console.error("[rag] 피드백 기록 실패:", e);
+  }
 }
 
 // 스트리밍: 생성 토큰이 쌓일 때마다 onText(누적 텍스트) 호출. 반환은 최종 답+출처.
