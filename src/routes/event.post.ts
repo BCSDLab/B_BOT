@@ -2,10 +2,13 @@ import type {
   GenericMessageEvent,
   MessageChangedEvent,
   MessageRepliedEvent,
+  ReactionAddedEvent,
+  ReactionRemovedEvent,
   SlackEvent,
   WebClient,
 } from "@slack/web-api";
 import { messageFunctionList } from "~/services/slack/message";
+import { setFeedback } from "~/services/rag";
 
 type Body = {
   type: "event_callback";
@@ -34,14 +37,19 @@ export default defineEventHandler(async (event) => {
     return { ok: true };
   }
 
+  const context = event.context as Context;
+
+  if (body.event.type === "reaction_added" || body.event.type === "reaction_removed") {
+    await handleReaction(context.slackWebClient, body.event).catch(console.error);
+    return { ok: true };
+  }
+
   if (body.event.type !== "message") {
     return "not Implemented";
   }
   if (body.event.channel_type !== "channel") {
     return "not Implemented";
   }
-
-  const context = event.context as Context;
 
   let text = "";
   let threadTs = "";
@@ -86,6 +94,36 @@ export default defineEventHandler(async (event) => {
 
   return { ok: true };
 });
+
+// 봇 user id 캐시(자신이 선제공한 👍👎를 만족도로 오집계하지 않으려고 필터).
+let _botUserId: string | undefined | null = null;
+async function botUserId(client: WebClient): Promise<string | undefined> {
+  if (_botUserId !== null) return _botUserId;
+  try {
+    _botUserId = ((await client.auth.test()) as { user_id?: string }).user_id;
+  } catch {
+    _botUserId = undefined;
+  }
+  return _botUserId;
+}
+
+const FEEDBACK: Record<string, number> = { "+1": 1, "-1": -1 };
+
+// 👍/👎 → rag_query_log.feedback. 추가=값, 제거=취소(null). 봇 자신·기타 이모지는 무시.
+async function handleReaction(
+  client: WebClient,
+  reactionEvent: ReactionAddedEvent | ReactionRemovedEvent,
+) {
+  const value = FEEDBACK[reactionEvent.reaction];
+  if (value === undefined) return;
+  if (reactionEvent.item.type !== "message") return;
+  const me = await botUserId(client);
+  if (me && reactionEvent.user === me) return;
+  await setFeedback(
+    reactionEvent.item.ts,
+    reactionEvent.type === "reaction_added" ? value : null,
+  );
+}
 
 async function processMessage({
   client,
