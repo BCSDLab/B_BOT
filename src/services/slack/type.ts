@@ -1,5 +1,5 @@
 import type { WebClient } from "@slack/web-api";
-import type { SlackShortcut, ViewSubmitAction } from '@slack/bolt';
+import type { BlockAction, SlackShortcut, ViewSubmitAction } from '@slack/bolt';
 
 interface Message {
   channel: string;
@@ -36,6 +36,21 @@ export interface ViewActionSetting {
   actionId: string;
   handler: (
     args: ViewActionHandlerParams,
+  ) => Promise<void>;
+}
+
+interface BlockActionHandlerParams {
+  client: WebClient;
+  body: BlockAction;
+  /** 이번에 눌린 요소 하나. body.actions에 여러 개가 올 수 있어 따로 넘긴다. */
+  action: BlockAction["actions"][number];
+  [key: string]: any;
+}
+
+export interface BlockActionSetting {
+  actionId: string;
+  handler: (
+    args: BlockActionHandlerParams,
   ) => Promise<void>;
 }
 
