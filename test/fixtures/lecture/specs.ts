@@ -9,7 +9,7 @@ export const FIXTURE_SPECS: Record<string, MappingSpec> = {
     headerRow: 1,
     timeFormat: "period",
     columns: {
-      no: 0, department: 3, code: 4, lectureClass: 5, name: 6,
+      department: 3, code: 4, lectureClass: 5, name: 6,
       grades: 8, designScore: 11, regularNumber: 12, professor: 13,
       target: 14, classTime: 16,
     },
@@ -18,7 +18,7 @@ export const FIXTURE_SPECS: Record<string, MappingSpec> = {
     headerRow: 2,
     timeFormat: "period",
     columns: {
-      no: 1, department: 3, code: 4, name: 5, lectureClass: 6,
+      department: 3, code: 4, name: 5, lectureClass: 6,
       regularNumber: 7, grades: 8, designScore: 11, target: 13,
       professor: 15, classTime: 16,
     },
@@ -27,7 +27,7 @@ export const FIXTURE_SPECS: Record<string, MappingSpec> = {
     headerRow: 2,
     timeFormat: "period",
     columns: {
-      no: 1, department: 4, code: 5, name: 6, lectureClass: 7,
+      department: 4, code: 5, name: 6, lectureClass: 7,
       grades: 9, designScore: 12, professor: 14, regularNumber: 15,
       target: 16, classTime: 17,
     },
@@ -36,7 +36,7 @@ export const FIXTURE_SPECS: Record<string, MappingSpec> = {
     headerRow: 3,
     timeFormat: "range",
     columns: {
-      no: 0, department: 1, code: 2, name: 3, lectureClass: 4,
+      department: 1, code: 2, name: 3, lectureClass: 4,
       grades: 7, designScore: 10, classTime: 11, professor: 12,
       regularNumber: 13,
     },
@@ -45,7 +45,7 @@ export const FIXTURE_SPECS: Record<string, MappingSpec> = {
     headerRow: 3,
     timeFormat: "range",
     columns: {
-      no: 0, department: 1, code: 2, name: 3, lectureClass: 4,
+      department: 1, code: 2, name: 3, lectureClass: 4,
       grades: 7, designScore: 10, classTime: 11, professor: 12,
       regularNumber: 13,
     },
@@ -54,7 +54,7 @@ export const FIXTURE_SPECS: Record<string, MappingSpec> = {
     headerRow: 3,
     timeFormat: "range",
     columns: {
-      no: 0, code: 3, name: 4, lectureClass: 5, grades: 8,
+      code: 3, name: 4, lectureClass: 5, grades: 8,
       designScore: 11, department: 12, regularNumber: 13, target: 15,
       classTime: 16, professor: 17,
     },

@@ -19,6 +19,7 @@
     "vitest": "^4.1.10"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.115.0",
     "@google-apps/meet": "^0.4.0",
     "@google-cloud/local-auth": "^3.0.1",
     "@notionhq/client": "^5.22.0",
@@ -27,6 +28,7 @@
     "google-auth-library": "^9.15.1",
     "mysql2": "^3.9.7",
     "nitropack": "^2.11.6",
+    "openai": "^7.4.0",
     "pg": "^8.21.0",
     "ts-pattern": "^5.6.2"
   },

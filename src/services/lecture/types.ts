@@ -42,7 +42,6 @@ export interface MappingSpec {
   seasonalDays?: number[];
   /** 컬럼 위치(0-based). 없는 컬럼은 생략하고, 그 필드는 기본값으로 채운다. */
   columns: {
-    no?: number;
     code: number;
     name: number;
     lectureClass: number;
