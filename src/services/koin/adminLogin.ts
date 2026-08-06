@@ -9,13 +9,6 @@ interface KoinAdminLoginResponse {
   token: string;
 }
 
-function requireEnv(name: string, value: string | undefined): string {
-  if (!value) {
-    throw new Error(`${name} 환경변수가 설정되지 않았습니다.`);
-  }
-  return value;
-}
-
 function encryptAccessToken(accessToken: string, encodedKey: string): string {
   const key = Buffer.from(encodedKey, "base64");
   if (key.length !== 32) {
@@ -58,13 +51,10 @@ async function replaceAccessToken(pool: Pool, encryptedAccessToken: string): Pro
 }
 
 export async function loginKoinAdmin(pool: Pool): Promise<string> {
-  const baseURL = requireEnv("KOIN_API_BASE_URL", import.meta.env.KOIN_API_BASE_URL);
-  const email = requireEnv("KOIN_ADMIN_EMAIL", import.meta.env.KOIN_ADMIN_EMAIL);
-  const password = requireEnv("KOIN_ADMIN_PASSWORD", import.meta.env.KOIN_ADMIN_PASSWORD);
-  const encryptionKey = requireEnv(
-    "KOIN_TOKEN_ENCRYPTION_KEY",
-    import.meta.env.KOIN_TOKEN_ENCRYPTION_KEY,
-  );
+  const baseURL = import.meta.env.KOIN_API_BASE_URL;
+  const email = import.meta.env.KOIN_ADMIN_EMAIL;
+  const password = import.meta.env.KOIN_ADMIN_PASSWORD;
+  const encryptionKey = import.meta.env.KOIN_TOKEN_ENCRYPTION_KEY;
 
   const response = await $fetch<KoinAdminLoginResponse>("admin/user/login", {
     baseURL,
