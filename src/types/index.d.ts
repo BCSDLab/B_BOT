@@ -20,7 +20,6 @@ interface ImportMetaEnv {
   readonly KOIN_API_BASE_URL: string;
   readonly KOIN_ADMIN_EMAIL: string;
   readonly KOIN_ADMIN_PASSWORD: string;
-  readonly KOIN_TOKEN_ENCRYPTION_KEY: string;
   readonly OLLAMA_BASE_URL?: string;
   readonly OLLAMA_GEN_MODEL?: string;
   readonly NOTION_TOKEN?: string;
