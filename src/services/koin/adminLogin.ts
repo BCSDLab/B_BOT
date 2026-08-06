@@ -13,8 +13,7 @@ export async function loginKoinAdmin(): Promise<string> {
     body: {
       email,
       password,
-    },
-    timeout: 10_000,
+    }
   });
 
   if (typeof response.token !== "string" || response.token.length === 0) {
