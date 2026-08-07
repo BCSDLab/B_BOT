@@ -4,10 +4,20 @@ import ExcelJS from "exceljs";
 export async function readSheet(filePath: string): Promise<string[][]> {
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.readFile(filePath);
+  return toRows(workbook, filePath);
+}
 
+/** 슬랙에서 받은 파일은 디스크를 거치지 않고 메모리에서 바로 읽는다. */
+export async function readSheetFromBuffer(buffer: ArrayBuffer): Promise<string[][]> {
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(buffer as Parameters<typeof workbook.xlsx.load>[0]);
+  return toRows(workbook, "업로드된 파일");
+}
+
+function toRows(workbook: ExcelJS.Workbook, label: string): string[][] {
   const worksheet = workbook.worksheets[0];
   if (!worksheet) {
-    throw new Error(`시트를 찾을 수 없습니다: ${filePath}`);
+    throw new Error(`시트를 찾을 수 없습니다: ${label}`);
   }
 
   const rows: string[][] = [];

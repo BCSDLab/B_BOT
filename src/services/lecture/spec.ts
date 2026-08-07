@@ -14,7 +14,7 @@ const ABSENT = "";
 
 const COLUMN_KEYS = [
   "code", "name", "lectureClass", "professor", "grades",
-  "regularNumber", "department", "target", "designScore", "classTime",
+  "regularNumber", "department", "target", "designScore", "classTime", "isEnglish",
 ] as const;
 
 type ColumnKey = (typeof COLUMN_KEYS)[number];
@@ -65,6 +65,7 @@ const SYSTEM_PROMPT = `너는 한국기술교육대학교 수강신청 편람 �
 - regularNumber: 정원. \`정원\`, \`수강정원\`.
 - department: 개설 학과. \`개설학과\`, \`개설학부(과)\`.
 - target: 수강 대상 학부. \`대상학부(과)\`, \`수강대상\`.
+- isEnglish: 영어 강의 여부. \`영어강의여부\`, \`영어강의\`. 값이 N/Y다. 계절학기엔 없다.
 
 답하는 법:
 - 각 항목에 **헤더 칸에 적힌 글자를 그대로 옮겨 적어라.** 위치를 세지 마라.
@@ -85,6 +86,7 @@ const VALUE_SHAPES: Partial<Record<ColumnKey, { test: (v: string) => boolean; ex
   grades: { test: (v) => /^\d{1,2}(\.\d)?$/.test(v), expected: "학점 숫자" },
   designScore: { test: (v) => /^\d{1,2}(\.\d)?$/.test(v), expected: "설계 학점 숫자" },
   regularNumber: { test: (v) => /^\d{1,4}$/.test(v), expected: "정원 숫자" },
+  isEnglish: { test: (v) => /^[YNyn]$/.test(v), expected: "N 또는 Y" },
 };
 
 /**
@@ -105,6 +107,7 @@ const HEADER_ALIASES: Record<string, string[]> = {
   department: ["개설학과", "개설학부", "개설학부(과)"],
   target: ["대상학부(과)", "대상학부", "수강대상"],
   classTime: ["강의시간"],
+  isEnglish: ["영어강의여부", "영어강의"],
   // 우리가 쓰지 않는 컬럼. 여기를 가리키면 무조건 오답이다.
   __unused: ["실습", "실", "강의", "강", "이수구분", "대표이수구분", "이수영역", "학년", "대상학년"],
 };

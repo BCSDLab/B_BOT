@@ -1,0 +1,141 @@
+import type { KnownBlock } from "@slack/web-api";
+import { buildAdminRequest, toAdminTerm } from "./adminApi";
+import { convertRows } from "./convert";
+import { renderReviewPage } from "./reviewHtml";
+import { buildReviewUrl, saveReview } from "./reviewStore";
+import { readSheetFromBuffer } from "./sheet";
+import { generateMappingSpec } from "./spec";
+
+export interface ConversionTarget {
+  year: number;
+  /** `여름학기`처럼 사람이 쓰는 이름. enum 변환은 안쪽에서 한다. */
+  termName: string;
+  fileName: string;
+}
+
+export interface ConversionOutcome {
+  token: string;
+  reviewUrl: string;
+  lectureCount: number;
+  issueCount: number;
+  parseFailureCount: number;
+  withoutTimeCount: number;
+}
+
+/**
+ * 엑셀 한 개를 검토 가능한 상태까지 끌고 간다.
+ * 스펙 생성만 LLM이고 나머지는 전부 결정적이다.
+ */
+export async function convertToReview(
+  buffer: ArrayBuffer,
+  { year, termName, fileName }: ConversionTarget,
+): Promise<ConversionOutcome> {
+  const term = toAdminTerm(termName);
+  const rows = await readSheetFromBuffer(buffer);
+  const spec = await generateMappingSpec(rows);
+  const converted = convertRows(rows, spec);
+
+  if (converted.lectures.length === 0) {
+    throw new Error("강의를 하나도 읽지 못했습니다. 파일이 편람이 맞는지 확인해주세요.");
+  }
+
+  const { request, issues } = buildAdminRequest(converted.lectures, { year, term });
+
+  const generatedAt = new Date().toLocaleString("ko-KR", { timeZone: "Asia/Seoul" });
+  const html = renderReviewPage({
+    year,
+    termName,
+    sourceFileName: fileName,
+    generatedAt,
+    lectures: converted.lectures,
+    issues,
+    parseFailures: converted.issues.map((i) => ({
+      row: i.row,
+      value: i.value,
+      message: i.message,
+    })),
+  });
+
+  const token = await saveReview({
+    html,
+    request,
+    meta: {
+      year,
+      termName,
+      sourceFileName: fileName,
+      lectureCount: converted.lectures.length,
+      issueCount: issues.length,
+      createdAt: new Date().toISOString(),
+    },
+  });
+
+  return {
+    token,
+    reviewUrl: buildReviewUrl(token),
+    lectureCount: converted.lectures.length,
+    issueCount: issues.length,
+    parseFailureCount: converted.issues.length,
+    withoutTimeCount: converted.lectures.filter((l) => l.lecture_infos.length === 0).length,
+  };
+}
+
+/**
+ * 변환 결과 안내. 확인이 필요한 게 있으면 반영 버튼을 아예 내리지 않고 경고를 붙인다.
+ * 판단은 사람이 하되, 무엇을 감수하는지는 보이게 한다.
+ */
+export function buildResultBlocks(
+  outcome: ConversionOutcome,
+  target: ConversionTarget,
+  requesterId: string,
+): KnownBlock[] {
+  const warn = outcome.issueCount > 0 || outcome.parseFailureCount > 0;
+
+  const lines = [
+    `*${target.year} ${target.termName}* 변환 완료`,
+    `강의 *${outcome.lectureCount}건* · 시간 없음 ${outcome.withoutTimeCount}건`,
+  ];
+  if (outcome.parseFailureCount > 0) {
+    lines.push(`:warning: 강의시간 해석 실패 *${outcome.parseFailureCount}건*`);
+  }
+  if (outcome.issueCount > 0) {
+    lines.push(`:warning: 어드민 API가 거절할 수 있는 항목 *${outcome.issueCount}건*`);
+  }
+
+  return [
+    { type: "section", text: { type: "mrkdwn", text: lines.join("\n") } },
+    {
+      type: "actions",
+      elements: [
+        {
+          type: "button",
+          text: { type: "plain_text", text: "검토 페이지 열기", emoji: true },
+          url: outcome.reviewUrl,
+          action_id: "lecture:review_link",
+        },
+        {
+          type: "button",
+          text: { type: "plain_text", text: warn ? "그래도 반영" : "반영", emoji: true },
+          style: warn ? undefined : "primary",
+          action_id: "lecture:apply",
+          value: JSON.stringify({ token: outcome.token, requesterId }),
+        },
+        {
+          type: "button",
+          text: { type: "plain_text", text: "취소", emoji: true },
+          style: "danger",
+          action_id: "lecture:cancel",
+          value: JSON.stringify({ token: outcome.token, requesterId }),
+        },
+      ],
+    },
+    {
+      type: "context",
+      elements: [
+        {
+          type: "mrkdwn",
+          text: `${target.fileName} · 검토 링크는 7일 후 만료됩니다 · 요청: <@${requesterId}>`,
+        },
+      ],
+    },
+  ];
+}

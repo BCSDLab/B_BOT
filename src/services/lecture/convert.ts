@@ -87,9 +87,11 @@ export function convertRows(rows: string[][], spec: MappingSpec): ConvertResult 
       department: cell(row, columns.department),
       target: cell(row, columns.target),
       design_score: cell(row, columns.designScore),
-      is_english: "0",
+      // 엑셀에 있으면 원본(N/Y)을 쓴다. 계절학기엔 컬럼이 없어 기본값으로 둔다.
+      is_english: cell(row, columns.isEnglish) || "0",
       is_elearning: rawTime.includes("온라인") ? "1" : "0",
       lecture_infos: infos,
+      raw_class_time: rawTime,
     });
   });
 

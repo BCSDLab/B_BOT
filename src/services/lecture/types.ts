@@ -18,6 +18,8 @@ export interface Lecture {
   is_english: string;
   is_elearning: string;
   lecture_infos: LectureInfo[];
+  /** 엑셀에 적혀 있던 원본 문자열. 검토 화면에서 파싱 결과와 나란히 보여주려고 남긴다. */
+  raw_class_time: string;
 }
 
 /**
@@ -51,6 +53,7 @@ export interface MappingSpec {
     department?: number;
     target?: number;
     designScore?: number;
+    isEnglish?: number;
     classTime: number;
   };
 }

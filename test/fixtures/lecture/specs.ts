@@ -11,7 +11,7 @@ export const FIXTURE_SPECS: Record<string, MappingSpec> = {
     columns: {
       department: 3, code: 4, lectureClass: 5, name: 6,
       grades: 8, designScore: 11, regularNumber: 12, professor: 13,
-      target: 14, classTime: 16,
+      target: 14, classTime: 16, isEnglish: 18,
     },
   },
   "regular-2026-1": {
@@ -20,7 +20,7 @@ export const FIXTURE_SPECS: Record<string, MappingSpec> = {
     columns: {
       department: 3, code: 4, name: 5, lectureClass: 6,
       regularNumber: 7, grades: 8, designScore: 11, target: 13,
-      professor: 15, classTime: 16,
+      professor: 15, classTime: 16, isEnglish: 24,
     },
   },
   "regular-2026-2": {
@@ -29,7 +29,7 @@ export const FIXTURE_SPECS: Record<string, MappingSpec> = {
     columns: {
       department: 4, code: 5, name: 6, lectureClass: 7,
       grades: 9, designScore: 12, professor: 14, regularNumber: 15,
-      target: 16, classTime: 17,
+      target: 16, classTime: 17, isEnglish: 26,
     },
   },
   "seasonal-2025-summer": {

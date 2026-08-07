@@ -8,6 +8,8 @@ export default defineConfig({
   resolve: {
     alias: {
       "~": fileURLToPath(new URL("./src", import.meta.url)),
+      // nitro.config.ts의 alias와 맞춘다.
+      "@/constant": fileURLToPath(new URL("./src/constant", import.meta.url)),
     },
   },
   test: {
