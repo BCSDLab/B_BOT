@@ -19,6 +19,10 @@ interface ImportMetaEnv {
   readonly ADMIN_NAME: string;
   readonly OLLAMA_BASE_URL?: string;
   readonly OLLAMA_GEN_MODEL?: string;
+  readonly ANTHROPIC_API_KEY?: string;
+  readonly OPENAI_API_KEY?: string;
+  readonly OPENAI_MODEL?: string;
+  readonly LECTURE_LLM_PROVIDER?: "openai" | "anthropic";
   readonly NOTION_TOKEN?: string;
   readonly GDRIVE_FOLDER_IDS?: string;
 }

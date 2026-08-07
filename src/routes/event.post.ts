@@ -8,6 +8,7 @@ import type {
   WebClient,
 } from "@slack/web-api";
 import { messageFunctionList } from "~/services/slack/message";
+import type { SlackFile } from "~/utils/slackFile";
 import { setFeedback } from "~/services/rag";
 
 type Body = {
@@ -55,6 +56,7 @@ export default defineEventHandler(async (event) => {
   let threadTs = "";
   let userId = "";
   let channelId = "";
+  let files: SlackFile[] | undefined;
 
   if (body.event.subtype === undefined) {
     const eventBody = body.event as GenericMessageEvent;
@@ -67,6 +69,19 @@ export default defineEventHandler(async (event) => {
     channelId = eventBody.channel;
     userId = eventBody.user ?? "";
     threadTs = eventBody.ts ?? eventBody.thread_ts ?? "";
+
+  } else if (body.event.subtype === "file_share") {
+    // 엑셀을 올리면서 명령어를 적는 흐름(!강의반영)을 위해 받는다.
+    // 일반 메시지와 달리 subtype이 붙어 있어 위 분기로는 들어오지 않는다.
+    const eventBody = body.event as GenericMessageEvent & { files?: SlackFile[] };
+    if (eventBody.bot_id) {
+      return { ok: true };
+    }
+    text = eventBody.text ?? "";
+    channelId = eventBody.channel;
+    userId = eventBody.user ?? "";
+    threadTs = eventBody.ts ?? eventBody.thread_ts ?? "";
+    files = eventBody.files;
 
   } else if (body.event.subtype === "message_changed") {
     const eventBody = body.event as MessageChangedEvent;
@@ -90,6 +105,7 @@ export default defineEventHandler(async (event) => {
     ts: threadTs,
     user: userId,
     channel: channelId,
+    files,
   }).catch(console.error);
 
   return { ok: true };
@@ -131,14 +147,22 @@ async function processMessage({
   ts,
   user,
   channel,
+  files,
 }: {
   client: WebClient;
   text: string;
   ts: string;
   user: string;
   channel: string;
+  files?: SlackFile[];
 }) {
+  const hasFiles = (files?.length ?? 0) > 0;
+
   for (const messageFunction of messageFunctionList) {
+    // 파일이 붙은 메시지는 그걸 받겠다고 선언한 핸들러만 처리한다.
+    if (hasFiles && !messageFunction.acceptsFiles) {
+      continue;
+    }
     if (typeof messageFunction.regex === "string") {
       const isIncluded = text.includes(messageFunction.regex);
       if (!isIncluded) {
@@ -158,6 +182,7 @@ async function processMessage({
         ts,
         user,
         channel,
+        files,
       });
     } catch (error) {
       console.error('Handler error:', error);

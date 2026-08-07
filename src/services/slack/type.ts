@@ -83,6 +83,12 @@ interface MessageHandlerParams extends Message {
 
 export interface MessageSetting {
   regex: string | RegExp;
+  /**
+   * 파일이 첨부된 메시지도 받을지. 기본은 받지 않는다.
+   * 파일 첨부 메시지를 모든 핸들러에 흘리면 스크린샷과 함께 쓴 `!질문` 같은 게
+   * 갑자기 반응하기 시작한다. 파일이 필요한 명령어만 켠다.
+   */
+  acceptsFiles?: boolean;
   handler: (
     args: MessageHandlerParams,
   ) => Promise<void>;

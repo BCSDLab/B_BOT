@@ -6,23 +6,29 @@
   "scripts": {
     "dev": "nitro dev",
     "build": "nitro build",
-    "nitro": "nitro"
+    "nitro": "nitro",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "devDependencies": {
     "@slack/bolt": "^4.2.1",
     "@total-typescript/ts-reset": "^0.6.1",
     "@types/node": "^22.13.10",
     "@types/pg": "^8.20.0",
-    "typescript": "^5.8.2"
+    "typescript": "^5.8.2",
+    "vitest": "^4.1.10"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.115.0",
     "@google-apps/meet": "^0.4.0",
     "@google-cloud/local-auth": "^3.0.1",
     "@notionhq/client": "^5.22.0",
     "@slack/web-api": "^7.8.0",
+    "exceljs": "^4.4.0",
     "google-auth-library": "^9.15.1",
     "mysql2": "^3.9.7",
     "nitropack": "^2.11.6",
+    "openai": "^7.4.0",
     "pg": "^8.21.0",
     "ts-pattern": "^5.6.2"
   },
