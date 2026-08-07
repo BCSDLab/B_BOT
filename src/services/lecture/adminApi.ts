@@ -168,20 +168,25 @@ export function buildAdminRequest(
   };
 }
 
+export interface KoinAdminAuth {
+  baseUrl: string;
+  accessToken: string;
+}
+
 /**
  * 실제 반영. 중복이 하나라도 있으면 409로 요청 전체가 거절되므로
  * 여기까지 오기 전에 `buildAdminRequest`의 사전 검증을 통과시켜야 한다.
+ *
+ * 인증은 이 모듈이 갖지 않는다. 토큰 발급 방식(정적 키·로그인 등)이 바뀌어도
+ * 여기는 그대로 두려는 것이다.
  */
-export async function submitLectures(request: AdminLectureCreateRequest): Promise<void> {
-  const base = import.meta.env.KOIN_API_BASE_URL;
-  const token = import.meta.env.KOIN_ADMIN_TOKEN;
-  if (!base || !token) {
-    throw new Error("KOIN_API_BASE_URL / KOIN_ADMIN_TOKEN이 설정되지 않았습니다.");
-  }
-
-  const response = await fetch(`${base.replace(/\/$/, "")}/admin/lectures`, {
+export async function submitLectures(
+  request: AdminLectureCreateRequest,
+  { baseUrl, accessToken }: KoinAdminAuth,
+): Promise<void> {
+  const response = await fetch(`${baseUrl.replace(/\/$/, "")}/admin/lectures`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
     body: JSON.stringify(request),
   });
 

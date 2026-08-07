@@ -23,8 +23,6 @@ interface ImportMetaEnv {
   readonly OPENAI_API_KEY?: string;
   readonly OPENAI_MODEL?: string;
   readonly LECTURE_LLM_PROVIDER?: "openai" | "anthropic";
-  readonly KOIN_API_BASE_URL?: string;
-  readonly KOIN_ADMIN_TOKEN?: string;
   readonly NOTION_TOKEN?: string;
   readonly GDRIVE_FOLDER_IDS?: string;
 }

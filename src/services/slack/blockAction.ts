@@ -1,4 +1,5 @@
 import { submitLectures } from "~/services/lecture/adminApi";
+import { getKoinAdminAuth } from "~/services/lecture/koinAuth";
 import { loadReview } from "~/services/lecture/reviewStore";
 import type { BlockActionSetting } from "./type";
 
@@ -51,7 +52,7 @@ export const blockActions: BlockActionSetting[] = [
             text: `:hourglass_flowing_sand: *반영 중…* ${stored.meta.lectureCount}건\n작업자: <@${actor}>` } }],
         });
 
-        await submitLectures(stored.request);
+        await submitLectures(stored.request, await getKoinAdminAuth());
 
         await updateSlack({
           client, channel, ts,
