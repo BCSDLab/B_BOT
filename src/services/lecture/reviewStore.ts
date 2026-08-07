@@ -44,6 +44,11 @@ export function isExpired(createdAt: string, now: Date): boolean {
 
 export function buildReviewUrl(token: string): string {
   const base = import.meta.env.APP_BASE_URL ?? "";
+  // 슬랙 버튼의 url은 절대 주소여야 한다. 비어 있으면 변환을 다 마친 뒤
+  // 메시지를 올리는 단계에서 invalid_blocks로 실패해 원인이 보이지 않는다.
+  if (!/^https?:\/\//.test(base)) {
+    throw new Error("APP_BASE_URL이 절대 주소로 설정되어 있지 않습니다.");
+  }
   return `${base.endsWith("/") ? base : `${base}/`}review/${token}`;
 }
 

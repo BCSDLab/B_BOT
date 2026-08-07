@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createReviewToken, isExpired, isValidToken } from "~/services/lecture/reviewStore";
+import { buildReviewUrl, createReviewToken, isExpired, isValidToken } from "~/services/lecture/reviewStore";
 
 describe("검토 링크 토큰", () => {
   it("추측할 수 없을 만큼 길다", () => {
@@ -40,5 +40,13 @@ describe("검토 링크 만료", () => {
   it("날짜가 깨져 있으면 만료로 본다", () => {
     // 열어주는 쪽으로 실수하지 않는다.
     expect(isExpired("올해쯤", now)).toBe(true);
+  });
+});
+
+describe("검토 링크 주소", () => {
+  it("APP_BASE_URL이 없으면 링크를 만들지 않는다", () => {
+    // 슬랙 버튼은 절대 주소만 받는다. 상대 경로를 넘기면 변환을 다 마친 뒤
+    // 메시지를 올리는 단계에서 실패해 원인이 보이지 않는다.
+    expect(() => buildReviewUrl(createReviewToken())).toThrow(/APP_BASE_URL/);
   });
 });

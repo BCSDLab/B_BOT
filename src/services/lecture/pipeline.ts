@@ -13,6 +13,20 @@ export interface ConversionTarget {
   fileName: string;
 }
 
+/** 변환을 시작하기 전에 없으면 반드시 실패할 설정만 확인한다. */
+function assertConfigured(): void {
+  const missing = [
+    !/^https?:\/\//.test(import.meta.env.APP_BASE_URL ?? "") ? "APP_BASE_URL" : null,
+    !import.meta.env.OPENAI_API_KEY && !import.meta.env.ANTHROPIC_API_KEY
+      ? "OPENAI_API_KEY (또는 ANTHROPIC_API_KEY)"
+      : null,
+  ].filter((name) => name !== null);
+
+  if (missing.length > 0) {
+    throw new Error(`서버 설정이 없습니다: ${missing.join(", ")}`);
+  }
+}
+
 export interface ConversionOutcome {
   token: string;
   reviewUrl: string;
@@ -31,6 +45,8 @@ export async function convertToReview(
   { year, termName, fileName }: ConversionTarget,
 ): Promise<ConversionOutcome> {
   const term = toAdminTerm(termName);
+  // LLM 호출과 파싱은 수십 초가 걸린다. 설정 때문에 실패할 거면 그 전에 알린다.
+  assertConfigured();
   const rows = await readSheetFromBuffer(buffer);
   const spec = await generateMappingSpec(rows);
   const converted = convertRows(rows, spec);
