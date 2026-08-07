@@ -17,6 +17,9 @@ interface ImportMetaEnv {
   readonly GOOGLE_PROJECT_ID: string;
   readonly CREDENTIALS_PATH: string;
   readonly ADMIN_NAME: string;
+  readonly KOIN_API_BASE_URL: string;
+  readonly KOIN_ADMIN_EMAIL: string;
+  readonly KOIN_ADMIN_PASSWORD: string;
   readonly OLLAMA_BASE_URL?: string;
   readonly OLLAMA_GEN_MODEL?: string;
   readonly ANTHROPIC_API_KEY?: string;
