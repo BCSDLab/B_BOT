@@ -1,9 +1,21 @@
 import { buildAdminRequest, ensureSemester, submitLectures, toAdminTerm } from "~/services/lecture/adminApi";
-import { cancelJob, claimJob, finishJob } from "~/services/lecture/jobStore";
+import {
+  downloadNoticeFile,
+  dropDetected,
+  fileNameOf,
+  loadDetected,
+} from "~/services/lecture/detected";
+import { cancelJob, claimJob, createJob, finishJob } from "~/services/lecture/jobStore";
 import { getKoinAdminAuth } from "~/services/lecture/koinAuth";
+import { linkThread } from "~/services/lecture/reviewStore";
 import { labelOf, resolveTargetByEnv } from "~/services/lecture/target";
 import { applyPatches, resolveAmbiguities } from "~/services/lecture/patch";
-import { buildPatchBlocks, buildStoredReview } from "~/services/lecture/pipeline";
+import {
+  buildPatchBlocks,
+  buildResultBlocks,
+  buildStoredReview,
+  convertToReview,
+} from "~/services/lecture/pipeline";
 import {
   dropPatchPlan,
   loadPatchPlan,
@@ -17,6 +29,101 @@ import type { BlockActionSetting } from "./type";
 // 등록하지 않은 action_id는 라우터에서 무시된다. 모달 안의 select와 URL 링크 버튼도
 // block_actions로 들어오는데, 그것들은 여기서 처리할 대상이 아니기 때문이다.
 export const blockActions: BlockActionSetting[] = [
+  {
+    // 배치가 감지한 공지에서 변환을 시작한다. 명령어로 하던 것과 같은 흐름을 탄다.
+    actionId: "lecture:detected_start",
+    async handler({ client, body, action }) {
+      if (action.type !== "button" || !body.channel) return;
+
+      const { token } = JSON.parse(action.value ?? "{}") as { token?: string };
+      const channel = body.channel.id;
+      const ts = body.message?.ts;
+      const actor = body.user.id;
+      if (!token) return;
+
+      const notice = await loadDetected(token);
+      if (!notice) {
+        await updateSlack({
+          client, channel, ts,
+          text: "만료됨",
+          blocks: [{ type: "section", text: { type: "mrkdwn",
+            text: ":x: 이미 처리했거나 만료된 알림입니다." } }],
+        });
+        return;
+      }
+      // 먼저 지운다. 두 명이 눌러 두 번 변환하면 검토 링크가 둘이 된다.
+      await dropDetected(token);
+
+      const target = {
+        env: notice.target,
+        year: notice.year,
+        termName: notice.term,
+        fileName: fileNameOf(notice),
+      };
+
+      await updateSlack({
+        client, channel, ts,
+        text: "변환 중",
+        blocks: [{ type: "section", text: { type: "mrkdwn",
+          text: `:hourglass_flowing_sand: *${target.year} ${target.termName}* 변환 중…\n${labelOf(target.env)} · ${target.fileName}\n작업자: <@${actor}>` } }],
+      });
+
+      try {
+        const buffer = await downloadNoticeFile(notice.fileUrl);
+        const outcome = await convertToReview(buffer, target);
+
+        // 이 메시지 스레드에 온 수정 요청이 어느 변환 건인지 찾을 수 있게 해둔다.
+        await linkThread(channel, ts ?? "", outcome.token);
+        await createJob({
+          token: outcome.token,
+          channelId: channel,
+          threadTs: ts ?? "",
+          year: target.year,
+          term: target.termName,
+          sourceFile: target.fileName,
+          lectureCount: outcome.lectureCount,
+          targetEnv: target.env,
+        });
+
+        await updateSlack({
+          client, channel, ts,
+          text: `${target.year} ${target.termName} 변환 완료 · ${outcome.lectureCount}건`,
+          blocks: buildResultBlocks(outcome, target, actor),
+        });
+      } catch (error) {
+        await updateSlack({
+          client, channel, ts,
+          text: "변환 실패",
+          blocks: [
+            { type: "section", text: { type: "mrkdwn",
+              text: `:x: *변환 실패*\n${error instanceof Error ? error.message : "알 수 없는 오류입니다"}` } },
+            { type: "context", elements: [{ type: "mrkdwn",
+              text: `${target.fileName} · 작업자: <@${actor}>` }] },
+          ],
+        });
+      }
+    },
+  },
+  {
+    actionId: "lecture:detected_ignore",
+    async handler({ client, body, action }) {
+      if (action.type !== "button" || !body.channel) return;
+
+      const { token } = JSON.parse(action.value ?? "{}") as { token?: string };
+      if (token) {
+        await dropDetected(token);
+      }
+
+      await updateSlack({
+        client,
+        channel: body.channel.id,
+        ts: body.message?.ts,
+        text: "무시함",
+        blocks: [{ type: "section", text: { type: "mrkdwn",
+          text: `:no_entry_sign: *이 공지는 넘어갑니다.*\n<@${body.user.id}>` } }],
+      });
+    },
+  },
   // 교시/시각 선택. LLM에 다시 묻지 않고 이미 계산해둔 두 해석 중 하나를 고른다.
   ...(["period", "clock"] as const).map((mode) => ({
     actionId: mode === "period" ? "lecture:time_period" : "lecture:time_clock",
