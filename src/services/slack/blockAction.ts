@@ -1,4 +1,4 @@
-import { buildAdminRequest, ensureSemester, submitLectures, toAdminTerm } from "~/services/lecture/adminApi";
+import { AdminApiError, buildAdminRequest, ensureSemester, submitLectures, toAdminTerm } from "~/services/lecture/adminApi";
 import {
   collectExcelAttachments,
   downloadNoticeFile,
@@ -435,6 +435,9 @@ export const blockActions: BlockActionSetting[] = [
         return;
       }
 
+      // 실패 메시지에서도 규모를 말해야 해서 try 밖에 둔다.
+      let lectureCount = 0;
+
       try {
         const stored = await loadReview(token);
         if (!stored) {
@@ -447,6 +450,8 @@ export const blockActions: BlockActionSetting[] = [
           });
           return;
         }
+
+        lectureCount = stored.meta.lectureCount;
 
         await updateSlack({
           client, channel, ts,
@@ -488,13 +493,39 @@ export const blockActions: BlockActionSetting[] = [
         // 실패로 되돌려 원인을 고친 뒤 다시 누를 수 있게 한다.
         await finishJob(token, "FAILED", message);
 
+        // 강의 생성 도중에 났으면 서버가 어디까지 넣었는지 우리는 모른다.
+        // 지울 API가 없으니, 다시 누르기 전에 그 사실을 먼저 말한다.
+        const mayBePartial = error instanceof AdminApiError && error.stage === "lectures";
+
         await updateSlack({
           client, channel, ts,
           text: "반영 실패",
           blocks: [
             { type: "section", text: { type: "mrkdwn", text: `:x: *반영 실패*\n${message}` } },
+            ...(mayBePartial
+              ? notice(
+                  ":warning: 강의 생성 중에 멈췄습니다. *일부가 이미 들어갔을 수 있습니다.*\n" +
+                    "지우는 API가 없으니, 다시 시도하기 전에 반영 상태를 확인해주세요.",
+                )
+              : []),
+            { type: "actions", elements: [
+              {
+                type: "button",
+                text: { type: "plain_text", text: "다시 시도", emoji: true },
+                action_id: "lecture:apply",
+                value: JSON.stringify({ token }),
+                ...(mayBePartial ? { confirm: {
+                  title: { type: "plain_text" as const, text: "다시 반영할까요?" },
+                  text: { type: "mrkdwn" as const, text:
+                    `*${lectureCount}건*을 다시 보냅니다.\n` +
+                    "앞선 시도에서 일부가 이미 들어갔다면 중복될 수 있고, 되돌릴 수 없습니다." },
+                  confirm: { type: "plain_text" as const, text: "그래도 반영" },
+                  deny: { type: "plain_text" as const, text: "취소" },
+                } } : {}),
+              },
+            ] },
             { type: "context", elements: [{ type: "mrkdwn",
-              text: `작업자: <@${actor}> · 원인을 해결하고 다시 눌러주세요.` }] },
+              text: `작업자: <@${actor}> · 원인을 해결한 뒤 눌러주세요.` }] },
           ],
         });
       }

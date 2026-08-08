@@ -206,6 +206,24 @@ export interface KoinAdminAuth {
 }
 
 /**
+ * 어드민 API 호출 실패.
+ *
+ * **어느 호출에서 났는지를 들고 다닌다.** 재시도해도 되는지가 거기서 갈리기 때문이다.
+ * 학기 생성에서 멈췄으면 강의는 아직 하나도 들어가지 않았다. 강의 생성에서 멈췄으면
+ * 서버가 어디까지 넣었는지 우리는 모르고, 지울 API도 없다.
+ */
+export class AdminApiError extends Error {
+  constructor(
+    message: string,
+    readonly stage: "semester" | "lectures",
+    readonly status: number,
+  ) {
+    super(message);
+    this.name = "AdminApiError";
+  }
+}
+
+/**
  * 학기가 없으면 강의 생성이 404로 막힌다. 이미 있으면 서버가 아무것도 하지 않으므로
  * 반영 직전에 그냥 매번 부른다. 있는지 먼저 확인할 이유가 없다.
  */
@@ -224,7 +242,12 @@ export async function ensureSemester(
   }
 
   const body = await response.text().catch(() => "");
-  throw new Error(`학기 생성 실패 (HTTP ${response.status})\n${body.slice(0, 200)}`);
+  throw new AdminApiError(
+    `학기 생성 실패 — POST /admin/semesters (HTTP ${response.status})\n` +
+      `${year} ${term}\n${body.slice(0, 300)}`,
+    "semester",
+    response.status,
+  );
 }
 
 /**
@@ -258,5 +281,13 @@ export async function submitLectures(
       409: "이미 등록된 강의가 있습니다. 지금은 수정 API가 없어 되돌릴 수 없습니다.",
     }[response.status] ?? `HTTP ${response.status}`;
 
-  throw new Error(`${reason}\n${body.slice(0, 300)}`);
+  // 500처럼 우리가 원인을 알 수 없는 응답일수록, 백엔드에 넘길 단서를 같이 남긴다.
+  const size = JSON.stringify(request).length;
+  throw new AdminApiError(
+    `강의 생성 실패 — POST /admin/lectures\n${reason}\n` +
+      `${request.year} ${request.term} · ${request.lectures.length}건 · ${Math.round(size / 1024)}KB\n` +
+      `${body.slice(0, 300)}`,
+    "lectures",
+    response.status,
+  );
 }
