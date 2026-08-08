@@ -29,6 +29,10 @@ import {
   updateReview,
 } from "~/services/lecture/reviewStore";
 import { handleBusAction } from "./busAction";
+import {
+  COOP_DETECTED_ACTION_IDS,
+  handleCoopDetectedAction,
+} from "./coopDetectedAction";
 import { applyCoopPatches } from "~/services/coop/patch";
 import { renderRegularCoopReview } from "~/services/coop/reviewHtml";
 import {
@@ -44,6 +48,12 @@ const busAction = (actionId: string): BlockActionSetting => ({
   actionId,
   async handler({ client, body, action }) {
     await handleBusAction(client, body, action);
+  },
+});
+const coopDetectedAction = (actionId: string): BlockActionSetting => ({
+  actionId,
+  async handler({ client, body, action }) {
+    await handleCoopDetectedAction(client, body, action);
   },
 });
 // 버튼·셀렉트 조작(block_actions) 핸들러 목록.
@@ -143,6 +153,7 @@ async function runConversion({
 }
 
 export const blockActions: BlockActionSetting[] = [
+  ...COOP_DETECTED_ACTION_IDS.map(coopDetectedAction),
   {
     /**
      * 배치가 올린 감지 알림의 `예`.
