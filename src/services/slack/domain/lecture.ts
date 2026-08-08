@@ -1,3 +1,4 @@
+import { createJob } from "~/services/lecture/jobStore";
 import { planPatches } from "~/services/lecture/patch";
 import { buildPatchBlocks, buildResultBlocks, convertToReview } from "~/services/lecture/pipeline";
 import { findTokenByThread, linkThread, loadReview, savePatchPlan } from "~/services/lecture/reviewStore";
@@ -110,6 +111,16 @@ export const messages: MessageSetting[] = [
 
         // 이 스레드에 온 수정 요청이 어느 변환 건인지 찾을 수 있게 해둔다.
         await linkThread(channel, threadRoot, outcome.token);
+        // 반영 권한을 한 명만 갖게 하려면 상태가 DB에 있어야 한다.
+        await createJob({
+          token: outcome.token,
+          channelId: channel,
+          threadTs: threadRoot,
+          year: target.year,
+          term: target.termName,
+          sourceFile: target.fileName,
+          lectureCount: outcome.lectureCount,
+        });
 
         await client.chat.update({
           channel,

@@ -1,4 +1,5 @@
 import { buildAdminRequest, ensureSemester, submitLectures, toAdminTerm } from "~/services/lecture/adminApi";
+import { cancelJob, claimJob, finishJob } from "~/services/lecture/jobStore";
 import { getKoinAdminAuth } from "~/services/lecture/koinAuth";
 import { applyPatches, resolveAmbiguities } from "~/services/lecture/patch";
 import { buildPatchBlocks, buildStoredReview } from "~/services/lecture/pipeline";
@@ -10,9 +11,6 @@ import {
   updateReview,
 } from "~/services/lecture/reviewStore";
 import type { BlockActionSetting } from "./type";
-
-/** 여러 명이 동시에 눌러 두 번 반영되는 걸 막는다. 되돌릴 API가 없어 특히 조심해야 한다. */
-const applying = new Set<string>();
 
 // 버튼·셀렉트 조작(block_actions) 핸들러 목록.
 // 등록하지 않은 action_id는 라우터에서 무시된다. 모달 안의 select와 URL 링크 버튼도
@@ -142,20 +140,22 @@ export const blockActions: BlockActionSetting[] = [
 
       if (!token) return;
 
-      // 중복 반영 방어. 어드민에 수정·삭제 API가 없어 두 번 들어가면 손으로 못 지운다.
-      if (applying.has(token)) {
+      // 반영 권한을 한 명만 갖게 한다. 두 번 들어가면 손으로 못 지운다.
+      // 프로세스 메모리가 아니라 DB에 둬서 재배포해도 풀리지 않는다.
+      const claim = await claimJob(token, actor);
+      if (!claim.ok) {
         await client.chat.postEphemeral({
           channel,
           user: actor,
-          text: "이미 다른 분이 반영을 진행 중입니다.",
+          text: claim.reason ?? "지금은 반영할 수 없습니다.",
         });
         return;
       }
-      applying.add(token);
 
       try {
         const stored = await loadReview(token);
         if (!stored) {
+          await finishJob(token, "FAILED", "검토 링크 만료");
           await updateSlack({
             client, channel, ts,
             text: "검토 링크 만료",
@@ -183,6 +183,7 @@ export const blockActions: BlockActionSetting[] = [
         // 학기가 없으면 강의 생성이 404로 막힌다. 이미 있으면 서버가 무시한다.
         await ensureSemester(request, auth);
         await submitLectures(request, auth);
+        await finishJob(token, "APPLIED");
 
         await updateSlack({
           client, channel, ts,
@@ -195,18 +196,19 @@ export const blockActions: BlockActionSetting[] = [
           ],
         });
       } catch (error) {
+        const message = error instanceof Error ? error.message : "알 수 없는 오류입니다";
+        // 실패로 되돌려 원인을 고친 뒤 다시 누를 수 있게 한다.
+        await finishJob(token, "FAILED", message);
+
         await updateSlack({
           client, channel, ts,
           text: "반영 실패",
           blocks: [
-            { type: "section", text: { type: "mrkdwn",
-              text: `:x: *반영 실패*\n${error instanceof Error ? error.message : "알 수 없는 오류입니다"}` } },
+            { type: "section", text: { type: "mrkdwn", text: `:x: *반영 실패*\n${message}` } },
             { type: "context", elements: [{ type: "mrkdwn",
-              text: `작업자: <@${actor}> · 원인을 해결하고 다시 변환해주세요.` }] },
+              text: `작업자: <@${actor}> · 원인을 해결하고 다시 눌러주세요.` }] },
           ],
         });
-      } finally {
-        applying.delete(token);
       }
     },
   },
@@ -215,13 +217,27 @@ export const blockActions: BlockActionSetting[] = [
     async handler({ client, body, action }) {
       if (action.type !== "button" || !body.channel) return;
 
+      const { token } = JSON.parse(action.value ?? "{}") as { token?: string };
+      const channel = body.channel.id;
+      const actor = body.user.id;
+
+      // 이미 반영됐거나 진행 중인 걸 취소한 것처럼 보이게 두면 안 된다.
+      if (token && !(await cancelJob(token, actor))) {
+        await client.chat.postEphemeral({
+          channel,
+          user: actor,
+          text: "이미 반영됐거나 진행 중이라 취소할 수 없습니다.",
+        });
+        return;
+      }
+
       await updateSlack({
         client,
-        channel: body.channel.id,
+        channel,
         ts: body.message?.ts,
         text: "취소됨",
         blocks: [{ type: "section", text: { type: "mrkdwn",
-          text: `:no_entry_sign: *반영을 취소했습니다.*\n<@${body.user.id}>` } }],
+          text: `:no_entry_sign: *반영을 취소했습니다.*\n<@${actor}>` } }],
       });
     },
   },
