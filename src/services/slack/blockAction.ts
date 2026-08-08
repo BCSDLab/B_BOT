@@ -29,6 +29,14 @@ import {
   updateReview,
 } from "~/services/lecture/reviewStore";
 import { handleBusAction } from "./busAction";
+import { applyCoopPatches } from "~/services/coop/patch";
+import { renderRegularCoopReview } from "~/services/coop/reviewHtml";
+import {
+  dropCoopPatchPlan,
+  loadCoopPatchPlan,
+  loadCoopReview,
+  updateCoopReview,
+} from "~/services/coop/reviewStore";
 import type { BlockActionSetting } from "./type";
 
 /** 버스 시간표 워크플로 버튼. 값 검증·상태 전이는 busAction이 담당한다. */
@@ -304,6 +312,76 @@ export const blockActions: BlockActionSetting[] = [
       // 배치가 웹훅으로 올린 메시지일 수 있어 response_url로 바꾼다.
       await replaceOriginal(body.response_url, "무시함",
         notice(`:no_entry_sign: *이 공지는 넘어갑니다.*\n<@${body.user.id}>`));
+    },
+  },
+  {
+    actionId: "coop:patch_apply",
+    async handler({ client, body, action }) {
+      if (action.type !== "button" || !body.channel) return;
+      const { patchToken } = JSON.parse(action.value ?? "{}") as { patchToken?: string };
+      const channel = body.channel.id;
+      const ts = body.message?.ts;
+      const actor = body.user.id;
+      if (!patchToken) return;
+
+      const plan = await loadCoopPatchPlan(patchToken);
+      if (!plan) {
+        await updateSlack({
+          client, channel, ts, text: "만료됨",
+          blocks: notice(":x: 이미 처리했거나 만료된 생협 수정 요청입니다."),
+        });
+        return;
+      }
+      // 두 사람이 동시에 같은 버튼을 눌러도 한 번만 적용한다.
+      await dropCoopPatchPlan(patchToken);
+
+      try {
+        const stored = await loadCoopReview(plan.reviewToken);
+        if (!stored?.conversion) {
+          await updateSlack({
+            client, channel, ts, text: "검토 만료",
+            blocks: notice(":x: 생협 검토 링크가 만료됐거나 수정 가능한 변환 데이터가 없습니다. 다시 변환해주세요."),
+          });
+          return;
+        }
+        const conversion = applyCoopPatches(stored.conversion, plan.patches);
+        const blockingCount = conversion.issues.filter((issue) => issue.severity === "blocking").length;
+        await updateCoopReview(plan.reviewToken, {
+          ...stored,
+          conversion,
+          request: conversion.request,
+          html: renderRegularCoopReview(conversion),
+          meta: { ...stored.meta, blockingCount },
+        });
+        await updateSlack({
+          client, channel, ts,
+          text: `생협 수정 ${plan.patches.length}건 적용`,
+          blocks: [
+            ...notice(`:white_check_mark: *생협 수정 ${plan.patches.length}건 적용*\n검토 페이지를 새로고침하면 반영돼 있습니다.`),
+            { type: "context", elements: [{ type: "mrkdwn", text: `작업자: <@${actor}>` }] },
+          ],
+        });
+      } catch (error) {
+        await updateSlack({
+          client, channel, ts, text: "생협 수정 실패",
+          blocks: notice(`:x: *생협 수정 적용 실패*\n${error instanceof Error ? error.message : "알 수 없는 오류입니다"}`),
+        });
+      }
+    },
+  },
+  {
+    actionId: "coop:patch_cancel",
+    async handler({ client, body, action }) {
+      if (action.type !== "button" || !body.channel) return;
+      const { patchToken } = JSON.parse(action.value ?? "{}") as { patchToken?: string };
+      if (patchToken) await dropCoopPatchPlan(patchToken);
+      await updateSlack({
+        client,
+        channel: body.channel.id,
+        ts: body.message?.ts,
+        text: "생협 수정 취소됨",
+        blocks: notice(`:no_entry_sign: *생협 수정을 취소했습니다.*\n<@${body.user.id}>`),
+      });
     },
   },
   // 교시/시각 선택. LLM에 다시 묻지 않고 이미 계산해둔 두 해석 중 하나를 고른다.

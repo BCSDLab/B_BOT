@@ -97,6 +97,7 @@ export async function convertRegularCoopToReview(
   const token = await saveCoopReview({
     html: artifacts.reviewHtml,
     request: artifacts.conversion.request,
+    conversion: artifacts.conversion,
     meta: {
       year: target.year,
       termName: target.termName,
@@ -140,6 +141,17 @@ export function buildRegularCoopResultBlocks(
         url: outcome.reviewUrl,
         action_id: "coop:review_link",
       }],
+    },
+    {
+      type: "section",
+      text: {
+        type: "mrkdwn",
+        text: [
+          "*잘못 추출된 값은 이 스레드에서 `!수정`으로 고칠 수 있습니다.*",
+          "예) `!수정 세탁소 평일 운영시간을 11:30 - 18:30으로 바꿔줘`",
+          "예) `!수정 운영 종료일을 2026-06-19로 바꿔줘`",
+        ].join("\n"),
+      },
     },
     {
       type: "context",

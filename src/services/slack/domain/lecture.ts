@@ -4,6 +4,7 @@ import { planPatches } from "~/services/lecture/patch";
 import { buildPatchBlocks, buildResultBlocks, convertToReview } from "~/services/lecture/pipeline";
 import { findTokenByThread, linkThread, loadReview, savePatchPlan } from "~/services/lecture/reviewStore";
 import { findJobByThread } from "~/services/bus/workflow";
+import { findCoopTokenByThread } from "~/services/coop/reviewStore";
 import { downloadSlackFile, findExcelFile } from "~/utils/slackFile";
 import { readThreadContext, threadRootOf } from "~/utils/slackThread";
 import type { MessageSetting } from "../type";
@@ -191,6 +192,8 @@ messages.push({
 
     // 버스 검수 스레드의 `!수정`은 bus 도메인이 처리한다. 여기서는 조용히 빠진다.
     if (!stored && parentTs && (await findJobByThread(channel, parentTs))) return;
+    // 생협 검수 스레드의 `!수정`은 coop 도메인이 처리한다.
+    if (!stored && parentTs && (await findCoopTokenByThread(channel, parentTs))) return;
 
     // 변환 스레드가 아니거나 만료됐으면 어디서 써야 하는지 알려준다.
     // 조용히 무시하면 왜 반응이 없는지 알 수 없다.
