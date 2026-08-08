@@ -50,6 +50,8 @@ const raw: RawRegularCoopTimetable = {
 describe("정규학기 기본값 정규화", () => {
   it("학기·날짜·전화번호를 표준 형식으로 만든다", () => {
     expect(normalizeSemester("2026.1학기")).toBe("26-1학기");
+    expect(normalizeSemester("2026년 1학기 시설물 운영 시간")).toBe("26-1학기");
+    expect(normalizeSemester("2026년 1학기 하계방학 운영 시간")).toBeNull();
     expect(normalizeDate("2026년 3월 3일(화)")).toBe("2026-03-03");
     expect(normalizePhone("560-1278")).toBe("041-560-1278");
   });

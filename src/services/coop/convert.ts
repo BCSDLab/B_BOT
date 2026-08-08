@@ -29,8 +29,11 @@ const NAME_ALIASES: Record<string, string> = {
 const clean = (value: string): string => value.replace(/[\s·.()\-]/g, "").trim();
 
 export function normalizeSemester(label: string): string | null {
-  const match = /^\s*(20)?(\d{2})\s*[-.]?\s*([12])학기\s*$/.exec(label);
-  return match ? `${match[2]}-${match[3]}학기` : null;
+  if (/(?:하계|동계)\s*방학|여름\s*학기|겨울\s*학기|계절\s*학기/.test(label)) {
+    return null;
+  }
+  const match = /(?:^|\D)(?:20)?(\d{2})\s*(?:년\s*)?[-.]?\s*제?\s*([12])\s*학기/.exec(label);
+  return match ? `${match[1]}-${match[2]}학기` : null;
 }
 
 export function normalizeDate(value: string): string | null {
