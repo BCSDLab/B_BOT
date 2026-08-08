@@ -47,6 +47,12 @@ function getPool(): pg.Pool {
   return (pool ??= createPool());
 }
 
+/** 테스트 종료용. 평소 실행 중엔 부를 필요가 없다 — 프로세스가 끝날 때 같이 닫힌다. */
+export async function closeBusJobPool(): Promise<void> {
+  await pool?.end();
+  pool = undefined;
+}
+
 // 이 레포에는 마이그레이션 도구가 없다. 첫 사용 때 한 번 만들고 넘어간다.
 let schemaReady: Promise<void> | undefined;
 
@@ -79,7 +85,12 @@ export function ensureBusJobSchema(): Promise<void> {
       `CREATE INDEX IF NOT EXISTS bus_update_job_thread_idx
          ON bus_update_job (channel_id, thread_ts)`,
     );
-  })());
+  })().catch((error) => {
+    // 실패한 Promise를 캐싱해두면 일시적인 DB 오류 한 번으로 이후 모든 호출이
+    // 계속 막힌다. 다음 호출이 다시 시도할 수 있게 캐시를 비운다.
+    schemaReady = undefined;
+    throw error;
+  }));
 }
 
 export async function createBusJob(job: {
@@ -158,11 +169,14 @@ export async function finishBusJob(
   status: Extract<BusJobStatus, "APPLIED" | "FAILED">,
   error?: string,
 ): Promise<void> {
+  await ensureBusJobSchema();
   await query(
     getPool(),
+    // APPLYING일 때만 종결한다. 이미 끝난 작업을 뒤늦게 온 실패 처리기가
+    // 덮어쓰면 안 된다.
     `UPDATE bus_update_job
         SET status = $2, error = $3, updated_at = now()
-      WHERE token = $1`,
+      WHERE token = $1 AND status = 'APPLYING'`,
     [token, status, error ?? null],
   );
 }
@@ -196,6 +210,7 @@ export async function setBusVersionSchedules(
   token: string,
   schedules: BusVersionSchedule[],
 ): Promise<void> {
+  await ensureBusJobSchema();
   await query(
     getPool(),
     `UPDATE bus_update_job SET version_schedules = $2, updated_at = now() WHERE token = $1`,

@@ -1,7 +1,13 @@
 import type { BlockAction } from "@slack/bolt";
 import type { KnownBlock, WebClient } from "@slack/web-api";
 import { submitBusTimetables } from "~/services/bus/adminApi";
-import { cancelBusJob, claimBusJob, finishBusJob, setBusVersionSchedules } from "~/services/bus/jobStore";
+import {
+  cancelBusJob,
+  claimBusJob,
+  findBusJob,
+  finishBusJob,
+  setBusVersionSchedules,
+} from "~/services/bus/jobStore";
 import { getBusAdminAuth } from "~/services/bus/koinAuth";
 import { applyBusPatchesToConversions } from "~/services/bus/patch";
 import { buildStoredBusReview } from "~/services/bus/pipeline";
@@ -105,12 +111,15 @@ export async function handleBusApplyAction(
       throw new Error(resolved.reason ?? "대상 환경을 찾지 못했습니다.");
     }
     const auth = await getBusAdminAuth(resolved.target);
+    // 예약 계산은 순수 함수라 여기서 먼저 검증한다. PUT이 끝난 뒤에 실패하면
+    // 이미 반영된 시간표를 FAILED로 잘못 표시하게 된다.
+    const versionSchedules = computeBusVersionSchedules(stored.conversions);
     await submitBusTimetables(stored.conversions, auth, ({ target, semesterType }) => {
       appliedPayloads.push(`${target}/${semesterType}`);
     });
     await finishBusJob(token, "APPLIED");
     // 시간표는 지금 반영됐지만, 사이트 버전 문구는 적용 전날 00:05에 바뀌어야 한다.
-    await setBusVersionSchedules(token, computeBusVersionSchedules(stored.conversions));
+    await setBusVersionSchedules(token, versionSchedules);
 
     await update(client, channel, ts, "버스 시간표 반영 완료", [
       ...section(
@@ -192,6 +201,12 @@ export async function handleBusPatchAction(
   await dropBusPatchPlan(patchToken);
 
   try {
+    // 이미 반영됐거나 반영 중인 작업의 검토 페이지를 고치면, 실제로 보낸 값과
+    // 화면이 갈라진다. Admin API는 이미 예전 값으로 나갔으니 여기서 막는다.
+    const job = await findBusJob(plan.reviewToken);
+    if (job && job.status !== "PENDING" && job.status !== "FAILED") {
+      throw new Error("이미 반영됐거나 반영 중인 작업이라 수정을 적용할 수 없습니다.");
+    }
     const stored = await loadBusReview(plan.reviewToken);
     if (!stored) throw new Error("검토 링크가 만료됐습니다. 파일을 다시 올려주세요.");
     const next = applyBusPatchesToConversions(stored.conversions, plan.patches).map(
@@ -225,7 +240,7 @@ export async function handleBusPatchAction(
       channel,
       ts,
       "수정 적용 실패",
-      section(`:x: *수정 적용 실패*\n${message}`),
+      section(`:x: *수정 적용 실패*\n${message}\n\`!수정\`을 다시 요청해주세요.`),
     );
   }
 }

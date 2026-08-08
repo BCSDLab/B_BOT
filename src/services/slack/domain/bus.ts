@@ -28,7 +28,7 @@ export function parseBusCommand(text: string): boolean {
 const USAGE = [
   "*사용법* — 버스 시간표 파일을 올리면서 메시지에 함께 적어주세요.",
   "```!버스반영```",
-  "지원 형식은 `.xls` `.xlsx` `.csv`입니다.",
+  "지원 형식은 `.xls` `.xlsx`입니다.",
 ].join("\n");
 
 export const messages: MessageSetting[] = [
@@ -91,7 +91,7 @@ export const messages: MessageSetting[] = [
               text: {
                 type: "mrkdwn",
                 text: [
-                  !file ? ":file_folder: 버스 시간표 파일(xls/xlsx/csv)을 함께 올려주세요." : null,
+                  !file ? ":file_folder: 버스 시간표 파일(xls/xlsx)을 함께 올려주세요." : null,
                   !parseBusCommand(text) ? ":pencil: `!버스반영`만 입력해주세요." : null,
                   "",
                   USAGE,
@@ -127,9 +127,9 @@ export const messages: MessageSetting[] = [
         const extension = `.${file.name.split(".").pop()?.toLowerCase()}`;
         const outcome = await convertBusToReview(bytes, extension, target);
 
-        // 이 스레드에 온 수정 요청이 어느 변환 건인지 찾을 수 있게 해둔다.
-        await linkBusThread(channel, threadRoot, outcome.token);
-        // 반영 권한을 한 명만 갖게 하려면 상태가 DB에 있어야 한다.
+        // 반영 권한을 한 명만 갖게 하려면 상태가 DB에 있어야 한다. job 행이 없는데
+        // 스레드부터 묶으면, 여기서 실패했을 때 스레드가 막다른 곳이 된다
+        // (재실행하면 "이미 변환 결과가 있다"고 막히는데 정작 반영 버튼은 없다).
         await createBusJob({
           token: outcome.token,
           channelId: channel,
@@ -139,6 +139,8 @@ export const messages: MessageSetting[] = [
           semesterTypes: outcome.semesterTypes,
           targetEnv: target.env,
         });
+        // 이 스레드에 온 수정 요청이 어느 변환 건인지 찾을 수 있게 해둔다.
+        await linkBusThread(channel, threadRoot, outcome.token);
 
         await client.chat.update({
           channel,
@@ -186,7 +188,8 @@ messages.push({
     const stored = token ? await loadBusReview(token) : null;
 
     // 강의·생협 검수 스레드의 `!수정`은 그쪽 도메인이 처리한다. 여기서는 조용히 빠진다.
-    if (!stored) return;
+    // stored가 있다는 건 token과 parentTs가 이미 있었다는 뜻이라, 아래부턴 단정 없이 쓴다.
+    if (!parentTs || !token || !stored) return;
 
     if (request === "") {
       await client.chat.postMessage({
@@ -220,7 +223,7 @@ messages.push({
     const messageTs = placeholder.ts as string;
 
     try {
-      const context = await readThreadContext(client, channel, parentTs!, ts);
+      const context = await readThreadContext(client, channel, parentTs, ts);
       const plan = await planBusPatches(request, stored.conversions, context);
 
       if (plan.patches.length === 0) {
@@ -244,7 +247,7 @@ messages.push({
         return;
       }
 
-      const patchToken = await saveBusPatchPlan(token!, {
+      const patchToken = await saveBusPatchPlan(token, {
         patches: plan.patches,
         problems: plan.problems,
         request,

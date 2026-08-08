@@ -126,7 +126,11 @@ export async function loadBusPatchPlan(token: string): Promise<StoredBusPatchPla
     return null;
   }
   const stored = await useStorage("kvStorage").getItem<StoredBusPatchPlan>(patchKey(token));
-  if (!stored || isBusReviewExpired(stored.createdAt, new Date())) {
+  if (!stored) {
+    return null;
+  }
+  if (isBusReviewExpired(stored.createdAt, new Date())) {
+    await useStorage("kvStorage").removeItem(patchKey(token));
     return null;
   }
   return stored;

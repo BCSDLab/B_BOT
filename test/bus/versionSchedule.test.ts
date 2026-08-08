@@ -59,9 +59,11 @@ describe("버스 버전 Admin API", () => {
         Authorization: "Bearer admin-token",
         "Content-Type": "application/json",
       },
+      signal: expect.any(AbortSignal),
     });
     expect(fetch).toHaveBeenNthCalledWith(2, "https://api.stage.koreatech.in/admin/version/shuttle_bus_timetable", {
       method: "PUT",
+      signal: expect.any(AbortSignal),
       headers: {
         Authorization: "Bearer admin-token",
         "Content-Type": "application/json",

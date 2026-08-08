@@ -6,8 +6,8 @@ import { busLabelOf, isBusProduction, type BusKoinEnv } from "./target";
 import { renderBusReviewHtml } from "./reviewHtml";
 import type { BusReviewMeta, StoredBusReview } from "./reviewStore";
 import { buildBusReviewUrl, saveBusReview } from "./reviewStore";
-import { normalizeTime, validateConversion } from "./validation";
-import type { BusConversion } from "./types";
+import { validateConversion } from "./validation";
+import { totalRouteCount, type BusConversion } from "./types";
 
 export interface BusConversionTarget {
   /** 채널로 정해진 대상. 변환부터 반영까지 바뀌지 않는다. */
@@ -16,14 +16,6 @@ export interface BusConversionTarget {
 }
 
 async function readSheetContext(buffer: Buffer, extension: string) {
-  if (extension === ".csv")
-    return buffer
-      .toString("utf8")
-      .split(/\r?\n/)
-      .map((line, index) => ({
-        row: index + 1,
-        cells: line.split(",").map(normalizeTime),
-      }));
   // These packages are optional runtime adapters so production can use the parser
   // best suited to its deployment image while the workflow itself stays portable.
   if (extension === ".xlsx") return analyseXlsx(buffer);
@@ -53,15 +45,6 @@ export interface BusConversionOutcome {
   routeCount: number;
   issueCount: number;
   semesterTypes: string[];
-}
-
-function totalRouteCount(conversions: BusConversion[]) {
-  return conversions.reduce(
-    (count, conversion) =>
-      count +
-      conversion.payloads.reduce((pc, payload) => pc + Object.values(payload.body)[0].length, 0),
-    0,
-  );
 }
 
 /** conversions에 실제로 등장하는 학기 구분. 정규+계절이 한 파일에 같이 나올 수 있다. */

@@ -85,6 +85,47 @@ describe("버스 timetable 반영", () => {
     );
   });
 
+  it("두 번째 payload가 실패해도 첫 번째는 이미 반영된 채로 남는다", async () => {
+    const shuttleConversion: BusConversion = {
+      ...conversion,
+      payloads: [
+        {
+          target: "shuttle",
+          semester_type: "REGULAR",
+          body: {
+            shuttle_bus_timetables: [
+              {
+                region: "청주",
+                route_type: "셔틀",
+                route_name: "청주 셔틀",
+                node_info: [{ name: "터미널" }],
+                route_info: [{ name: "1회", arrival_time: ["09:00"] }],
+              },
+            ],
+          },
+        },
+      ],
+    };
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(null, { status: 200 }))
+      .mockResolvedValueOnce(new Response("서버 오류", { status: 500 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const applied: string[] = [];
+
+    await expect(
+      submitBusTimetables([conversion, shuttleConversion], auth, ({ target, semesterType }) => {
+        applied.push(`${target}/${semesterType}`);
+      }),
+    ).rejects.toThrow(/shuttle Admin API failed: 500/);
+
+    // 각 PUT은 대상×학기 하나를 통째로 덮어써서, 앞선 성공은 재시도해도 안전하다.
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls[0][0].toString()).toContain("/admin/bus/commuting/timetable");
+    expect(fetchMock.mock.calls[1][0].toString()).toContain("/admin/bus/shuttle/timetable");
+    expect(applied).toEqual(["commuting/REGULAR"]);
+  });
+
   it("올바르지 않은 body_key면 보내기 전에 거부한다", async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);

@@ -14,16 +14,31 @@ import type { BusConversion } from "./types";
  * Admin API PUT은 승인 즉시 나가지만, 이 문구가 미리 바뀌면 아직 오지 않은
  * 학기를 안내하게 되므로 하루 앞당겨 예약해둔다.
  */
+/** `Date`는 2026-02-30 같은 값을 다음 달로 보정해버리므로, 구성 요소가 그대로 남는지 되짚어 본다. */
+function assertRealCalendarDate(dateText: string, original: string) {
+  const [year, month, day] = dateText.split("-").map(Number);
+  const roundTrip = new Date(Date.UTC(year, month - 1, day));
+  if (
+    roundTrip.getUTCFullYear() !== year ||
+    roundTrip.getUTCMonth() !== month - 1 ||
+    roundTrip.getUTCDate() !== day
+  ) {
+    throw new Error(`version_update.content에 존재하지 않는 날짜가 있습니다: ${original}`);
+  }
+}
+
 export function computeBusVersionSchedules(conversions: BusConversion[]): BusVersionSchedule[] {
   return conversions.map((conversion) => {
     const [start] = conversion.version_update.content.split("~");
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(start.trim())) {
+    const trimmed = start.trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
       throw new Error(
         `version_update.content 형식이 올바르지 않습니다: ${conversion.version_update.content}`,
       );
     }
+    assertRealCalendarDate(trimmed, conversion.version_update.content);
     const scheduledAt = new Date(
-      new Date(`${start.trim()}T00:05:00+09:00`).getTime() - 86_400_000,
+      new Date(`${trimmed}T00:05:00+09:00`).getTime() - 86_400_000,
     );
     return { version_update: conversion.version_update, scheduled_at: scheduledAt.toISOString() };
   });
@@ -41,7 +56,8 @@ export async function runDueBusVersionUpdates(client?: WebClient): Promise<void>
 
     for (const schedule of schedules) {
       if (schedule.completed_at) continue;
-      if (new Date(schedule.scheduled_at) > new Date()) continue;
+      // 아직 때가 안 된 일정을 만나면 멈춘다. 순서를 건너뛰면 뒤 학기가 먼저 노출될 수 있다.
+      if (new Date(schedule.scheduled_at) > new Date()) break;
 
       const resolved = resolveBusTargetByEnv(job.target_env as BusKoinEnv);
       if (!resolved.target) break; // 설정이 없으면 다음 주기에 다시 시도한다.
@@ -59,6 +75,9 @@ export async function runDueBusVersionUpdates(client?: WebClient): Promise<void>
 
     const allDone = schedules.length > 0 && schedules.every((s) => s.completed_at);
     if (allDone) {
+      // 완료 저장을 먼저 한다. Slack 전송이 실패해도 다음 주기가 같은 PUT을
+      // 다시 하면 안 된다 — 알림은 놓쳐도 되지만 갱신은 두 번 하면 안 된다.
+      await setBusVersionSchedules(job.token, []);
       if (client) {
         await client.chat.postMessage({
           channel: job.channel_id,
@@ -66,8 +85,6 @@ export async function runDueBusVersionUpdates(client?: WebClient): Promise<void>
           text: `버스 시간표 버전 갱신 ${schedules.length}건이 모두 완료되었습니다.`,
         });
       }
-      // 완료됐으면 비워서 다음 주기에 다시 집히지 않게 한다.
-      await setBusVersionSchedules(job.token, []);
     } else if (changed) {
       await setBusVersionSchedules(job.token, schedules);
     }

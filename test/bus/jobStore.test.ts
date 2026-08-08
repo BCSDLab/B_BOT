@@ -2,10 +2,13 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   cancelBusJob,
   claimBusJob,
+  closeBusJobPool,
   createBusJob,
   ensureBusJobSchema,
+  findBusJobsWithPendingVersionSchedules,
   finishBusJob,
   findBusJob,
+  setBusVersionSchedules,
 } from "~/services/bus/jobStore";
 
 /**
@@ -43,6 +46,8 @@ describe.skipIf(!hasTestDb)("버스 반영 작업 상태", () => {
     const pool = createPool();
     await query(pool, `DELETE FROM bus_update_job WHERE token LIKE 'test-%'`);
     await pool.end();
+    // jobStore.ts가 쓰는 모듈 전역 풀도 닫아야 vitest가 열린 연결 없이 종료된다.
+    await closeBusJobPool();
   });
 
   it("스키마 생성은 여러 번 불러도 된다", async () => {
@@ -141,5 +146,26 @@ describe.skipIf(!hasTestDb)("버스 반영 작업 상태", () => {
     const result = await claimBusJob("test-없는토큰", "U1");
     expect(result.ok).toBe(false);
     expect(result.reason).toMatch(/찾지 못/);
+  });
+
+  it("반영 완료 후 예약을 걸면 대기 목록에 나타나고, 비우면 사라진다", async () => {
+    const token = nextToken();
+    await createBusJob(job(token));
+    await claimBusJob(token, "U1");
+    await finishBusJob(token, "APPLIED");
+
+    const schedule = {
+      version_update: { type: "shuttle_bus_timetable" as const, title: "정규학기" as const, content: "2026-03-02~2026-06-19" },
+      scheduled_at: "2026-03-01T15:05:00.000Z",
+    };
+    await setBusVersionSchedules(token, [schedule]);
+
+    const pending = await findBusJobsWithPendingVersionSchedules();
+    expect(pending.map((j) => j.token)).toContain(token);
+    expect(pending.find((j) => j.token === token)?.version_schedules).toEqual([schedule]);
+
+    await setBusVersionSchedules(token, []);
+    const afterClear = await findBusJobsWithPendingVersionSchedules();
+    expect(afterClear.map((j) => j.token)).not.toContain(token);
   });
 });

@@ -1,6 +1,9 @@
 import type { BusConversion, BusPayload, BusRoute, BusTarget, BusVersionUpdate, SemesterType } from "./types";
 import type { BusAdminAuth } from "./koinAuth";
 
+/** 응답이 없으면 job이 APPLYING/버전 갱신 크론이 영원히 멈춘다. */
+const REQUEST_TIMEOUT_MS = 30_000;
+
 /**
  * Swagger 스펙으로 고정된 Admin API 경로·body 루트 키.
  */
@@ -91,6 +94,7 @@ export async function submitBusTimetables(
     url.searchParams.set("semester_type", payload.semester_type);
     const response = await fetch(url, {
       method: "PUT",
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       headers: {
         Authorization: `Bearer ${accessToken}`,
         "Content-Type": "application/json",
@@ -128,7 +132,10 @@ export async function updateBusVersionViaAdminApi(
     Authorization: `Bearer ${accessToken}`,
     "Content-Type": "application/json",
   };
-  const currentResponse = await fetch(versionUrl, { headers });
+  const currentResponse = await fetch(versionUrl, {
+    headers,
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
   if (!currentResponse.ok) {
     throw new Error(`Version Admin API GET failed: ${currentResponse.status}`);
   }
@@ -139,6 +146,7 @@ export async function updateBusVersionViaAdminApi(
 
   const updateResponse = await fetch(versionUrl, {
     method: "PUT",
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     headers,
     body: JSON.stringify({
       version: current.version,

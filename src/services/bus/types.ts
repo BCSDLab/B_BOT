@@ -40,3 +40,16 @@ export interface BusConversion {
   provenance: Record<string, unknown>;
   warnings: unknown[];
 }
+
+/**
+ * 검토 페이지의 "전체 노선" 타일과 저장된 메타(`BusReviewMeta.routeCount`)가
+ * 항상 같은 수를 보여줘야 한다. 각자 세면 언젠가 갈라진다.
+ */
+export function totalRouteCount(conversions: BusConversion[]): number {
+  return conversions.reduce(
+    (count, conversion) =>
+      count +
+      conversion.payloads.reduce((pc, payload) => pc + Object.values(payload.body)[0].length, 0),
+    0,
+  );
+}

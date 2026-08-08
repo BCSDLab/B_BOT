@@ -1,6 +1,20 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { vi } from "vitest";
 import CHANNEL_ID from "@/constant/CHANNEL_ID.json";
 import { busLabelOf, isBusProduction, resolveBusTarget } from "~/services/bus/target";
+
+// 환경별 설정 유무에 따라 결과가 갈리는 테스트라, 로컬 .env·CI 환경에 기대지 않고
+// 값을 직접 고정한다.
+beforeEach(() => {
+  vi.stubEnv("KOIN_STAGE_API_BASE_URL", "https://api.stage.koreatech.in");
+  vi.stubEnv("KOIN_PROD_API_BASE_URL", "https://api.koreatech.in");
+  vi.stubEnv("KOIN_ADMIN_EMAIL", "admin@example.com");
+  vi.stubEnv("KOIN_ADMIN_PASSWORD", "password");
+});
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
 
 describe("버스 대상 코인 결정", () => {
   it("등록되지 않은 채널에서는 아무것도 하지 않는다", () => {
@@ -19,30 +33,28 @@ describe("버스 대상 코인 결정", () => {
   });
 
   it("스테이지 채널과 운영 채널이 다른 환경으로 간다", () => {
-    // 설정이 없으면 target이 비지만, 어느 환경으로 판정했는지는 사유에 드러난다.
     const stage = resolveBusTarget(CHANNEL_ID.코인_이벤트알림_stage);
     const prod = resolveBusTarget(CHANNEL_ID.코인_이벤트알림);
 
-    expect(stage.target?.env ?? stage.reason).not.toEqual(prod.target?.env ?? prod.reason);
+    expect(stage.target?.env).toBe("stage");
+    expect(prod.target?.env).toBe("prod");
   });
 
   it("설정이 없는 환경은 반쯤 열어두지 않는다", () => {
     // baseUrl만 있고 계정이 없는 상태로 붙으면 엉뚱한 곳에 401을 던진다.
+    vi.stubEnv("KOIN_ADMIN_PASSWORD", "");
     const prod = resolveBusTarget(CHANNEL_ID.코인_이벤트알림);
-    if (!prod.ok) {
-      expect(prod.target).toBeUndefined();
-      expect(prod.reason).toMatch(/설정/);
-    }
+
+    expect(prod.ok).toBe(false);
+    expect(prod.target).toBeUndefined();
+    expect(prod.reason).toMatch(/설정/);
   });
 
   it("작업용 채널은 스테이지로만 간다", () => {
     // 개발 중 확인용이라 열어두되, 실수로 프로덕션에 닿지 않게 한다.
     const sprint = resolveBusTarget(CHANNEL_ID.sprint_ai_코인_업무자동화);
-    const prod = resolveBusTarget(CHANNEL_ID.코인_이벤트알림);
-    const stage = resolveBusTarget(CHANNEL_ID.코인_이벤트알림_stage);
 
-    expect(sprint.target?.env ?? sprint.reason).toEqual(stage.target?.env ?? stage.reason);
-    expect(sprint.target?.env ?? sprint.reason).not.toEqual(prod.target?.env ?? prod.reason);
+    expect(sprint.target?.env).toBe("stage");
   });
 
   it("사람에게 보여줄 이름과 위험 표시", () => {
