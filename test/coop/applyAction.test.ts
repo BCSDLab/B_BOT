@@ -2,6 +2,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("~/services/coop/adminApi", () => ({
   applyCoopTimetable: vi.fn(async () => 17),
+  applyCoopTimetables: vi.fn(async (_inputs, _auth, onApplied) => {
+    onApplied?.(21, 0);
+    onApplied?.(22, 1);
+    return [21, 22];
+  }),
 }));
 
 vi.mock("~/services/coop/jobStore", () => ({
@@ -56,13 +61,14 @@ vi.mock("~/services/coop/target", () => ({
   })),
 }));
 
-import { applyCoopTimetable } from "~/services/coop/adminApi";
+import { applyCoopTimetable, applyCoopTimetables } from "~/services/coop/adminApi";
 import {
   cancelCoopJob,
   claimCoopJob,
   finishCoopJob,
 } from "~/services/coop/jobStore";
 import { handleCoopApplyAction } from "~/services/slack/coopApplyAction";
+import { loadCoopReview } from "~/services/coop/reviewStore";
 
 function client() {
   return {
@@ -124,5 +130,64 @@ describe("생협 반영 Slack 액션", () => {
     expect(slack.chat.update).toHaveBeenCalledWith(expect.objectContaining({
       text: "생협 반영 취소됨",
     }));
+  });
+
+  it("방학 검토는 계절학기와 방학을 한 번에 순차 반영한다", async () => {
+    const conversion = {
+      semester: "26-하계계절학기",
+      fromDate: "2026-06-22",
+      toDate: "2026-07-17",
+      request: { coop_shops: [] },
+      shops: [],
+      excludedShops: [],
+      issues: [],
+    };
+    vi.mocked(loadCoopReview).mockResolvedValueOnce({
+      html: "<html></html>",
+      request: conversion.request,
+      conversion,
+      periods: [
+        { kind: "계절학기", request: conversion.request, conversion },
+        {
+          kind: "방학",
+          request: { coop_shops: [] },
+          conversion: {
+            ...conversion,
+            semester: "26-하계방학",
+            fromDate: "2026-07-18",
+            toDate: "2026-08-30",
+          },
+        },
+      ],
+      meta: {
+        env: "stage",
+        year: 2026,
+        termName: "하계계절학기·하계방학",
+        sourceFileName: "하계방학.png",
+        shopCount: 11,
+        blockingCount: 0,
+        createdAt: "2026-08-08T00:00:00.000Z",
+      },
+    });
+    const slack = client();
+    await handleCoopApplyAction(slack as never, body as never, {
+      type: "button",
+      action_id: "coop:apply",
+      value: JSON.stringify({ token: "a".repeat(32) }),
+    } as never);
+
+    expect(applyCoopTimetables).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({ semester: expect.objectContaining({ semester: "26-하계계절학기" }) }),
+        expect.objectContaining({ semester: expect.objectContaining({ semester: "26-하계방학" }) }),
+      ]),
+      expect.objectContaining({ accessToken: "token" }),
+      expect.any(Function),
+    );
+    expect(finishCoopJob).toHaveBeenCalledWith(
+      "a".repeat(32),
+      "APPLIED",
+      { semesterId: 21, semesterIds: [21, 22] },
+    );
   });
 });

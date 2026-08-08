@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   applyCoopTimetable,
+  applyCoopTimetables,
   CoopAdminApiError,
   createCoopSemester,
 } from "~/services/coop/adminApi";
@@ -52,6 +53,36 @@ describe("생협 Admin API", () => {
     for (const [, init] of fetchMock.mock.calls) {
       expect(init?.headers).toMatchObject({ Authorization: "Bearer token" });
     }
+  });
+
+  it("두 학기를 모두 생성한 뒤 한 번 조회하고 순서대로 시간표를 갱신한다", async () => {
+    const vacationSemester = {
+      semester: "26-하계방학",
+      from_date: "2026-07-18",
+      to_date: "2026-08-30",
+    };
+    const fetchMock = vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(new Response(null, { status: 200 }))
+      .mockResolvedValueOnce(new Response(null, { status: 200 }))
+      .mockResolvedValueOnce(Response.json([
+        { id: 21, ...semester, is_applied: false },
+        { id: 22, ...vacationSemester, is_applied: false },
+      ]))
+      .mockResolvedValueOnce(new Response(null, { status: 200 }))
+      .mockResolvedValueOnce(new Response(null, { status: 200 }));
+
+    await expect(applyCoopTimetables([
+      { semester, timetable },
+      { semester: vacationSemester, timetable },
+    ], auth)).resolves.toEqual([21, 22]);
+
+    expect(fetchMock.mock.calls.map(([url, init]) => [url, init?.method])).toEqual([
+      ["https://api.stage.example.com/admin/coopshop/semesters", "POST"],
+      ["https://api.stage.example.com/admin/coopshop/semesters", "POST"],
+      ["https://api.stage.example.com/admin/coopshop/semesters", "GET"],
+      ["https://api.stage.example.com/admin/coopshop/timetable/21", "PUT"],
+      ["https://api.stage.example.com/admin/coopshop/timetable/22", "PUT"],
+    ]);
   });
 
   it("이미 생성된 동일 학기는 조회와 업데이트를 계속한다", async () => {

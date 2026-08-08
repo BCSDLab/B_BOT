@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   collectCoopImages,
+  guessCoopSemester,
   guessRegularCoopSemester,
   hasImageSignature,
 } from "~/services/coop/detected";
@@ -46,6 +47,15 @@ describe("생협 공지 정규학기 판별", () => {
     expect(guessRegularCoopSemester("2026년 1학기 하계방학 운영 시간")).toBeNull();
     expect(guessRegularCoopSemester("2026학년도 하계 계절학기 운영 시간")).toBeNull();
     expect(guessRegularCoopSemester("생협 운영시간 안내")).toBeNull();
+  });
+});
+
+describe("생협 공지 방학 판별", () => {
+  it("하계·동계방학 제목을 읽는다", () => {
+    expect(guessCoopSemester("2026년 하계방학 생협 운영시간 안내"))
+      .toEqual({ year: 2026, termName: "하계방학" });
+    expect(guessCoopSemester("2026년 동계 계절학기 및 방학 운영시간"))
+      .toEqual({ year: 2026, termName: "동계방학" });
   });
 });
 

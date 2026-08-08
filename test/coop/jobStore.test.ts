@@ -62,6 +62,14 @@ describe.skipIf(!hasTestDb)("생협 반영 작업 상태", () => {
     expect((await claimCoopJob(token, "U2")).ok).toBe(false);
   });
 
+  it("복수 학기의 ID를 함께 남긴다", async () => {
+    const token = nextToken();
+    await createCoopJob(job(token));
+    await claimCoopJob(token, "U1");
+    await finishCoopJob(token, "APPLIED", { semesterId: 21, semesterIds: [21, 22] });
+    expect((await findCoopJob(token))?.semester_ids).toEqual([21, 22]);
+  });
+
   it("실패한 작업은 원인을 지우고 재시도할 수 있다", async () => {
     const token = nextToken();
     await createCoopJob(job(token));

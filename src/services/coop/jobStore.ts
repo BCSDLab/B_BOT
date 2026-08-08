@@ -15,6 +15,7 @@ export interface CoopJob {
   shop_count: number;
   target_env: string;
   semester_id: number | null;
+  semester_ids: number[];
   status: CoopJobStatus;
   actor: string | null;
   error: string | null;
@@ -43,12 +44,18 @@ export function ensureCoopJobSchema(): Promise<void> {
          shop_count  INTEGER NOT NULL,
          target_env  TEXT NOT NULL,
          semester_id INTEGER,
+         semester_ids JSONB NOT NULL DEFAULT '[]'::jsonb,
          status      TEXT NOT NULL DEFAULT 'PENDING',
          actor       TEXT,
          error       TEXT,
          created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
          updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
        )`,
+    );
+    await query(
+      getPool(),
+      `ALTER TABLE coop_update_job
+         ADD COLUMN IF NOT EXISTS semester_ids JSONB NOT NULL DEFAULT '[]'::jsonb`,
     );
     await query(
       getPool(),
@@ -122,7 +129,7 @@ export async function claimCoopJob(token: string, actor: string): Promise<CoopCl
 export async function finishCoopJob(
   token: string,
   status: Extract<CoopJobStatus, "APPLIED" | "FAILED">,
-  options: { error?: string; semesterId?: number } = {},
+  options: { error?: string; semesterId?: number; semesterIds?: number[] } = {},
 ): Promise<void> {
   await query(
     getPool(),
@@ -130,9 +137,16 @@ export async function finishCoopJob(
         SET status = $2,
             error = $3,
             semester_id = COALESCE($4, semester_id),
+            semester_ids = COALESCE($5::jsonb, semester_ids),
             updated_at = now()
       WHERE token = $1`,
-    [token, status, options.error ?? null, options.semesterId ?? null],
+    [
+      token,
+      status,
+      options.error ?? null,
+      options.semesterId ?? null,
+      options.semesterIds ? JSON.stringify(options.semesterIds) : null,
+    ],
   );
 }
 
