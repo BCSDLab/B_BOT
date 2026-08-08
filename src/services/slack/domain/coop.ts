@@ -2,8 +2,15 @@ import {
   buildRegularCoopResultBlocks,
   convertRegularCoopToReview,
 } from "~/services/coop/pipeline";
+import { buildCoopPatchBlocks, planCoopPatches } from "~/services/coop/patch";
+import {
+  findCoopTokenByThread,
+  linkCoopThread,
+  loadCoopReview,
+  saveCoopPatchPlan,
+} from "~/services/coop/reviewStore";
 import { downloadSlackImage, findImageFile } from "~/utils/slackFile";
-import { threadRootOf } from "~/utils/slackThread";
+import { readThreadContext, threadRootOf } from "~/utils/slackThread";
 import type { MessageSetting } from "../type";
 
 const COMMAND = /^!생협반영/;
@@ -75,6 +82,7 @@ export const messages: MessageSetting[] = [{
         downloaded.mimeType,
         target,
       );
+      await linkCoopThread(channel, threadRoot, outcome.token);
       await client.chat.update({
         channel,
         ts: messageTs,
@@ -103,3 +111,115 @@ export const messages: MessageSetting[] = [{
     }
   },
 }];
+
+const EDIT_COMMAND = /^!수정/;
+
+messages.push({
+  regex: EDIT_COMMAND,
+  async handler({ client, channel, ts, text, user, parentTs }) {
+    if (!parentTs) return;
+    const token = await findCoopTokenByThread(channel, parentTs);
+    if (!token) return;
+
+    const request = text.replace(EDIT_COMMAND, "").trim();
+    const stored = await loadCoopReview(token);
+    if (!stored) {
+      await client.chat.postMessage({
+        channel,
+        thread_ts: parentTs,
+        text: "생협 검토 링크가 만료됐습니다.",
+        blocks: [{
+          type: "section",
+          text: { type: "mrkdwn", text: ":x: 생협 검토 링크가 만료됐습니다. 이미지를 다시 변환해주세요." },
+        }],
+      });
+      return;
+    }
+    if (!stored.conversion) {
+      await client.chat.postMessage({
+        channel,
+        thread_ts: parentTs,
+        text: "이전 변환 결과는 수정할 수 없습니다.",
+        blocks: [{
+          type: "section",
+          text: { type: "mrkdwn", text: ":information_source: 수정 기능 배포 전에 만든 결과입니다. 이미지를 다시 변환해주세요." },
+        }],
+      });
+      return;
+    }
+    if (!request) {
+      await client.chat.postMessage({
+        channel,
+        thread_ts: parentTs,
+        text: "무엇을 바꿀지 적어주세요.",
+        blocks: [{
+          type: "section",
+          text: {
+            type: "mrkdwn",
+            text: [
+              ":pencil: *무엇을 바꿀지 함께 적어주세요.*",
+              "예) `!수정 세탁소 평일 운영시간을 11:30 - 18:30으로 바꿔줘`",
+              "예) `!수정 복지관식당 토요일을 미운영으로 바꿔줘`",
+              "예) `!수정 운영 종료일을 2026-06-19로 바꿔줘`",
+            ].join("\n"),
+          },
+        }],
+      });
+      return;
+    }
+
+    const placeholder = await client.chat.postMessage({
+      channel,
+      thread_ts: parentTs,
+      text: "생협 수정 요청 확인 중",
+      blocks: [{
+        type: "section",
+        text: { type: "mrkdwn", text: ":mag: 생협 수정 요청을 확인하는 중…" },
+      }],
+    });
+    const messageTs = placeholder.ts as string;
+
+    try {
+      const context = await readThreadContext(client, channel, parentTs, ts);
+      const plan = await planCoopPatches(request, stored.conversion, context);
+      if (plan.patches.length === 0) {
+        await client.chat.update({
+          channel,
+          ts: messageTs,
+          text: "수정할 내용을 찾지 못했습니다.",
+          blocks: [{
+            type: "section",
+            text: {
+              type: "mrkdwn",
+              text: [
+                ":grey_question: *수정할 내용을 찾지 못했습니다.*",
+                ...plan.problems.map((problem) => `• ${problem}`),
+              ].join("\n"),
+            },
+          }],
+        });
+        return;
+      }
+      const patchToken = await saveCoopPatchPlan(token, plan);
+      await client.chat.update({
+        channel,
+        ts: messageTs,
+        text: `생협 수정 ${plan.patches.length}건 확인`,
+        blocks: buildCoopPatchBlocks(plan, patchToken, user),
+      });
+    } catch (error) {
+      await client.chat.update({
+        channel,
+        ts: messageTs,
+        text: "생협 수정 요청 처리 실패",
+        blocks: [{
+          type: "section",
+          text: {
+            type: "mrkdwn",
+            text: `:x: *수정 요청을 처리하지 못했습니다*\n${error instanceof Error ? error.message : "알 수 없는 오류입니다"}`,
+          },
+        }],
+      });
+    }
+  },
+});
