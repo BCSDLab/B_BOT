@@ -119,19 +119,58 @@ export const messages: MessageSetting[] = [
  * 명령어 접두사를 두지 않은 건, 이미 그 스레드가 어느 변환 건인지 정해져 있어서다.
  * 반대로 변환 스레드가 아닌 곳의 대화는 여기까지 오지 않는다.
  */
+const EDIT_COMMAND = /^!수정/;
+
 messages.push({
-  regex: /./,
+  regex: EDIT_COMMAND,
   async handler({ client, channel, ts, text, user, parentTs }) {
-    if (!parentTs) {
-      return;
-    }
-    const token = await findTokenByThread(channel, parentTs);
-    if (!token) {
+    const request = text.replace(EDIT_COMMAND, "").trim();
+    const token = parentTs ? await findTokenByThread(channel, parentTs) : null;
+    const stored = token ? await loadReview(token) : null;
+
+    // 변환 스레드가 아니거나 만료됐으면 어디서 써야 하는지 알려준다.
+    // 조용히 무시하면 왜 반응이 없는지 알 수 없다.
+    if (!parentTs || !stored) {
+      await client.chat.postMessage({
+        channel,
+        thread_ts: ts,
+        text: "변환 결과 스레드에서 사용해주세요.",
+        blocks: [
+          {
+            type: "section",
+            text: {
+              type: "mrkdwn",
+              text: [
+                ":thread: *`!수정`은 변환 결과 스레드 안에서 써주세요.*",
+                parentTs
+                  ? "이 스레드의 검토 링크가 만료됐거나 변환 기록을 찾지 못했습니다."
+                  : "`!강의반영`으로 만든 결과 메시지에 답글로 달아주세요.",
+              ].join("\n"),
+            },
+          },
+        ],
+      });
       return;
     }
 
-    const stored = await loadReview(token);
-    if (!stored) {
+    if (request === "") {
+      await client.chat.postMessage({
+        channel,
+        thread_ts: parentTs,
+        text: "무엇을 바꿀지 적어주세요.",
+        blocks: [
+          {
+            type: "section",
+            text: {
+              type: "mrkdwn",
+              text: [
+                ":pencil: *무엇을 바꿀지 함께 적어주세요.*",
+                "예) `!수정 유체역학 03 담당교수를 우창규로 바꿔줘`",
+              ].join("\n"),
+            },
+          },
+        ],
+      });
       return;
     }
 
@@ -147,7 +186,7 @@ messages.push({
 
     try {
       const context = await readThreadContext(client, channel, parentTs, ts);
-      const plan = await planPatches(text, stored.lectures, stored.timeFormat, context);
+      const plan = await planPatches(request, stored.lectures, stored.timeFormat, context);
 
       if (plan.patches.length === 0 && plan.ambiguities.length === 0) {
         await client.chat.update({

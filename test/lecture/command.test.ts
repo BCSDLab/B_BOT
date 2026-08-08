@@ -54,3 +54,44 @@ describe("파일 첨부 메시지 처리 범위", () => {
     expect(accepting[0].regex.toString()).toContain("강의반영");
   });
 });
+
+describe("명령어 충돌", () => {
+  it("!강의반영이 수정 핸들러에 걸리지 않는다", async () => {
+    const { messageFunctionList } = await import("~/services/slack/message");
+
+    // 스레드에서 !강의반영을 치면 두 핸들러가 모두 반응하던 문제.
+    const matching = messageFunctionList.filter((m) =>
+      typeof m.regex === "string"
+        ? "!강의반영 2026 여름학기".includes(m.regex)
+        : m.regex.test("!강의반영 2026 여름학기"),
+    );
+
+    expect(matching).toHaveLength(1);
+  });
+
+  it("스레드 잡담에는 아무 핸들러도 걸리지 않는다", async () => {
+    const { messageFunctionList } = await import("~/services/slack/message");
+
+    // 접두사가 없으면 봇이 끼어들지 않아야 한다.
+    const matching = messageFunctionList.filter((m) =>
+      typeof m.regex === "string"
+        ? "이거 맞나요?".includes(m.regex)
+        : m.regex.test("이거 맞나요?"),
+    );
+
+    expect(matching).toHaveLength(0);
+  });
+
+  it("!수정은 수정 핸들러만 받는다", async () => {
+    const { messageFunctionList } = await import("~/services/slack/message");
+
+    const matching = messageFunctionList.filter((m) =>
+      typeof m.regex === "string"
+        ? "!수정 유체역학 03 교수 우창규로".includes(m.regex)
+        : m.regex.test("!수정 유체역학 03 교수 우창규로"),
+    );
+
+    expect(matching).toHaveLength(1);
+    expect(matching[0].acceptsFiles).toBeFalsy();
+  });
+});

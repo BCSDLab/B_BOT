@@ -8,6 +8,7 @@ import type {
   WebClient,
 } from "@slack/web-api";
 import { messageFunctionList } from "~/services/slack/message";
+import { botUserId } from "~/utils/slackBot";
 import type { SlackFile } from "~/utils/slackFile";
 import { setFeedback } from "~/services/rag";
 
@@ -115,18 +116,6 @@ export default defineEventHandler(async (event) => {
 
   return { ok: true };
 });
-
-// 봇 user id 캐시(자신이 선제공한 👍👎를 만족도로 오집계하지 않으려고 필터).
-let _botUserId: string | undefined | null = null;
-async function botUserId(client: WebClient): Promise<string | undefined> {
-  if (_botUserId !== null) return _botUserId;
-  try {
-    _botUserId = ((await client.auth.test()) as { user_id?: string }).user_id;
-  } catch {
-    _botUserId = undefined;
-  }
-  return _botUserId;
-}
 
 const FEEDBACK: Record<string, number> = { "+1": 1, "-1": -1 };
 
