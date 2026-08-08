@@ -55,7 +55,7 @@ export function resolveRegularSemesterLabel(
   return normalizeSemester(semesterLabel) ?? normalizeSemester(title);
 }
 
-async function extractTimetable({
+export async function extractCoopTimetable({
   imageBase64,
   mimeType,
   fileName,
@@ -76,9 +76,9 @@ async function extractTimetable({
 }
 
 export async function extractRegularTimetable(
-  input: Parameters<typeof extractTimetable>[0],
+  input: Parameters<typeof extractCoopTimetable>[0],
 ): Promise<RawRegularCoopTimetable> {
-  const extracted = await extractTimetable(input);
+  const extracted = await extractCoopTimetable(input);
   const semesterLabel = resolveRegularSemesterLabel(extracted.semesterLabel, extracted.title);
   if (!semesterLabel) {
     throw new Error([
@@ -91,9 +91,9 @@ export async function extractRegularTimetable(
 }
 
 export async function extractVacationTimetable(
-  input: Parameters<typeof extractTimetable>[0],
+  input: Parameters<typeof extractCoopTimetable>[0],
 ): Promise<RawRegularCoopTimetable> {
-  const extracted = await extractTimetable(input);
+  const extracted = await extractCoopTimetable(input);
   const vacation = normalizeVacationSemester(extracted.semesterLabel)
     ?? normalizeVacationSemester(extracted.title);
   if (!vacation) {
@@ -106,5 +106,34 @@ export async function extractVacationTimetable(
   return {
     ...extracted,
     semesterLabel: `${vacation.year}년 ${vacation.season}방학`,
+  };
+}
+
+export type ExtractedCoopSemester =
+  | { kind: "regular"; year: number; termName: "1학기" | "2학기"; normalizedLabel: string }
+  | { kind: "vacation"; year: number; season: "하계" | "동계"; termName: "하계방학" | "동계방학"; normalizedLabel: string };
+
+export function resolveExtractedCoopSemester(
+  extracted: Pick<RawRegularCoopTimetable, "semesterLabel" | "title">,
+): ExtractedCoopSemester | null {
+  const regular = resolveRegularSemesterLabel(extracted.semesterLabel, extracted.title);
+  const regularMatch = /^(\d{2})-([12])학기$/.exec(regular ?? "");
+  if (regularMatch) {
+    return {
+      kind: "regular",
+      year: 2000 + Number(regularMatch[1]),
+      termName: `${regularMatch[2]}학기` as "1학기" | "2학기",
+      normalizedLabel: regular!,
+    };
+  }
+  const vacation = normalizeVacationSemester(extracted.semesterLabel)
+    ?? normalizeVacationSemester(extracted.title);
+  if (!vacation) return null;
+  return {
+    kind: "vacation",
+    year: vacation.year,
+    season: vacation.season,
+    termName: `${vacation.season}방학`,
+    normalizedLabel: `${vacation.year}년 ${vacation.season}방학`,
   };
 }

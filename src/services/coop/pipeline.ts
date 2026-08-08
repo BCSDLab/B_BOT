@@ -15,7 +15,7 @@ import type {
   RegularConversionResult,
   VacationSeason,
 } from "./types";
-import { extractRegularTimetable, extractVacationTimetable } from "./vision";
+import { extractCoopTimetable, extractRegularTimetable, extractVacationTimetable } from "./vision";
 
 export interface RegularCoopArtifacts {
   conversion: RegularConversionResult;
@@ -107,6 +107,24 @@ export async function extractVacationCoopImage({
   });
 }
 
+export async function extractCoopImage({
+  image,
+  mimeType,
+  fileName,
+}: {
+  image: ArrayBuffer | Uint8Array;
+  mimeType: StructuredImageMimeType;
+  fileName: string;
+}): Promise<RawRegularCoopTimetable> {
+  const bytes = image instanceof Uint8Array ? image : new Uint8Array(image);
+  if (bytes.byteLength === 0) throw new Error("생협 시간표 이미지가 비어 있습니다.");
+  return await extractCoopTimetable({
+    imageBase64: Buffer.from(bytes).toString("base64"),
+    mimeType,
+    fileName,
+  });
+}
+
 export async function convertVacationCoopToReview(
   raw: RawRegularCoopTimetable,
   vacationStartDate: string,
@@ -190,16 +208,24 @@ export async function convertRegularCoopToReview(
   mimeType: StructuredImageMimeType,
   target: RegularCoopTarget,
 ): Promise<RegularCoopOutcome> {
+  if (image.byteLength === 0) throw new Error("생협 시간표 이미지가 비어 있습니다.");
+  const raw = await extractRegularTimetable({
+    imageBase64: Buffer.from(new Uint8Array(image)).toString("base64"),
+    mimeType,
+    fileName: target.fileName,
+  });
+  return await convertRegularRawCoopToReview(raw, target);
+}
+
+export async function convertRegularRawCoopToReview(
+  raw: RawRegularCoopTimetable,
+  target: RegularCoopTarget,
+): Promise<RegularCoopOutcome> {
   if (!/^https?:\/\//.test(import.meta.env.APP_BASE_URL ?? "")) {
     throw new Error("서버 설정이 없습니다: APP_BASE_URL");
   }
   const baseline = await fetchCoopShopBaseline();
-  const artifacts = await convertRegularCoopImage({
-    image,
-    mimeType,
-    fileName: target.fileName,
-    baseline,
-  });
+  const artifacts = buildRegularCoopArtifacts(raw, baseline);
 
   const expected = expectedRegularSemester(target);
   if (artifacts.conversion.semester !== expected) {
