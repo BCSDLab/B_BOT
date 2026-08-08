@@ -15,6 +15,12 @@ import {
   convertRegularCoopToReview,
 } from "~/services/coop/pipeline";
 import { linkCoopThread } from "~/services/coop/reviewStore";
+import { createCoopJob } from "~/services/coop/jobStore";
+import {
+  labelOf,
+  resolveTarget,
+  type KoinEnv,
+} from "~/services/lecture/target";
 
 const MAX_CHOICES = 4;
 const ARTICLE_URL = (articleId: number) => `https://koreatech.in/articles/${articleId}`;
@@ -48,6 +54,7 @@ async function runCoopConversion({
   image,
   year,
   termName,
+  env,
 }: {
   client: WebClient;
   channel: string;
@@ -56,19 +63,30 @@ async function runCoopConversion({
   image: CoopNoticeImage;
   year: number;
   termName: "1학기" | "2학기";
+  env: KoinEnv;
 }) {
   await client.chat.update({
     channel,
     ts,
     text: "생협 운영시간 변환 중",
-    blocks: section(`:hourglass_flowing_sand: *${year} ${termName} 생협 운영시간* 변환 중…\n${image.name}\n작업자: <@${actor}>`),
+    blocks: section(`:hourglass_flowing_sand: *${year} ${termName} 생협 운영시간* 변환 중…\n${labelOf(env)} · ${image.name}\n작업자: <@${actor}>`),
   });
 
   try {
     const buffer = await downloadCoopNoticeImage(image);
-    const target = { year, termName, fileName: image.name };
+    const target = { env, year, termName, fileName: image.name };
     const outcome = await convertRegularCoopToReview(buffer, image.mimeType, target);
     await linkCoopThread(channel, ts ?? "", outcome.token);
+    await createCoopJob({
+      token: outcome.token,
+      channelId: channel,
+      threadTs: ts ?? "",
+      year,
+      term: termName,
+      sourceFile: image.name,
+      shopCount: outcome.shopCount,
+      targetEnv: env,
+    });
     await client.chat.update({
       channel,
       ts,
@@ -143,6 +161,7 @@ export async function handleCoopDetectedAction(
       image,
       year: detected.year,
       termName: detected.termName,
+      env: detected.env,
     });
     return;
   }
@@ -152,10 +171,21 @@ export async function handleCoopDetectedAction(
   };
   if (!articleId) return;
 
+  const resolved = resolveTarget(channel);
+  if (!resolved.target) {
+    await replaceOriginal(
+      body.response_url,
+      "생협 반영 대상 채널이 아닙니다.",
+      section(`:x: ${resolved.reason ?? "반영 대상을 찾지 못했습니다."}`),
+    );
+    return;
+  }
+  const env = resolved.target.env;
+
   await replaceOriginal(
     body.response_url,
     "생협 업데이트를 진행합니다.",
-    section(`:white_check_mark: *생협 업데이트를 진행합니다.*\n<@${actor}>`),
+    section(`:white_check_mark: *생협 업데이트를 진행합니다.* · ${labelOf(env)}\n<@${actor}>`),
   );
   const posted = await client.chat.postMessage({
     channel,
@@ -201,6 +231,7 @@ export async function handleCoopDetectedAction(
 
   if (images.length > 1) {
     const token = await saveDetectedCoop({
+      env,
       articleId,
       articleTitle: article.title ?? `게시글 ${articleId}`,
       articleUrl,
@@ -247,6 +278,7 @@ export async function handleCoopDetectedAction(
     ts,
     actor,
     image: images[0],
+    env,
     ...semester,
   });
 }

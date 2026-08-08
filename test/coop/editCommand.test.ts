@@ -19,7 +19,7 @@ describe("생협 검수 스레드 수정 안내", () => {
       excludedCount: 3,
       blockingCount: 0,
       infoCount: 3,
-    }, { year: 2026, termName: "1학기", fileName: "시간표.png" }, "U1");
+    }, { env: "stage", year: 2026, termName: "1학기", fileName: "시간표.png" }, "U1");
     const json = JSON.stringify(blocks);
     expect(json).toContain("`!수정`");
     expect(json).toContain("세탁소 평일 운영시간");

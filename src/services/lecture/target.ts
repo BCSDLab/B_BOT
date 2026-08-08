@@ -66,7 +66,7 @@ export function resolveTarget(channelId: string): ResolveResult {
     return {
       ok: false,
       reason: [
-        "이 채널은 강의 반영 대상이 아닙니다.",
+        "이 채널은 Admin API 반영 대상이 아닙니다.",
         `<#${CHANNEL_ID.코인_이벤트알림_stage}> 또는 <#${CHANNEL_ID.코인_이벤트알림}>에서 실행해주세요.`,
       ].join(" "),
     };

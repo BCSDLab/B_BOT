@@ -6,12 +6,14 @@ import {
 } from "~/services/lecture/reviewStore";
 import type { AdminUpdateSemesterRequest, RegularConversionResult } from "./types";
 import type { CoopPatch } from "./patch";
+import type { KoinEnv } from "~/services/lecture/target";
 
 export interface StoredCoopReview {
   html: string;
   request: AdminUpdateSemesterRequest;
   conversion: RegularConversionResult;
   meta: {
+    env: KoinEnv;
     year: number;
     termName: string;
     sourceFileName: string;

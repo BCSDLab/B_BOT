@@ -33,7 +33,12 @@ import {
   COOP_DETECTED_ACTION_IDS,
   handleCoopDetectedAction,
 } from "./coopDetectedAction";
+import {
+  COOP_APPLY_ACTION_IDS,
+  handleCoopApplyAction,
+} from "./coopApplyAction";
 import { applyCoopPatches } from "~/services/coop/patch";
+import { buildCoopApplyButtons } from "~/services/coop/pipeline";
 import { renderRegularCoopReview } from "~/services/coop/reviewHtml";
 import {
   dropCoopPatchPlan,
@@ -54,6 +59,12 @@ const coopDetectedAction = (actionId: string): BlockActionSetting => ({
   actionId,
   async handler({ client, body, action }) {
     await handleCoopDetectedAction(client, body, action);
+  },
+});
+const coopApplyAction = (actionId: string): BlockActionSetting => ({
+  actionId,
+  async handler({ client, body, action }) {
+    await handleCoopApplyAction(client, body, action);
   },
 });
 // 버튼·셀렉트 조작(block_actions) 핸들러 목록.
@@ -154,6 +165,7 @@ async function runConversion({
 
 export const blockActions: BlockActionSetting[] = [
   ...COOP_DETECTED_ACTION_IDS.map(coopDetectedAction),
+  ...COOP_APPLY_ACTION_IDS.map(coopApplyAction),
   {
     /**
      * 배치가 올린 감지 알림의 `예`.
@@ -369,6 +381,14 @@ export const blockActions: BlockActionSetting[] = [
           text: `생협 수정 ${plan.patches.length}건 적용`,
           blocks: [
             ...notice(`:white_check_mark: *생협 수정 ${plan.patches.length}건 적용*\n검토 페이지를 새로고침하면 반영돼 있습니다.`),
+            ...(blockingCount === 0 ? [{
+              type: "actions" as const,
+              elements: buildCoopApplyButtons(
+                plan.reviewToken,
+                stored.meta.env,
+                stored.meta.shopCount,
+              ),
+            }] : notice(`:warning: 확인이 필요한 항목이 *${blockingCount}건* 남아 있습니다.`)),
             { type: "context", elements: [{ type: "mrkdwn", text: `작업자: <@${actor}>` }] },
           ],
         });

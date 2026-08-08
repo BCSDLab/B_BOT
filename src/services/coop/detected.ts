@@ -6,6 +6,7 @@ import {
 } from "~/services/lecture/detected";
 import { createReviewToken, isValidToken } from "~/services/lecture/reviewStore";
 import { normalizeSemester } from "./convert";
+import type { KoinEnv } from "~/services/lecture/target";
 
 export interface CoopNoticeImage {
   name: string;
@@ -20,6 +21,7 @@ interface ArticleAttachment {
 }
 
 export interface DetectedCoopNotice {
+  env: KoinEnv;
   articleId: number;
   articleTitle: string;
   articleUrl: string;
