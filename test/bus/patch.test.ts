@@ -481,6 +481,137 @@ describe("버스 수정 요청 해석 (LLM 없이 코드 가드)", () => {
     expect(patch).toBeNull();
     expect(problems.join(" ")).toMatch(/대전 등교.*찾지 못했습니다/);
   });
+
+  // 실제로 겪은 버그: 하계 계절학기·방학기간 시간표만 있는 파일(정규학기 없음)에서
+  // "!수정 천안 등교 터미널/천안역 운행요일 ..."처럼 학기를 말하지 않으면, LLM은
+  // 노선 목록만 보고 학기는 못 봐서 "정규학기"로 찍는다. 예전 코드는 그 hallucination을
+  // 그대로 믿고 conversions.length===1(학기가 하나뿐인지)만 확인했는데, 계절학기+방학기간
+  // 두 개라 이 조건도 안 맞아 "정규학기의 변환 결과가 없습니다"로 잘못 반려했다.
+  it("LLM이 존재하지 않는 학기를 내놓아도, 노선이 실제 학기 하나에서만 찾아지면 그 학기로 확정한다", () => {
+    const seasonal = conversion({
+      payloads: [
+        {
+          target: "commuting",
+          semester_type: "SEASONAL",
+          body: { commuting_bus_timetables: [route({ route_name: "터미널/천안역" })] },
+        },
+      ],
+    });
+    const vacation = conversion({
+      payloads: [
+        {
+          target: "commuting",
+          semester_type: "VACATION",
+          body: {
+            commuting_bus_timetables: [
+              route({ route_name: "두정역/KTX" }),
+            ],
+          },
+        },
+      ],
+    });
+    const problems: string[] = [];
+    const patch = resolvePatch(
+      {
+        semester: "정규학기", // LLM의 hallucination — 실제로는 REGULAR가 없다.
+        region: "천안",
+        direction: "등교",
+        route: "터미널/천안역",
+        field: "running_days",
+        trip: "1회",
+        stop: "",
+        value: "",
+        days: "월화수목금",
+      } as RawPatch,
+      [seasonal, vacation],
+      problems,
+    );
+
+    expect(problems).toHaveLength(0);
+    expect(patch).not.toBeNull();
+    expect(patch?.semester).toBe("SEASONAL");
+    expect(patch?.routeName).toBe("터미널/천안역");
+  });
+
+  it("같은 이름의 노선이 여러 학기에 걸쳐 있으면 학기를 지정해달라고 안내한다", () => {
+    const seasonal = conversion({
+      payloads: [
+        {
+          target: "commuting",
+          semester_type: "SEASONAL",
+          body: { commuting_bus_timetables: [route({ route_name: "터미널/천안역" })] },
+        },
+      ],
+    });
+    const vacation = conversion({
+      payloads: [
+        {
+          target: "commuting",
+          semester_type: "VACATION",
+          body: { commuting_bus_timetables: [route({ route_name: "터미널/천안역" })] },
+        },
+      ],
+    });
+    const problems: string[] = [];
+    const patch = resolvePatch(
+      {
+        semester: "정규학기",
+        region: "천안",
+        direction: "등교",
+        route: "터미널/천안역",
+        field: "running_days",
+        trip: "1회",
+        stop: "",
+        value: "",
+        days: "월화수목금",
+      } as RawPatch,
+      [seasonal, vacation],
+      problems,
+    );
+
+    expect(patch).toBeNull();
+    expect(problems.join(" ")).toMatch(/여러 학기에 걸쳐.*계절학기.*방학기간/);
+  });
+
+  it("실제 존재하는 학기를 명시하면 그 학기 안에서만 찾는다", () => {
+    const seasonal = conversion({
+      payloads: [
+        {
+          target: "commuting",
+          semester_type: "SEASONAL",
+          body: { commuting_bus_timetables: [route({ route_name: "터미널/천안역" })] },
+        },
+      ],
+    });
+    const vacation = conversion({
+      payloads: [
+        {
+          target: "commuting",
+          semester_type: "VACATION",
+          body: { commuting_bus_timetables: [route({ route_name: "터미널/천안역" })] },
+        },
+      ],
+    });
+    const problems: string[] = [];
+    const patch = resolvePatch(
+      {
+        semester: "방학기간",
+        region: "천안",
+        direction: "등교",
+        route: "터미널/천안역",
+        field: "running_days",
+        trip: "1회",
+        stop: "",
+        value: "",
+        days: "월화수목금",
+      } as RawPatch,
+      [seasonal, vacation],
+      problems,
+    );
+
+    expect(problems).toHaveLength(0);
+    expect(patch?.semester).toBe("VACATION");
+  });
 });
 
 describe.skipIf(!hasLlmCredentials())("버스 수정 요청 해석", () => {

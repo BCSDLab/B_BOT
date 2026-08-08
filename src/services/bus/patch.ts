@@ -174,6 +174,12 @@ interface RawPatch {
 }
 export type { RawPatch };
 
+const TITLE_OF: Record<SemesterType, string> = {
+  REGULAR: "정규학기",
+  SEASONAL: "계절학기",
+  VACATION: "방학기간",
+};
+
 function conversionBySemester(
   conversions: BusConversion[],
   semester: SemesterType,
@@ -183,8 +189,31 @@ function conversionBySemester(
   );
 }
 
+/** `conversionBySemester`와 달리 같은 학기가 여러 BusConversion에 걸쳐 있어도 전부 찾는다. */
+function conversionsBySemester(conversions: BusConversion[], semester: SemesterType): BusConversion[] {
+  return conversions.filter((conversion) =>
+    conversion.payloads.some((payload) => payload.semester_type === semester),
+  );
+}
+
 function semesterOfTitle(title: string): SemesterType | undefined {
   return SEMESTER_OF[clean(title)];
+}
+
+/**
+ * conversions에 실제로 등장하는 학기 구분. LLM은 노선 목록({{ROUTES}})만 보고
+ * 학기 정보는 못 보므로, 원문에 학기 언급이 없으면 십중팔구 "정규학기"로 찍는다
+ * (실제로 계절학기·방학기간만 있는 파일이어도 마찬가지) — 그 hallucination을
+ * 걸러내려면 파일에 학기가 실제로 몇 종류 있는지를 코드가 직접 세야 한다.
+ * 하나의 학기라도 sheet/지역별로 BusConversion이 여러 개로 쪼개질 수 있어
+ * `conversions.length === 1`은 대리 지표로 쓸 수 없다.
+ */
+function distinctSemesterTypes(conversions: BusConversion[]): SemesterType[] {
+  const found = new Set<SemesterType>();
+  for (const conversion of conversions) {
+    for (const payload of conversion.payloads) found.add(payload.semester_type);
+  }
+  return [...found];
 }
 
 function routeCandidates(
@@ -246,25 +275,34 @@ export function resolvePatch(
   conversions: BusConversion[],
   problems: string[],
 ): BusPatch | null {
-  let semester = semesterOfTitle(raw.semester);
-  let conversion = semester ? conversionBySemester(conversions, semester) : undefined;
-  // LLM이 존재하지 않는 학기를 hallucination 했을 때, 변환 목록이 하나뿐이면 fallback.
-  if (!conversion && conversions.length === 1) {
-    conversion = conversions[0];
-    semester = undefined;
-  }
-  if (!conversion) {
-    problems.push(
-      semester
-        ? `"${clean(raw.semester)}"의 변환 결과가 없습니다.`
-        : "어느 학기의 시간표인지 확정할 수 없습니다. (정규학기/계절학기/방학기간을 지정해주세요)",
-    );
-    return null;
-  }
-  const resolvedSemester: SemesterType =
-    semester ?? (conversion.payloads[0].semester_type as SemesterType);
+  // LLM은 노선 목록({{ROUTES}})만 보고 학기 정보는 못 본다 — 원문에 학기 언급이
+  // 없으면 실제로 뭐가 있는지 모른 채 "정규학기"를 찍어내는 일이 흔하다. 그래서
+  // raw.semester가 실제 존재하는 학기와 맞아떨어질 때만 "사용자가 지정한 학기"로
+  // 믿고, 그렇지 않으면 hallucination으로 보고 무시한다 — 바로 실패시키지 않는다.
+  const explicitSemester = semesterOfTitle(raw.semester);
+  const explicitMatches = explicitSemester ? conversionsBySemester(conversions, explicitSemester) : [];
 
   if (raw.field === "period") {
+    // period는 노선이 아니라 학기 전체(version_update)에 대한 수정이라, 노선
+    // 검색으로 학기를 되짚을 방법이 없다. 학기가 실제로 하나뿐이면 그걸로
+    // 강제하고, 그마저 아니면 명시적으로 받아야 한다.
+    let conversion = explicitMatches[0];
+    let resolvedSemester = explicitSemester;
+    if (!conversion) {
+      const distinct = distinctSemesterTypes(conversions);
+      if (distinct.length === 1) {
+        resolvedSemester = distinct[0];
+        conversion = conversionBySemester(conversions, resolvedSemester);
+      }
+    }
+    if (!conversion || !resolvedSemester) {
+      problems.push(
+        explicitSemester
+          ? `"${TITLE_OF[explicitSemester]}"의 변환 결과가 없습니다.`
+          : "어느 학기의 적용 기간을 바꿀지 확정할 수 없습니다. (정규학기/계절학기/방학기간을 지정해주세요)",
+      );
+      return null;
+    }
     const before = conversion.version_update.content;
     const after = clean(raw.value);
     if (!PERIOD.test(after)) {
@@ -290,22 +328,39 @@ export function resolvePatch(
     };
   }
 
-  const candidates = routeCandidates(conversion, {
-    region: raw.region,
-    direction: raw.direction,
-    route: raw.route,
-  });
-  if (candidates.length === 0) {
-    const label = clean(raw.route) || (clean(raw.region) || clean(raw.direction)
-      ? `${clean(raw.region)} ${clean(raw.direction)}`.trim()
-      : "지정한");
+  // 나머지 항목은 전부 노선 단위 수정이다. 학기를 먼저 확정하지 않고, 실제로
+  // 존재하는 학기(explicitMatches)로 좁혀지면 그 안에서만, 아니면 전체 학기에서
+  // 노선을 찾는다 — 노선 검색 결과가 학기를 알려주지, 그 반대가 아니다.
+  const searchSpace = explicitMatches.length > 0 ? explicitMatches : conversions;
+  const hints = { region: raw.region, direction: raw.direction, route: raw.route };
+  const matches = searchSpace.flatMap((conversion) =>
+    routeCandidates(conversion, hints).map((candidate) => ({ conversion, ...candidate })),
+  );
+
+  const label = clean(raw.route) || (clean(raw.region) || clean(raw.direction)
+    ? `${clean(raw.region)} ${clean(raw.direction)}`.trim()
+    : "지정한");
+
+  if (matches.length === 0) {
+    problems.push(`"${label}"에 해당하는 노선을 찾지 못했습니다.`);
+    return null;
+  }
+
+  const bySemester = new Map<SemesterType, typeof matches>();
+  for (const match of matches) {
+    const semesterType = match.payload.semester_type as SemesterType;
+    bySemester.set(semesterType, [...(bySemester.get(semesterType) ?? []), match]);
+  }
+  if (bySemester.size > 1) {
     problems.push(
-      `"${label}"에 해당하는 노선을 ${conversion.payloads[0].semester_type === "REGULAR" ? "정규학기" : conversion.payloads[0].semester_type === "SEASONAL" ? "계절학기" : "방학기간"}에서 찾지 못했습니다.`,
+      `"${label}"이 여러 학기에 걸쳐 있습니다: ${[...bySemester.keys()].map((s) => TITLE_OF[s]).join(", ")}. ` +
+        `학기를 지정해주세요. (예: "계절학기 ${label} ...")`,
     );
     return null;
   }
+  const [[resolvedSemester, candidates]] = bySemester;
+
   if (candidates.length > 1) {
-    const label = clean(raw.route) || `${clean(raw.region)} ${clean(raw.direction)}`.trim();
     problems.push(
       `"${label}"는 여러 노선입니다: ${candidates.map((c) => describeRoute(c.route)).join(", ")}. 방향(등교/하교)까지 지정해주세요.`,
     );
