@@ -35,6 +35,18 @@ describe("첨부에서 엑셀 모으기", () => {
     expect(files[0].name).toContain("개설교과목");
   });
 
+  it("같은 자리의 파일이 갈렸으면 최신 이름을 쓴다", () => {
+    // 학교가 편람을 새로 올리면 포털은 같은 fs를 갈아끼우고 코인은 두 행을 다 들고 있다.
+    // 옛 이름을 잡으면 받는 파일은 최신인데 이름만 지난 날짜로 뜬다.
+    const url = "https://portal.koreatech.ac.kr/ctt/bb/bulletin?b=16&p=1601&a=fd&fs=5";
+    const files = collectExcelAttachments([
+      { name: "붙임4. 개설교과목 편람_260727.xlsx(122 KB)", url, created_at: "2026-07-27 06:01:45" },
+      { name: "붙임4. 개설교과목 편람_260728.xlsx(124 KB)", url, created_at: "2026-07-28 03:01:12" },
+    ]);
+    expect(files).toHaveLength(1);
+    expect(files[0].name).toContain("260728");
+  });
+
   it("같은 첨부가 여러 번 실려도 하나만 본다", () => {
     // 실제 게시글에 같은 파일이 네 번 들어 있는 경우가 있었다.
     const same = attach("편람.xlsx(21 KB)", "https://portal.koreatech.ac.kr/f?a=9");

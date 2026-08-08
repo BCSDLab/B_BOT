@@ -41,6 +41,7 @@ export function isAllowedFileUrl(url: string): boolean {
 interface ArticleAttachment {
   name?: string;
   url?: string;
+  created_at?: string;
 }
 
 interface Article {
@@ -59,30 +60,36 @@ const LIKELY_NAMES = ["개설교과목", "개설 교과목", "편람", "교과�
  * (편람 외에 폐강강좌·시간표 등). 조용히 첫 번째를 집으면 엉뚱한 파일을
  * 변환하고도 아무도 모른다. 둘 이상이면 사람이 고른다.
  *
- * 같은 파일이 여러 번 실려 오는 게시글이 있어 주소로 한 번 걸러낸다.
+ * 같은 파일이 여러 번 실려 오는 게시글이 있어 주소로 한 번 걸러낸다. 이때 **가장 최근
+ * 것을 남긴다.** 학교가 편람을 새로 올리면 포털은 같은 자리(fs)의 파일을 갈아끼우는데
+ * 코인은 옛 이름과 새 이름을 둘 다 들고 있다. 먼저 나온 걸 잡으면 받아오는 파일은
+ * 최신인데 이름만 옛날 날짜로 뜬다. 사람이 알아채기 어려운 어긋남이다.
+ *
  * 이름 끝에 `(21 KB)`처럼 크기가 붙어 있어 확장자는 그 앞에서 본다.
  */
 export function collectExcelAttachments(
   attachments: ArticleAttachment[] | undefined,
 ): AttachmentFile[] {
-  const seen = new Set<string>();
-  const files: AttachmentFile[] = [];
+  const newest = new Map<string, { file: AttachmentFile; at: string }>();
 
   for (const attachment of attachments ?? []) {
     const url = attachment.url ?? "";
     const name = cleanFileName(attachment.name ?? "");
-    if (!url || seen.has(url)) {
+    if (!url || !name.toLowerCase().endsWith(".xlsx") || !isAllowedFileUrl(url)) {
       continue;
     }
-    seen.add(url);
 
-    if (name.toLowerCase().endsWith(".xlsx") && isAllowedFileUrl(url)) {
-      files.push({ name, url });
+    const at = attachment.created_at ?? "";
+    const kept = newest.get(url);
+    if (!kept || at > kept.at) {
+      newest.set(url, { file: { name, url }, at });
     }
   }
 
   // 편람으로 보이는 걸 앞에 둔다. 고르는 사람이 대개 첫 번째를 누르게 된다.
-  return files.sort((a, b) => likelihood(b.name) - likelihood(a.name));
+  return [...newest.values()]
+    .map(({ file }) => file)
+    .sort((a, b) => likelihood(b.name) - likelihood(a.name));
 }
 
 function likelihood(name: string): number {
