@@ -35,8 +35,10 @@ describe("생협 검토 HTML", () => {
     expect(html).toContain("2026년 3월 3일 - 6월 19일");
     expect(html).toContain('<article class="card');
     expect(html).toContain("상세 검증");
-    expect(html).toContain("반영에서 제외한 2캠 사업장");
     expect(html).toContain("학생회관 2층");
+    expect(html).not.toContain("반영 매장");
+    expect(html).not.toContain("반영에서 제외한 2캠 사업장");
+    expect(html).not.toContain("매장명 · 위치 · 전화번호 검색");
   });
 
   it("원본 문자열을 HTML escape 한다", () => {
