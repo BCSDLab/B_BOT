@@ -6,6 +6,8 @@ import type {
   RawCoopShop,
   RawRegularCoopTimetable,
   RegularConversionResult,
+  VacationSeason,
+  VacationSplitConversionResult,
 } from "./types";
 
 const NAME_ALIASES: Record<string, string> = {
@@ -34,6 +36,18 @@ export function normalizeSemester(label: string): string | null {
   }
   const match = /(?:^|\D)(?:20)?(\d{2})\s*(?:년\s*)?[-.]?\s*제?\s*([12])\s*학기/.exec(label);
   return match ? `${match[1]}-${match[2]}학기` : null;
+}
+
+export function normalizeVacationSemester(
+  label: string,
+): { year: number; season: VacationSeason } | null {
+  const match = /(?:^|\D)(20\d{2}|\d{2})\s*(?:년\s*)?[-.]?\s*(하계|동계)\s*(?:방학|계절\s*학기)/.exec(label);
+  if (!match) return null;
+  const parsedYear = Number(match[1]);
+  return {
+    year: parsedYear < 100 ? 2000 + parsedYear : parsedYear,
+    season: match[2] as VacationSeason,
+  };
 }
 
 export function normalizeDate(value: string): string | null {
@@ -154,12 +168,12 @@ function convertHours(source: RawCoopShop, issues: ConversionIssue[]): AdminOper
   return result;
 }
 
-export function convertRegularTimetable(
+function convertTimetable(
   raw: RawRegularCoopTimetable,
   baseline: CoopShopBaseline,
+  semester: string | null,
 ): RegularConversionResult {
   const issues: ConversionIssue[] = [];
-  const semester = normalizeSemester(raw.semesterLabel);
   const fromDate = normalizeDate(raw.fromDate);
   const toDate = normalizeDate(raw.toDate);
 
@@ -176,7 +190,7 @@ export function convertRegularTimetable(
   for (const shop of excludedShops) {
     const label = `${shop.groupLabel} ${shop.shopLabel}`.trim();
     issues.push({ code: "excluded_second_campus", severity: "info", shop: label,
-      detail: "2캠 사업장은 정규학기 1차 반영 대상에서 제외합니다." });
+      detail: "2캠 사업장은 반영 대상에서 제외합니다." });
   }
 
   const used = new Set<number>();
@@ -241,5 +255,87 @@ export function convertRegularTimetable(
     shops,
     excludedShops,
     issues,
+  };
+}
+
+export function convertRegularTimetable(
+  raw: RawRegularCoopTimetable,
+  baseline: CoopShopBaseline,
+): RegularConversionResult {
+  return convertTimetable(raw, baseline, normalizeSemester(raw.semesterLabel));
+}
+
+function previousDate(value: string): string {
+  const date = new Date(`${value}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() - 1);
+  return date.toISOString().slice(0, 10);
+}
+
+function closesAfterSeasonalTerm(remark: string): boolean {
+  return /계절\s*학기\s*까지\s*운영/.test(remark);
+}
+
+function closeVacationHours(result: RegularConversionResult): RegularConversionResult {
+  const next = structuredClone(result) as RegularConversionResult;
+  for (const shop of next.shops) {
+    if (!closesAfterSeasonalTerm(shop.source.remark)) continue;
+    shop.admin.operation_hours = shop.admin.operation_hours.map((hour) => ({
+      ...(hour.type ? { type: hour.type } : {}),
+      day_of_week: hour.day_of_week,
+      open_time: "미운영",
+      close_time: "미운영",
+    }));
+    next.issues.push({
+      code: "vacation_hours_closed",
+      severity: "info",
+      shop: shop.admin.coop_shop_info.name,
+      detail: "비고의 '계절학기까지 운영' 조건에 따라 방학 기간은 미운영으로 변환했습니다.",
+    });
+  }
+  next.request = { coop_shops: next.shops.map((shop) => shop.admin) };
+  return next;
+}
+
+export function convertVacationTimetable(
+  raw: RawRegularCoopTimetable,
+  baseline: CoopShopBaseline,
+  vacationStartDateValue: string,
+): VacationSplitConversionResult {
+  const vacationSemester = normalizeVacationSemester(raw.semesterLabel)
+    ?? normalizeVacationSemester(raw.title);
+  if (!vacationSemester) {
+    throw new Error(`하계·동계 방학 학기를 해석하지 못했습니다: ${raw.semesterLabel || raw.title}`);
+  }
+
+  const fromDate = normalizeDate(raw.fromDate);
+  const toDate = normalizeDate(raw.toDate);
+  const vacationStartDate = normalizeDate(vacationStartDateValue);
+  if (!fromDate || !toDate || !vacationStartDate) {
+    throw new Error("전체 운영 기간 또는 방학 시작일을 해석하지 못했습니다.");
+  }
+  if (fromDate >= vacationStartDate || vacationStartDate > toDate) {
+    throw new Error(`방학 시작일은 전체 운영 기간 안에서 시작일보다 늦어야 합니다: ${fromDate} - ${toDate}`);
+  }
+
+  const yearShort = String(vacationSemester.year).slice(-2);
+  const seasonalSemester = `${yearShort}-${vacationSemester.season}계절학기`;
+  const vacationSemesterName = `${yearShort}-${vacationSemester.season}방학`;
+  const seasonal = convertTimetable(
+    { ...raw, fromDate, toDate: previousDate(vacationStartDate) },
+    baseline,
+    seasonalSemester,
+  );
+  const vacationBase = convertTimetable(
+    { ...raw, fromDate: vacationStartDate, toDate },
+    baseline,
+    vacationSemesterName,
+  );
+
+  return {
+    year: vacationSemester.year,
+    season: vacationSemester.season,
+    vacationStartDate,
+    seasonal,
+    vacation: closeVacationHours(vacationBase),
   };
 }
