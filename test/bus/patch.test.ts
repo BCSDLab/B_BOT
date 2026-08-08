@@ -770,9 +770,25 @@ describe("프롬프트 노선 목록 생성", () => {
     );
     const list = buildRouteList([two]);
 
-    expect(list).toContain("천안 등교 천안역");
-    expect(list).toContain("천안 등교 터미널");
-    expect(list).toContain("천안 셔틀 천안 셔틀");
+    expect(list).toContain("천안 | 등교 | 천안역");
+    expect(list).toContain("천안 | 등교 | 터미널");
+    expect(list).toContain("천안 | 셔틀 | 천안 셔틀");
     expect(list.split("\n").length).toBe(3);
+  });
+
+  // 실제로 겪은 버그: "천안 셔틀 천안 셔틀"처럼 region/route_type/route_name이
+  // 공백으로만 이어지면 LLM이 필드 경계를 못 읽고 노선명 전체를 되읽어 노선을
+  // 못 찾는다. 구분자로 필드를 나눠야 한다.
+  it("지역·방향·노선명이 공백으로 뭉개지지 않게 구분자로 나눈다", () => {
+    const list = buildRouteList([conversion()]);
+    expect(list).toContain("천안 | 셔틀 | 천안 셔틀");
+    expect(list).not.toContain("천안 셔틀 천안 셔틀");
+  });
+
+  // 회차 정보가 없으면 "1회부터 7회까지" 같은 범위가 실제로 있는지 LLM이 확인할
+  // 방법이 없어 무조건 unclear로 넘겨버렸다.
+  it("각 노선의 실제 회차 이름을 함께 보여준다", () => {
+    const list = buildRouteList([conversion()]);
+    expect(list).toContain("회차: 1회, 2회");
   });
 });

@@ -145,18 +145,22 @@ const SYSTEM_PROMPT = `너는 버스 시간표 수정 요청을 구조화하는 
 사용자가 자연어로 말한 수정 사항을 항목 단위로 쪼갠다. 파싱으로 만든 버스 노선 데이터를
 바꾸는 요청만 다룬다.
 
-아래는 실제 존재하는 노선 목록이다. 사용자가 지역·방향·노선명을 줄여 말해도 이 목록의
-정확한 값으로 맞춰서 적는다. 목록에 없는 지역·방향·노선명은 지어내지 마라.
-예: 사용자가 "세종 등교 셔틀"이라 하면 목록에서 "세종" "등교" "세종 등교/하교"를 찾는다.
+아래는 실제 존재하는 노선 목록이다. 한 줄이 노선 하나이고
+"지역 | 방향 | 노선명 | 회차: 회차1, 회차2, ..." 형태다. 사용자가 지역·방향·노선명을
+줄여 말해도 이 목록의 정확한 값으로 맞춰서 적는다. 목록에 없는 지역·방향·노선명·회차는
+지어내지 마라. 예: 사용자가 "세종 등교 셔틀"이라 하면 목록에서 "세종" "등교" "세종 등교/하교"를 찾는다.
 
 실제 노선 목록:
 {{ROUTES}}
 
 - 값을 지어내지 마라. 사용자가 말하지 않은 건 바꾸지 않는다.
-- 한 문장에 여러 노선·항목이 있으면 각각 따로 적는다. 단, 같은 노선의 회차 범위
-  ("1회부터 7회까지", "1~7회" 등)는 여러 항목으로 쪼개지 마라 — patch 하나로 두고
-  trip에 범위 텍스트 그대로 적는다.
+- 한 문장에 여러 노선·항목이 있으면 각각 따로 적는다.
 - 무슨 뜻인지 애매하면 patches에 넣지 말고 unclear에 적어라. 추측해서 바꾸면 되돌릴 방법이 없다.
+- **예외: 회차 범위("1회부터 7회까지", "1~7회" 등)는 절대 unclear로 넘기지 마라.**
+  노선 목록에 각 노선의 실제 회차 이름이 함께 나와 있으니 그걸 보고 판단해라 —
+  범위에 맞는 회차들로 나눠 각각 patch를 적어도 되고, 자신 없으면 범위 텍스트를
+  trip에 그대로 적어도 된다(그 경우 실제 회차와 맞는지는 코드가 다시 확인한다).
+  둘 중 뭘 하든 좋으니, 노선(지역/방향/노선명)만 특정되면 unclear로 포기하지 마라.
 - 도착시각은 HH:MM 또는 마커(도착/정차/하차/미정차/하차/승하차/종점)로 적는다.
 - 적용 기간은 YYYY-MM-DD~YYYY-MM-DD 형태 그대로 적는다.
 - 직전 대화가 함께 주어지면 참고만 해라. **지금 메시지가 요청하는 것만** 내놓는다.
@@ -711,16 +715,26 @@ export function resolvePatches(
 
 /** 실제 존재하는 노선 목록을 "지역 방향 노선명" 형태로 정리한다. 중복은 제거한다. */
 export function buildRouteList(conversions: BusConversion[]): string {
-  const names = new Set<string>();
+  // region/route_type/route_name을 공백으로만 이으면 "천안 셔틀 천안 셔틀"처럼
+  // 지역명·노선명이 겹칠 때 필드 경계가 안 보여 LLM이 노선명을 잘못 되읽는다.
+  // 회차 이름도 같이 안 주면 "1회부터 7회까지" 같은 범위가 진짜 있는 회차인지
+  // LLM이 확인할 방법이 없어 unclear로 넘겨버린다 — 둘 다 여기서 같이 준다.
+  const trips = new Map<string, Set<string>>();
   for (const conversion of conversions) {
     for (const payload of conversion.payloads) {
       const routes = Object.values(payload.body)[0] ?? [];
       for (const route of routes) {
-        names.add(`${route.region} ${route.route_type} ${route.route_name}`);
+        const key = `${route.region} | ${route.route_type} | ${route.route_name}`;
+        const names = trips.get(key) ?? new Set<string>();
+        for (const trip of route.route_info) names.add(trip.name);
+        trips.set(key, names);
       }
     }
   }
-  return [...names].sort().join("\n");
+  return [...trips.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([key, names]) => `${key} | 회차: ${[...names].join(", ")}`)
+    .join("\n");
 }
 
 /**
