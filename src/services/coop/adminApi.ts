@@ -19,6 +19,11 @@ export interface CoopSemesterResponse extends CoopSemesterCreateRequest {
 
 export type CoopAdminStage = "semester_create" | "semester_lookup" | "timetable";
 
+export interface CoopTimetableApplyInput {
+  semester: CoopSemesterCreateRequest;
+  timetable: AdminUpdateSemesterRequest;
+}
+
 export class CoopAdminApiError extends Error {
   constructor(
     message: string,
@@ -136,13 +141,10 @@ export async function updateCoopTimetable(
   );
 }
 
-export async function applyCoopTimetable(
+function findExactSemester(
+  semesters: CoopSemesterResponse[],
   semester: CoopSemesterCreateRequest,
-  timetable: AdminUpdateSemesterRequest,
-  auth: CoopAdminAuth,
-): Promise<number> {
-  await createCoopSemester(semester, auth);
-  const semesters = await getCoopSemesters(auth);
+): CoopSemesterResponse {
   const matched = semesters.find((candidate) => candidate.semester === semester.semester);
 
   if (!matched) {
@@ -163,7 +165,35 @@ export async function applyCoopTimetable(
       409,
     );
   }
+  return matched;
+}
 
-  await updateCoopTimetable(matched.id, timetable, auth);
-  return matched.id;
+export async function applyCoopTimetables(
+  inputs: CoopTimetableApplyInput[],
+  auth: CoopAdminAuth,
+  onApplied?: (semesterId: number, index: number) => void,
+): Promise<number[]> {
+  if (inputs.length === 0) return [];
+  for (const input of inputs) {
+    await createCoopSemester(input.semester, auth);
+  }
+  const semesters = await getCoopSemesters(auth);
+  const matched = inputs.map((input) => findExactSemester(semesters, input.semester));
+  const appliedIds: number[] = [];
+  for (const [index, input] of inputs.entries()) {
+    const semesterId = matched[index].id;
+    await updateCoopTimetable(semesterId, input.timetable, auth);
+    appliedIds.push(semesterId);
+    onApplied?.(semesterId, index);
+  }
+  return appliedIds;
+}
+
+export async function applyCoopTimetable(
+  semester: CoopSemesterCreateRequest,
+  timetable: AdminUpdateSemesterRequest,
+  auth: CoopAdminAuth,
+): Promise<number> {
+  const [semesterId] = await applyCoopTimetables([{ semester, timetable }], auth);
+  return semesterId;
 }

@@ -1,6 +1,6 @@
 import type { StructuredImageMimeType } from "~/helper/adapter/structured";
 import { createCoopReviewToken, isValidCoopToken } from "./reviewStore";
-import { normalizeSemester } from "./convert";
+import { normalizeSemester, normalizeVacationSemester } from "./convert";
 import type { CoopKoinEnv } from "./target";
 
 export interface CoopNoticeImage {
@@ -21,7 +21,7 @@ export interface DetectedCoopNotice {
   articleTitle: string;
   articleUrl: string;
   year: number;
-  termName: "1학기" | "2학기";
+  termName: "1학기" | "2학기" | "하계방학" | "동계방학";
   images: CoopNoticeImage[];
 }
 
@@ -119,6 +119,17 @@ export function guessRegularCoopSemester(
     year: 2000 + Number(matched[1]),
     termName: `${matched[2]}학기` as "1학기" | "2학기",
   };
+}
+
+export function guessCoopSemester(
+  title: string,
+): { year: number; termName: DetectedCoopNotice["termName"] } | null {
+  const regular = guessRegularCoopSemester(title);
+  if (regular) return regular;
+  const vacation = normalizeVacationSemester(title);
+  return vacation
+    ? { year: vacation.year, termName: `${vacation.season}방학` }
+    : null;
 }
 
 export function hasImageSignature(

@@ -3,6 +3,7 @@ import type {
   ConversionIssue,
   ConvertedCoopShop,
   RegularConversionResult,
+  VacationSplitConversionResult,
 } from "./types";
 
 const escapeHtml = (value: unknown): string => String(value ?? "")
@@ -154,4 +155,27 @@ details{margin-top:16px;border-top:1px solid var(--line);padding-top:10px}summar
 <section class="grid">${cards}</section>
 </main>
 </body></html>`;
+}
+
+export function renderVacationCoopReview(result: VacationSplitConversionResult): string {
+  const sections = [
+    { label: "계절학기", value: result.seasonal },
+    { label: "방학", value: result.vacation },
+  ].map(({ label, value }) => {
+    const period = `${formatKoreanDate(value.fromDate, true)} - ${formatKoreanDate(value.toDate, false)}`;
+    const cards = value.shops.map((shop) => shopCard(shop, value.issues)).join("\n");
+    return `<section class="period"><header><h2>${escapeHtml(value.semester)} · ${label}</h2><p>기간 : ${escapeHtml(period)}</p></header><div class="grid">${cards}</div></section>`;
+  }).join("\n");
+
+  const regular = renderRegularCoopReview(result.seasonal);
+  const style = regular.match(/<style>([\s\S]*?)<\/style>/)?.[1] ?? "";
+  return `<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow"><title>${result.year}년 ${result.season} 생협 운영 시간</title>
+<style>${style}
+.period{margin-top:38px}.period>header{margin-bottom:18px}.period>header h2{font-size:26px}.period+.period{padding-top:34px;border-top:2px solid var(--line)}
+</style></head><body><main>
+<header><h1>${result.year}년 ${result.season} 생협 운영 시간</h1><p>방학 시작일 ${escapeHtml(formatKoreanDate(result.vacationStartDate, true))} 기준으로 두 학기를 분리했습니다.</p></header>
+${sections}
+</main></body></html>`;
 }

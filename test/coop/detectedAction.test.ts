@@ -13,12 +13,13 @@ vi.mock("~/services/coop/detected", () => ({
     url: "https://koreatech.in/articles/123",
     attachments: [],
   })),
-  guessRegularCoopSemester: vi.fn(() => ({ year: 2026, termName: "1학기" })),
+  guessCoopSemester: vi.fn(() => ({ year: 2026, termName: "1학기" })),
   loadDetectedCoop: vi.fn(async () => null),
   saveDetectedCoop: vi.fn(async () => "a".repeat(32)),
 }));
 
 vi.mock("~/services/coop/pipeline", () => ({
+  extractVacationCoopImage: vi.fn(),
   convertRegularCoopToReview: vi.fn(async () => ({
     token: "b".repeat(32),
     reviewUrl: "https://bot.example.com/review/token",

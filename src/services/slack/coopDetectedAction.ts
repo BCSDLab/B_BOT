@@ -5,7 +5,7 @@ import {
   downloadCoopNoticeImage,
   dropDetectedCoop,
   fetchCoopArticle,
-  guessRegularCoopSemester,
+  guessCoopSemester,
   loadDetectedCoop,
   saveDetectedCoop,
   type CoopNoticeImage,
@@ -13,6 +13,7 @@ import {
 import {
   buildRegularCoopResultBlocks,
   convertRegularCoopToReview,
+  extractVacationCoopImage,
 } from "~/services/coop/pipeline";
 import { linkCoopThread } from "~/services/coop/reviewStore";
 import { createCoopJob } from "~/services/coop/jobStore";
@@ -21,6 +22,7 @@ import {
   resolveCoopTarget,
   type CoopKoinEnv,
 } from "~/services/coop/target";
+import { savePendingCoopVacation } from "~/services/coop/vacationStore";
 
 const MAX_CHOICES = 4;
 const ARTICLE_URL = (articleId: number) => `https://koreatech.in/articles/${articleId}`;
@@ -62,7 +64,7 @@ async function runCoopConversion({
   actor: string;
   image: CoopNoticeImage;
   year: number;
-  termName: "1학기" | "2학기";
+  termName: "1학기" | "2학기" | "하계방학" | "동계방학";
   env: CoopKoinEnv;
 }) {
   await client.chat.update({
@@ -74,6 +76,35 @@ async function runCoopConversion({
 
   try {
     const buffer = await downloadCoopNoticeImage(image);
+    if (termName === "하계방학" || termName === "동계방학") {
+      const season = termName.startsWith("하계") ? "하계" : "동계";
+      const raw = await extractVacationCoopImage({
+        image: buffer,
+        mimeType: image.mimeType,
+        fileName: image.name,
+      });
+      await savePendingCoopVacation(channel, ts ?? "", {
+        env,
+        year,
+        season,
+        fileName: image.name,
+        requesterId: actor,
+        raw,
+      });
+      await client.chat.update({
+        channel,
+        ts,
+        text: "방학 시작일 입력 대기",
+        blocks: section([
+          `:calendar: *${year} ${season} 운영시간을 읽었습니다.*`,
+          `전체 기간: ${raw.fromDate} - ${raw.toDate}`,
+          "",
+          "이 메시지의 스레드에 방학 시작일을 입력해주세요.",
+          "예) `!학기구분 2026-07-18`",
+        ].join("\n")),
+      });
+      return;
+    }
     const target = { env, year, termName, fileName: image.name };
     const outcome = await convertRegularCoopToReview(buffer, image.mimeType, target);
     await linkCoopThread(channel, ts ?? "", outcome.token);
@@ -219,11 +250,11 @@ export async function handleCoopDetectedAction(
     return;
   }
 
-  const semester = guessRegularCoopSemester(article.title ?? "");
+  const semester = guessCoopSemester(article.title ?? "");
   if (!semester) {
-    await say("생협 정규학기를 확인해주세요", [
-      ":grey_question: *제목에서 정규학기를 읽지 못했습니다.*",
-      "이미지를 직접 올리고 `!생협반영 2026 1학기`처럼 학기를 지정해주세요.",
+    await say("생협 학기를 확인해주세요", [
+      ":grey_question: *제목에서 학기를 읽지 못했습니다.*",
+      "이미지를 직접 올리고 `!생협반영 2026 1학기` 또는 `!생협반영 2026 하계방학`처럼 학기를 지정해주세요.",
       ...images.map((image) => `<${image.url}|${image.name}>`),
     ].join("\n"));
     return;

@@ -1,6 +1,6 @@
 import type { BlockAction } from "@slack/bolt";
 import type { KnownBlock, WebClient } from "@slack/web-api";
-import { applyCoopTimetable } from "~/services/coop/adminApi";
+import { applyCoopTimetable, applyCoopTimetables } from "~/services/coop/adminApi";
 import {
   cancelCoopJob,
   claimCoopJob,
@@ -38,6 +38,7 @@ export async function handleCoopApplyAction(
   const channel = body.channel.id;
   const ts = body.message?.ts;
   const actor = body.user.id;
+  const appliedSemesterIds: number[] = [];
 
   if (action.action_id === "coop:cancel") {
     if (!(await cancelCoopJob(token, actor))) {
@@ -78,13 +79,14 @@ export async function handleCoopApplyAction(
       return;
     }
 
-    const blockingCount = stored.conversion.issues
-      .filter((issue) => issue.severity === "blocking").length;
+    const conversions = stored.periods?.map((period) => period.conversion)
+      ?? [stored.conversion];
+    const blockingCount = conversions.reduce((count, conversion) =>
+      count + conversion.issues.filter((issue) => issue.severity === "blocking").length, 0);
     if (blockingCount > 0) {
       throw new Error(`확인이 필요한 항목 ${blockingCount}건을 먼저 수정해주세요.`);
     }
-    const { semester, fromDate, toDate } = stored.conversion;
-    if (!semester || !fromDate || !toDate) {
+    if (conversions.some(({ semester, fromDate, toDate }) => !semester || !fromDate || !toDate)) {
       throw new Error("학기 이름 또는 운영 기간이 비어 있습니다. 검토 페이지에서 확인해주세요.");
     }
 
@@ -98,17 +100,32 @@ export async function handleCoopApplyAction(
       throw new Error(resolved.reason ?? "대상 환경을 찾지 못했습니다.");
     }
     const auth = await getCoopAdminAuth(resolved.target);
-    const semesterId = await applyCoopTimetable({
-      semester,
-      from_date: fromDate,
-      to_date: toDate,
-    }, stored.request, auth);
-    await finishCoopJob(token, "APPLIED", { semesterId });
+    if (stored.periods) {
+      await applyCoopTimetables(stored.periods.map((period) => ({
+        semester: {
+          semester: period.conversion.semester,
+          from_date: period.conversion.fromDate,
+          to_date: period.conversion.toDate,
+        },
+        timetable: period.request,
+      })), auth, (semesterId) => appliedSemesterIds.push(semesterId));
+    } else {
+      const { semester, fromDate, toDate } = stored.conversion;
+      const semesterId = await applyCoopTimetable({
+        semester,
+        from_date: fromDate,
+        to_date: toDate,
+      }, stored.request, auth);
+      appliedSemesterIds.push(semesterId);
+    }
+    await finishCoopJob(token, "APPLIED", stored.periods
+      ? { semesterId: appliedSemesterIds[0], semesterIds: appliedSemesterIds }
+      : { semesterId: appliedSemesterIds[0] });
 
     await update(client, channel, ts, "생협 반영 완료", [
       ...section(
         `:white_check_mark: *${stored.meta.year} ${stored.meta.termName} 생협 반영 완료*\n` +
-        `${coopTargetLabel(stored.meta.env)} · 매장 *${stored.meta.shopCount}개* · 학기 ID ${semesterId}`,
+        `${coopTargetLabel(stored.meta.env)} · 매장 *${stored.meta.shopCount}개* · 학기 ID ${appliedSemesterIds.join(", ")}`,
       ),
       {
         type: "context",
@@ -117,9 +134,16 @@ export async function handleCoopApplyAction(
     ]);
   } catch (error) {
     const message = error instanceof Error ? error.message : "알 수 없는 오류입니다";
-    await finishCoopJob(token, "FAILED", { error: message });
+    const partial = appliedSemesterIds.length > 0
+      ? `\n:warning: 먼저 처리된 학기 ID: ${appliedSemesterIds.join(", ")} · 재시도하면 같은 데이터로 다시 갱신합니다.`
+      : "";
+    await finishCoopJob(token, "FAILED", {
+      error: `${message}${partial}`,
+      semesterId: appliedSemesterIds[0],
+      semesterIds: appliedSemesterIds,
+    });
     await update(client, channel, ts, "생협 반영 실패", [
-      ...section(`:x: *생협 반영 실패*\n${message}`),
+      ...section(`:x: *생협 반영 실패*\n${message}${partial}`),
       {
         type: "actions",
         elements: [{

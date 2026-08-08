@@ -1,4 +1,6 @@
 export type RegularTermName = "1학기" | "2학기";
+export type VacationSeason = "하계" | "동계";
+export type VacationPeriodKind = "계절학기" | "방학";
 
 export interface RawOperationHour {
   dayLabel: string;
@@ -83,7 +85,8 @@ export type ConversionIssueCode =
   | "unmatched_shop"
   | "missing_shop"
   | "phone_changed"
-  | "baseline_phone_used";
+  | "baseline_phone_used"
+  | "vacation_hours_closed";
 
 export interface ConversionIssue {
   code: ConversionIssueCode;
@@ -106,4 +109,12 @@ export interface RegularConversionResult {
   shops: ConvertedCoopShop[];
   excludedShops: RawCoopShop[];
   issues: ConversionIssue[];
+}
+
+export interface VacationSplitConversionResult {
+  year: number;
+  season: VacationSeason;
+  vacationStartDate: string;
+  seasonal: RegularConversionResult;
+  vacation: RegularConversionResult;
 }

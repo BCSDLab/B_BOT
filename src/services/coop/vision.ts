@@ -1,5 +1,5 @@
 import regularPrompt from "./prompts/regular-timetable";
-import { normalizeSemester } from "./convert";
+import { normalizeSemester, normalizeVacationSemester } from "./convert";
 import { generateCoopStructured } from "./llm";
 import type { RawRegularCoopTimetable } from "./types";
 import type { StructuredImageMimeType } from "~/helper/adapter/structured";
@@ -55,7 +55,7 @@ export function resolveRegularSemesterLabel(
   return normalizeSemester(semesterLabel) ?? normalizeSemester(title);
 }
 
-export async function extractRegularTimetable({
+async function extractTimetable({
   imageBase64,
   mimeType,
   fileName,
@@ -72,6 +72,13 @@ export async function extractRegularTimetable({
     maxTokens: 8192,
   });
 
+  return extracted;
+}
+
+export async function extractRegularTimetable(
+  input: Parameters<typeof extractTimetable>[0],
+): Promise<RawRegularCoopTimetable> {
+  const extracted = await extractTimetable(input);
   const semesterLabel = resolveRegularSemesterLabel(extracted.semesterLabel, extracted.title);
   if (!semesterLabel) {
     throw new Error([
@@ -81,4 +88,23 @@ export async function extractRegularTimetable({
     ].join("\n"));
   }
   return { ...extracted, semesterLabel };
+}
+
+export async function extractVacationTimetable(
+  input: Parameters<typeof extractTimetable>[0],
+): Promise<RawRegularCoopTimetable> {
+  const extracted = await extractTimetable(input);
+  const vacation = normalizeVacationSemester(extracted.semesterLabel)
+    ?? normalizeVacationSemester(extracted.title);
+  if (!vacation) {
+    throw new Error([
+      "하계·동계 방학 시간표가 아닙니다.",
+      `읽은 학기: ${extracted.semesterLabel || "(없음)"}`,
+      `읽은 제목: ${extracted.title || "(없음)"}`,
+    ].join("\n"));
+  }
+  return {
+    ...extracted,
+    semesterLabel: `${vacation.year}년 ${vacation.season}방학`,
+  };
 }
