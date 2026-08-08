@@ -21,7 +21,8 @@ const escapeHtml = (value: string) =>
 
 const ISSUE_LABEL: Record<PreflightIssue["kind"], string> = {
   too_long: "길이 초과",
-  missing: "필수값 없음",
+  missing: "읽지 못함",
+  empty_value: "값 없음",
   too_many_slots: "시간 개수 초과",
   slot_out_of_range: "시간 범위 벗어남",
   duplicate: "중복",
@@ -50,11 +51,17 @@ export function renderReviewPage(input: ReviewPageInput): string {
     .map((lecture) => {
       const label = `${lecture.code}|${lecture.lecture_class} ${lecture.name}`;
       const own = issuesByLecture.get(label) ?? [];
+      const blocking = own.some((i) => i.severity === "blocking");
       const noTime = lecture.lecture_infos.length === 0;
-      const flags = [own.length > 0 ? "issue" : "", noTime ? "notime" : ""].filter(Boolean).join(" ");
+      const flags = [blocking ? "issue" : "", own.length > 0 ? "flagged" : "", noTime ? "notime" : ""]
+        .filter(Boolean)
+        .join(" ");
 
       const chips = own
-        .map((i) => `<span class="chip" title="${escapeHtml(i.detail)}">${ISSUE_LABEL[i.kind]}</span>`)
+        .map(
+          (i) =>
+            `<span class="chip ${i.severity}" title="${escapeHtml(i.detail)}">${ISSUE_LABEL[i.kind]}</span>`,
+        )
         .join("");
 
       return `<tr class="${flags}" data-search="${escapeHtml(
@@ -73,14 +80,18 @@ export function renderReviewPage(input: ReviewPageInput): string {
     })
     .join("\n");
 
-  const issueSummary = Object.entries(
-    issues.reduce<Record<string, number>>((acc, i) => {
-      acc[ISSUE_LABEL[i.kind]] = (acc[ISSUE_LABEL[i.kind]] ?? 0) + 1;
-      return acc;
-    }, {}),
-  )
-    .map(([kind, count]) => `<li><b>${count}</b>건 · ${kind}</li>`)
-    .join("");
+  const blocking = issues.filter((i) => i.severity === "blocking");
+  const info = issues.filter((i) => i.severity === "info");
+
+  const summarize = (list: PreflightIssue[]) =>
+    Object.entries(
+      list.reduce<Record<string, number>>((acc, i) => {
+        acc[ISSUE_LABEL[i.kind]] = (acc[ISSUE_LABEL[i.kind]] ?? 0) + 1;
+        return acc;
+      }, {}),
+    )
+      .map(([kind, count]) => `<li><b>${count}</b>건 · ${kind}</li>`)
+      .join("");
 
   const failureRows = parseFailures
     .slice(0, 50)
@@ -153,8 +164,10 @@ tr.issue:hover { filter: brightness(0.97); }
 .parsed { color: var(--ok); }
 .chip {
   display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 4px;
-  background: var(--warn-line); color: var(--warn-fg); font-size: 11px; white-space: nowrap;
+  font-size: 11px; white-space: nowrap;
 }
+.chip.blocking { background: var(--warn-line); color: var(--warn-fg); }
+.chip.info { background: var(--line); color: var(--dim); }
 footer { margin-top: 24px; color: var(--dim); font-size: 12px; }
 .count { color: var(--dim); font-size: 13px; margin-left: auto; }
 </style>
@@ -167,7 +180,8 @@ footer { margin-top: 24px; color: var(--dim); font-size: 12px; }
 <div class="tiles">
   <div class="tile"><div class="n">${lectures.length}</div><div class="k">강의</div></div>
   <div class="tile"><div class="n">${withoutTime}</div><div class="k">시간 없음</div></div>
-  <div class="tile${issues.length > 0 ? " warn" : ""}"><div class="n">${issues.length}</div><div class="k">확인 필요</div></div>
+  <div class="tile${blocking.length > 0 ? " warn" : ""}"><div class="n">${blocking.length}</div><div class="k">반영 불가</div></div>
+  <div class="tile"><div class="n">${info.length}</div><div class="k">값 없음</div></div>
   <div class="tile${parseFailures.length > 0 ? " warn" : ""}"><div class="n">${parseFailures.length}</div><div class="k">파싱 실패</div></div>
 </div>
 
@@ -177,16 +191,23 @@ ${
     : ""
 }
 ${
-  issues.length > 0
-    ? `<div class="panel"><h2>어드민 API가 거절할 수 있는 항목</h2><ul>${issueSummary}</ul>
-<p class="dim" style="margin:8px 0 0">아래 표에서 노란 행이 해당 강의입니다. 하나라도 남으면 요청 전체가 거절될 수 있습니다.</p></div>`
+  blocking.length > 0
+    ? `<div class="panel"><h2>반영을 막는 항목</h2><ul>${summarize(blocking)}</ul>
+<p class="dim" style="margin:8px 0 0">아래 표에서 노란 행이 해당 강의입니다. 하나라도 남으면 요청 전체가 거절됩니다.</p></div>`
+    : ""
+}
+${
+  info.length > 0
+    ? `<div class="panel"><h2>엑셀에 값이 없는 항목</h2><ul>${summarize(info)}</ul>
+<p class="dim" style="margin:8px 0 0">원본이 비어 있는 값입니다. 빈 값으로 보내며 반영은 됩니다. 정원은 0으로 보냅니다.</p></div>`
     : ""
 }
 
 <div class="controls">
   <input type="search" id="q" placeholder="과목코드 · 과목명 · 교수 · 학과 검색">
   <button id="f-all" aria-pressed="true">전체</button>
-  <button id="f-issue" aria-pressed="false">확인 필요</button>
+  <button id="f-issue" aria-pressed="false">반영 불가</button>
+  <button id="f-flagged" aria-pressed="false">값 없음</button>
   <button id="f-notime" aria-pressed="false">시간 없음</button>
   <span class="count" id="count"></span>
 </div>
@@ -214,7 +235,7 @@ ${rows}
   var rows = Array.prototype.slice.call(document.querySelectorAll("#rows tr"));
   var q = document.getElementById("q");
   var count = document.getElementById("count");
-  var buttons = { all: document.getElementById("f-all"), issue: document.getElementById("f-issue"), notime: document.getElementById("f-notime") };
+  var buttons = { all: document.getElementById("f-all"), issue: document.getElementById("f-issue"), flagged: document.getElementById("f-flagged"), notime: document.getElementById("f-notime") };
   var mode = "all";
 
   function apply() {

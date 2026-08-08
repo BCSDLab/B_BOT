@@ -69,12 +69,20 @@ const LIMITS = {
 const MAX_CLASS_TIME = 50;
 const MAX_SLOT = 999;
 
-/** professor만 선택 항목이다. 나머지는 비면 400이 난다. */
-const REQUIRED_FIELDS = Object.keys(LIMITS).filter((f) => f !== "professor") as (keyof typeof LIMITS)[];
+/**
+ * 이게 비면 파싱이 잘못된 것이다. 값이 없는 게 아니라 못 읽은 것이므로 반영을 막는다.
+ * 나머지 필드는 빈 문자열로 보내도 된다(백엔드 확인 완료).
+ */
+const IDENTITY_FIELDS = ["code", "name", "lecture_class"] as const;
+
+/** 엑셀에 정원이 비어 있는 강의가 있다. 빈 값 대신 0으로 보낸다(백엔드 확인 완료). */
+const EMPTY_REGULAR_NUMBER = "0";
 
 export interface PreflightIssue {
   lecture: string;
-  kind: "too_long" | "missing" | "too_many_slots" | "slot_out_of_range" | "duplicate";
+  kind: "too_long" | "missing" | "empty_value" | "too_many_slots" | "slot_out_of_range" | "duplicate";
+  /** blocking은 반영을 막고, info는 사람이 알아두기만 하면 된다. */
+  severity: "blocking" | "info";
   detail: string;
 }
 
@@ -83,6 +91,9 @@ export interface PreflightResult {
   issues: PreflightIssue[];
   stats: { total: number; withoutTime: number; maxClassTime: number };
 }
+
+export const blockingIssues = (issues: PreflightIssue[]) =>
+  issues.filter((issue) => issue.severity === "blocking");
 
 export function buildAdminRequest(
   lectures: Lecture[],
@@ -106,7 +117,7 @@ export function buildAdminRequest(
       name: lecture.name,
       grades: lecture.grades,
       lecture_class: lecture.lecture_class,
-      regular_number: lecture.regular_number,
+      regular_number: lecture.regular_number || EMPTY_REGULAR_NUMBER,
       department: lecture.department,
       target: lecture.target,
       professor: lecture.professor || undefined,
@@ -122,27 +133,47 @@ export function buildAdminRequest(
         issues.push({
           lecture: label,
           kind: "too_long",
+          severity: "blocking",
           detail: `${field} ${value.length}자 (상한 ${limit}) — "${value.slice(0, 30)}…"`,
         });
       }
     }
 
-    for (const field of REQUIRED_FIELDS) {
-      if (!admin[field as keyof AdminLecture]) {
-        issues.push({ lecture: label, kind: "missing", detail: `${field}가 비어 있습니다` });
+    for (const field of Object.keys(LIMITS) as (keyof typeof LIMITS)[]) {
+      if (admin[field as keyof AdminLecture]) {
+        continue;
       }
+      // professor는 아예 선택 항목이라 비어도 알릴 것이 없다.
+      if (field === "professor") {
+        continue;
+      }
+      const identity = (IDENTITY_FIELDS as readonly string[]).includes(field);
+      issues.push({
+        lecture: label,
+        kind: identity ? "missing" : "empty_value",
+        severity: identity ? "blocking" : "info",
+        detail: identity
+          ? `${field}를 읽지 못했습니다`
+          : `${field}가 엑셀에 비어 있습니다 (빈 값으로 보냅니다)`,
+      });
     }
 
     if (class_time.length > MAX_CLASS_TIME) {
       issues.push({
         lecture: label,
         kind: "too_many_slots",
+        severity: "blocking",
         detail: `class_time ${class_time.length}개 (상한 ${MAX_CLASS_TIME})`,
       });
     }
     const bad = class_time.find((slot) => slot < 0 || slot > MAX_SLOT);
     if (bad !== undefined) {
-      issues.push({ lecture: label, kind: "slot_out_of_range", detail: `class_time에 ${bad} 포함` });
+      issues.push({
+        lecture: label,
+        kind: "slot_out_of_range",
+        severity: "blocking",
+        detail: `class_time에 ${bad} 포함`,
+      });
     }
 
     // 중복이 하나라도 있으면 요청 전체가 409로 막힌다. 보내기 전에 잡는다.
@@ -152,6 +183,7 @@ export function buildAdminRequest(
       issues.push({
         lecture: label,
         kind: "duplicate",
+        severity: "blocking",
         detail: `과목코드+분반이 이미 나왔습니다 (앞선 ${before + 1}번째 강의)`,
       });
     } else {

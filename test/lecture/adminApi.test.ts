@@ -1,6 +1,6 @@
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { buildAdminRequest, toAdminTerm, toClassTime } from "~/services/lecture/adminApi";
+import { blockingIssues, buildAdminRequest, toAdminTerm, toClassTime } from "~/services/lecture/adminApi";
 import { convertRows } from "~/services/lecture/convert";
 import { readSheet } from "~/services/lecture/sheet";
 import { FIXTURE_SPECS } from "../fixtures/lecture/specs";
@@ -43,8 +43,10 @@ describe("어드민 요청 사전 검증", () => {
     it(name, async () => {
       const { request, issues, stats } = await build(name, year, term);
 
+      const blocking = blockingIssues(issues);
       console.log(`\n[${name}] ${request.year} ${request.term}`);
       console.log(`  강의 ${stats.total}건 · 시간없음 ${stats.withoutTime} · class_time 최대 ${stats.maxClassTime}/50`);
+      console.log(`  반영 불가 ${blocking.length} · 값 없음 ${issues.length - blocking.length}`);
       if (issues.length > 0) {
         const byKind = issues.reduce<Record<string, number>>((acc, i) => {
           acc[i.kind] = (acc[i.kind] ?? 0) + 1;
@@ -60,6 +62,10 @@ describe("어드민 요청 사전 검증", () => {
       // 상한을 넘기면 서버가 요청 전체를 거절한다. 여기서 먼저 막아야 한다.
       expect(issues.filter((i) => i.kind === "too_many_slots")).toHaveLength(0);
       expect(issues.filter((i) => i.kind === "duplicate")).toHaveLength(0);
+      // 엑셀에 값이 없는 건 빈 문자열로 보내면 되므로 반영을 막지 않는다(백엔드 확인).
+      expect(blocking).toHaveLength(0);
+      // 정원이 비면 0으로 채워 보낸다.
+      expect(request.lectures.every((l) => l.regular_number !== "")).toBe(true);
     });
   }
 });

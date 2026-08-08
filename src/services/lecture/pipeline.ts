@@ -1,5 +1,5 @@
 import type { KnownBlock } from "@slack/web-api";
-import { buildAdminRequest, toAdminTerm } from "./adminApi";
+import { blockingIssues, buildAdminRequest, toAdminTerm } from "./adminApi";
 import { convertRows } from "./convert";
 import { renderReviewPage } from "./reviewHtml";
 import { buildReviewUrl, saveReview } from "./reviewStore";
@@ -31,7 +31,8 @@ export interface ConversionOutcome {
   token: string;
   reviewUrl: string;
   lectureCount: number;
-  issueCount: number;
+  blockingCount: number;
+  emptyValueCount: number;
   parseFailureCount: number;
   withoutTimeCount: number;
 }
@@ -56,6 +57,7 @@ export async function convertToReview(
   }
 
   const { request, issues } = buildAdminRequest(converted.lectures, { year, term });
+  const blocking = blockingIssues(issues);
 
   const generatedAt = new Date().toLocaleString("ko-KR", { timeZone: "Asia/Seoul" });
   const html = renderReviewPage({
@@ -80,7 +82,7 @@ export async function convertToReview(
       termName,
       sourceFileName: fileName,
       lectureCount: converted.lectures.length,
-      issueCount: issues.length,
+      issueCount: blocking.length,
       createdAt: new Date().toISOString(),
     },
   });
@@ -89,7 +91,8 @@ export async function convertToReview(
     token,
     reviewUrl: buildReviewUrl(token),
     lectureCount: converted.lectures.length,
-    issueCount: issues.length,
+    blockingCount: blocking.length,
+    emptyValueCount: issues.length - blocking.length,
     parseFailureCount: converted.issues.length,
     withoutTimeCount: converted.lectures.filter((l) => l.lecture_infos.length === 0).length,
   };
@@ -104,7 +107,7 @@ export function buildResultBlocks(
   target: ConversionTarget,
   requesterId: string,
 ): KnownBlock[] {
-  const warn = outcome.issueCount > 0 || outcome.parseFailureCount > 0;
+  const warn = outcome.blockingCount > 0 || outcome.parseFailureCount > 0;
 
   const lines = [
     `*${target.year} ${target.termName}* 변환 완료`,
@@ -113,8 +116,12 @@ export function buildResultBlocks(
   if (outcome.parseFailureCount > 0) {
     lines.push(`:warning: 강의시간 해석 실패 *${outcome.parseFailureCount}건*`);
   }
-  if (outcome.issueCount > 0) {
-    lines.push(`:warning: 어드민 API가 거절할 수 있는 항목 *${outcome.issueCount}건*`);
+  if (outcome.blockingCount > 0) {
+    lines.push(`:warning: 반영을 막는 항목 *${outcome.blockingCount}건*`);
+  }
+  if (outcome.emptyValueCount > 0) {
+    // 반영은 되지만 원본이 비어 있다는 사실은 알고 넘어가야 한다.
+    lines.push(`엑셀에 값이 없는 항목 ${outcome.emptyValueCount}건 (빈 값으로 반영)`);
   }
 
   return [
