@@ -40,41 +40,16 @@ export interface BusConversion {
   provenance: Record<string, unknown>;
   warnings: unknown[];
 }
-export type JobState =
-  | "START_PENDING"
-  | "CONVERTING"
-  | "REVIEW_PENDING"
-  | "PUBLISHING"
-  | "VERSION_SCHEDULED"
-  | "COMPLETED"
-  | "REVISION_REQUESTED"
-  | "FAILED"
-  | "CANCELLED";
-export interface BusJob {
-  id: string;
-  domain: "BUS";
-  article_id: string;
-  article_url: string;
-  article_title: string;
-  attachment_url: string;
-  source_hash: string;
-  source_file_name?: string;
-  requester_id?: string;
-  state: JobState;
-  state_version: number;
-  payload_hash?: string;
-  conversions?: BusConversion[];
-  review_url?: string;
-  /** 검수 페이지 토큰. 수정 반영 때 같은 링크에 덮어쓰기 위해 남긴다. */
-  review_token?: string;
-  revision_note?: string;
-  version_schedules?: Array<{
-    version_update: BusVersionUpdate;
-    scheduled_at: string;
-    completed_at?: string;
-  }>;
-  slack?: { channel: string; ts: string };
-  error?: string;
-  created_at: string;
-  updated_at: string;
+
+/**
+ * 검토 페이지의 "전체 노선" 타일과 저장된 메타(`BusReviewMeta.routeCount`)가
+ * 항상 같은 수를 보여줘야 한다. 각자 세면 언젠가 갈라진다.
+ */
+export function totalRouteCount(conversions: BusConversion[]): number {
+  return conversions.reduce(
+    (count, conversion) =>
+      count +
+      conversion.payloads.reduce((pc, payload) => pc + Object.values(payload.body)[0].length, 0),
+    0,
+  );
 }

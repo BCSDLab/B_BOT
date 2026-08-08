@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { renderBusReviewHtml } from "~/services/bus/review";
+import { renderBusReviewHtml } from "~/services/bus/reviewHtml";
 
 const conversion = {
   payloads: [{

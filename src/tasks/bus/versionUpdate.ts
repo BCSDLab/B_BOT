@@ -1,5 +1,5 @@
 import { WebClient } from "@slack/web-api";
-import { runDueVersionUpdates } from "~/services/bus/workflow";
+import { runDueBusVersionUpdates } from "~/services/bus/versionSchedule";
 
 let running = false;
 
@@ -15,7 +15,7 @@ export default defineTask({
     running = true;
     const client = new WebClient(import.meta.env.SLACK_BOT_TOKEN);
     try {
-      await runDueVersionUpdates(client);
+      await runDueBusVersionUpdates(client);
       return { result: "ok" };
     } catch (error) {
       return {

@@ -1,4 +1,4 @@
-import type { BusConversion, BusRoute } from "./types";
+import { totalRouteCount, type BusConversion, type BusRoute } from "./types";
 
 const esc = (value: unknown) =>
   String(value ?? "").replace(/[&<>\"']/g, (character) =>
@@ -64,9 +64,7 @@ function routeHtml(
 
 /** Human review page: route stops and every trip time only; payload JSON remains separate. */
 export function renderBusReviewHtml(id: string, conversions: BusConversion[]) {
-  const totalRoutes = conversions.reduce((count, conversion) => count + conversion.payloads.reduce(
-    (payloadCount, payload) => payloadCount + Object.values(payload.body)[0].length, 0,
-  ), 0);
+  const totalRoutes = totalRouteCount(conversions);
   let totalIssueRoutes = 0;
   let totalNoDaysRoutes = 0;
   const groups = conversions.map((conversion) => {

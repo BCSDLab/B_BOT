@@ -34,13 +34,14 @@ export function findExcelFile(files: SlackFile[] | undefined): SlackFile | null 
   );
 }
 
-/** 버스 시간표처럼 xls/xlsx/csv를 모두 받는 경우. findExcelFile은 xlsx 전용이다. */
+/**
+ * 버스 시간표처럼 xls/xlsx를 모두 받는 경우. findExcelFile은 xlsx 전용이다.
+ * csv는 결정론적 파서가 시트 구조를 요구해 받지 않는다.
+ */
 export function findSpreadsheetFile(files: SlackFile[] | undefined): SlackFile | null {
   return (
     files?.find((file) =>
-      [".xls", ".xlsx", ".csv"].some((extension) =>
-        file.name?.toLowerCase().endsWith(extension),
-      ),
+      [".xls", ".xlsx"].some((extension) => file.name?.toLowerCase().endsWith(extension)),
     ) ?? null
   );
 }
@@ -109,8 +110,8 @@ export async function downloadSlackFile(file: SlackFile): Promise<ArrayBuffer> {
 }
 
 /**
- * xls/xlsx/csv를 모두 받는다. xlsx는 zip이라 PK로 시작하므로 여기서도 검사한다.
- * xls(BIFF)·csv는 매직 바이트 규칙이 달라 이름만으로 구분한다.
+ * xls/xlsx를 모두 받는다. xlsx는 zip이라 PK로 시작하므로 여기서도 검사한다.
+ * xls(BIFF)는 매직 바이트 규칙이 달라 이름만으로 구분한다.
  */
 export async function downloadSlackSpreadsheet(file: SlackFile): Promise<Buffer> {
   const buffer = await download(file);
