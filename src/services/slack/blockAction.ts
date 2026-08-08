@@ -35,6 +35,10 @@ import {
   handleBusPatchAction,
 } from "./busAction";
 import {
+  BUS_DETECTED_ACTION_IDS,
+  handleBusDetectedAction,
+} from "./busDetectedAction";
+import {
   COOP_DETECTED_ACTION_IDS,
   handleCoopDetectedAction,
 } from "./coopDetectedAction";
@@ -63,6 +67,12 @@ const busPatchAction = (actionId: string): BlockActionSetting => ({
   actionId,
   async handler({ client, body, action }) {
     await handleBusPatchAction(client, body, action);
+  },
+});
+const busDetectedAction = (actionId: string): BlockActionSetting => ({
+  actionId,
+  async handler({ client, body, action }) {
+    await handleBusDetectedAction(client, body, action);
   },
 });
 const coopDetectedAction = (actionId: string): BlockActionSetting => ({
@@ -792,4 +802,5 @@ export const blockActions: BlockActionSetting[] = [
   },
   ...BUS_APPLY_ACTION_IDS.map(busApplyAction),
   ...BUS_PATCH_ACTION_IDS.map(busPatchAction),
+  ...BUS_DETECTED_ACTION_IDS.map(busDetectedAction),
 ];
