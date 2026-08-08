@@ -63,7 +63,12 @@ function restaurantSchedule(hours: AdminOperationHour[]): string {
   return `<div class="schedule-table"><table>
     <thead><tr><th>시간</th>${days.map((day) => `<th>${day}</th>`).join("")}</tr></thead>
     <tbody>${types.map((type) => `<tr><th>${escapeHtml(type)}</th>${days.map((day) => {
-      const hour = hours.find((item) => item.type === type && item.day_of_week === day);
+      const hour = hours.find((item) => item.type === type && item.day_of_week === day)
+        ?? hours.find((item) =>
+          !item.type
+          && item.day_of_week === day
+          && item.open_time === item.close_time
+          && !/^\d{1,2}:\d{2}$/.test(item.open_time));
       return `<td${hour && !/^\d/.test(hour.open_time) ? ' class="state"' : ""}>${hour ? escapeHtml(displayHour(hour)) : "-"}</td>`;
     }).join("")}</tr>`).join("")}</tbody>
   </table></div>`;
