@@ -114,7 +114,12 @@ const PATCH_SCHEMA = {
             ],
             description: "무엇을 바꿀지. arrival_time은 특정 회차·정류장의 도착 시각, period는 적용 기간.",
           },
-          trip: { type: "string", description: "회차 이름(1회, 목·금 추가1 등). 해당 없으면 빈 문자열." },
+          trip: {
+            type: "string",
+            description:
+              "회차 이름(1회, 목·금 추가1 등). 해당 없으면 빈 문자열. " +
+              "'1회부터 7회까지'/'1~7회'처럼 회차 범위면 여러 patch로 나누지 말고 원문 그대로 여기 적는다 — 실제 회차와 맞는지는 코드가 확인해서 알아서 펼친다.",
+          },
           stop: { type: "string", description: "정류장 이름. 해당 없으면 빈 문자열." },
           value: {
             type: "string",
@@ -148,7 +153,9 @@ const SYSTEM_PROMPT = `너는 버스 시간표 수정 요청을 구조화하는 
 {{ROUTES}}
 
 - 값을 지어내지 마라. 사용자가 말하지 않은 건 바꾸지 않는다.
-- 한 문장에 여러 노선·항목이 있으면 각각 따로 적는다.
+- 한 문장에 여러 노선·항목이 있으면 각각 따로 적는다. 단, 같은 노선의 회차 범위
+  ("1회부터 7회까지", "1~7회" 등)는 여러 항목으로 쪼개지 마라 — patch 하나로 두고
+  trip에 범위 텍스트 그대로 적는다.
 - 무슨 뜻인지 애매하면 patches에 넣지 말고 unclear에 적어라. 추측해서 바꾸면 되돌릴 방법이 없다.
 - 도착시각은 HH:MM 또는 마커(도착/정차/하차/미정차/하차/승하차/종점)로 적는다.
 - 적용 기간은 YYYY-MM-DD~YYYY-MM-DD 형태 그대로 적는다.
@@ -604,6 +611,104 @@ export function resolvePatch(
   return null;
 }
 
+const TRIP_RANGE = /(\d+)\s*(?:회차?)?\s*(?:~|-|부터)\s*(\d+)\s*회차?/;
+
+/** "1회부터 7회까지" / "1~7회" / "1회 ~ 7회까지" 같은 회차 범위 표현에서 시작·끝 번호를 뽑는다. */
+function parseTripRange(text: string): [number, number] | undefined {
+  const match = clean(text).match(TRIP_RANGE);
+  if (!match) return undefined;
+  const from = Number(match[1]);
+  const to = Number(match[2]);
+  if (!Number.isFinite(from) || !Number.isFinite(to) || from > to) return undefined;
+  return [from, to];
+}
+
+/**
+ * region+direction+route 힌트만으로 노선을 하나 찾는다. `resolvePatch`가 field별로
+ * 하는 것과 같은 학기 판단·모호성 검사를 회차 범위 전개 전에 한 번 더 해야 해서
+ * 뽑아뒀다 — route를 찾아야 그 노선에 실제로 있는 회차 목록을 알 수 있다.
+ */
+function findSingleRoute(
+  raw: RawPatch,
+  conversions: BusConversion[],
+  problems: string[],
+): BusRoute | undefined {
+  const explicitSemester = semesterOfTitle(raw.semester);
+  const explicitMatches = explicitSemester ? conversionsBySemester(conversions, explicitSemester) : [];
+  const searchSpace = explicitMatches.length > 0 ? explicitMatches : conversions;
+  const hints = { region: raw.region, direction: raw.direction, route: raw.route };
+  const matches = searchSpace.flatMap((conversion) =>
+    routeCandidates(conversion, hints).map((candidate) => ({ conversion, ...candidate })),
+  );
+  const label = clean(raw.route) || `${clean(raw.region)} ${clean(raw.direction)}`.trim();
+
+  if (matches.length === 0) {
+    problems.push(`"${label}"에 해당하는 노선을 찾지 못했습니다.`);
+    return undefined;
+  }
+  const bySemester = new Map<SemesterType, typeof matches>();
+  for (const match of matches) {
+    const semesterType = match.payload.semester_type as SemesterType;
+    bySemester.set(semesterType, [...(bySemester.get(semesterType) ?? []), match]);
+  }
+  if (bySemester.size > 1) {
+    problems.push(
+      `"${label}"이 여러 학기에 걸쳐 있습니다: ${[...bySemester.keys()].map((s) => TITLE_OF[s]).join(", ")}. 학기를 지정해주세요.`,
+    );
+    return undefined;
+  }
+  const [[, candidates]] = bySemester;
+  if (candidates.length > 1) {
+    problems.push(
+      `"${label}"는 여러 노선입니다: ${candidates.map((c) => describeRoute(c.route)).join(", ")}. 방향(등교/하교)까지 지정해주세요.`,
+    );
+    return undefined;
+  }
+  return candidates[0].route;
+}
+
+/**
+ * `resolvePatch`를 감싸서 회차 범위를 전개한다. 스키마상 patch 하나엔 회차 하나만
+ * 담을 수 있어(안 그러면 LLM이 직접 여러 개로 쪼개려다 노선명에 이상한 값을
+ * 채우거나 "확정할 수 없다"며 통째로 포기하는 일이 잦았다) — 범위 텍스트는
+ * 그대로 두게 하고, 실제 회차 목록과의 대조·전개는 여기서 코드가 한다.
+ */
+export function resolvePatches(
+  raw: RawPatch,
+  conversions: BusConversion[],
+  problems: string[],
+): BusPatch[] {
+  const range = raw.trip ? parseTripRange(raw.trip) : undefined;
+  if (!range) {
+    const patch = resolvePatch(raw, conversions, problems);
+    return patch ? [patch] : [];
+  }
+
+  const route = findSingleRoute(raw, conversions, problems);
+  if (!route) return [];
+
+  const [from, to] = range;
+  const tripNames = route.route_info
+    .map((t) => ({ name: t.name, n: Number(clean(t.name).match(/^(\d+)회$/)?.[1]) }))
+    .filter((t) => Number.isFinite(t.n) && t.n >= from && t.n <= to)
+    .map((t) => t.name);
+
+  if (tripNames.length === 0) {
+    problems.push(
+      `${describeRoute(route)}: ${from}회~${to}회에 해당하는 회차를 찾지 못했습니다. ` +
+        `(가능한 회차: ${route.route_info.map((t) => t.name).join(", ")})`,
+    );
+    return [];
+  }
+
+  const resolved: BusPatch[] = [];
+  for (const tripName of tripNames) {
+    const patch = resolvePatch({ ...raw, trip: tripName }, conversions, problems);
+    if (patch) resolved.push(patch);
+  }
+  return resolved;
+}
+
 /** 실제 존재하는 노선 목록을 "지역 방향 노선명" 형태로 정리한다. 중복은 제거한다. */
 export function buildRouteList(conversions: BusConversion[]): string {
   const names = new Set<string>();
@@ -642,8 +747,7 @@ export async function planBusPatches(
   const problems = raw.unclear.map((line) => `무슨 뜻인지 확실하지 않아 넘겼습니다: ${line}`);
   const patches: BusPatch[] = [];
   for (const item of raw.patches) {
-    const patch = resolvePatch(item, conversions, problems);
-    if (patch) patches.push(patch);
+    patches.push(...resolvePatches(item, conversions, problems));
   }
   return { patches, problems };
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { hasLlmCredentials } from "~/services/lecture/llm";
-import { applyBusPatchesToConversions, buildRouteList, planBusPatches, resolvePatch, type RawPatch } from "~/services/bus/patch";
+import { applyBusPatchesToConversions, buildRouteList, planBusPatches, resolvePatch, resolvePatches, type RawPatch } from "~/services/bus/patch";
 import type { BusConversion, BusRoute } from "~/services/bus/types";
 import { validateConversion } from "~/services/bus/validation";
 
@@ -611,6 +611,128 @@ describe("버스 수정 요청 해석 (LLM 없이 코드 가드)", () => {
 
     expect(problems).toHaveLength(0);
     expect(patch?.semester).toBe("VACATION");
+  });
+});
+
+describe("resolvePatches (회차 범위 전개)", () => {
+  const shuttleWithSevenTrips = () =>
+    conversion({
+      payloads: [
+        {
+          target: "shuttle",
+          semester_type: "REGULAR",
+          body: {
+            shuttle_bus_timetables: [
+              route({
+                route_type: "셔틀",
+                route_name: "천안 셔틀",
+                route_info: Array.from({ length: 7 }, (_, i) => ({
+                  name: `${i + 1}회`,
+                  arrival_time: ["08:00"],
+                })),
+              }),
+            ],
+          },
+        },
+      ],
+    });
+
+  // 실제로 겪은 버그: "1회부터 7회까지"/"1회~7회" 같은 회차 범위를 LLM이 스스로
+  // 여러 patch로 쪼개려다 노선명에 이상한 값을 채우거나("천안 셔틀 천안 셔틀")
+  // "확정할 수 없다"며 통째로 포기했다. 이제 범위 텍스트를 trip에 그대로 받아
+  // 코드가 실제 회차 목록과 대조해서 펼친다.
+  it("'1회부터 7회까지'를 실제 회차 7개로 펼친다", () => {
+    const problems: string[] = [];
+    const patches = resolvePatches(
+      {
+        semester: "정규학기",
+        region: "천안",
+        direction: "셔틀",
+        route: "천안 셔틀",
+        field: "running_days",
+        trip: "1회부터 7회까지",
+        stop: "",
+        value: "",
+        days: "월화수목금",
+      } as RawPatch,
+      [shuttleWithSevenTrips()],
+      problems,
+    );
+
+    expect(problems).toHaveLength(0);
+    expect(patches).toHaveLength(7);
+    expect(patches.map((p) => p.tripName)).toEqual([
+      "1회", "2회", "3회", "4회", "5회", "6회", "7회",
+    ]);
+    expect(patches.every((p) => p.kind === "running_days")).toBe(true);
+  });
+
+  it("'1~7회' 표기도 같은 범위로 해석한다", () => {
+    const problems: string[] = [];
+    const patches = resolvePatches(
+      {
+        semester: "정규학기",
+        region: "천안",
+        direction: "셔틀",
+        route: "천안 셔틀",
+        field: "running_days",
+        trip: "1~7회",
+        stop: "",
+        value: "",
+        days: "월화수목금",
+      } as RawPatch,
+      [shuttleWithSevenTrips()],
+      problems,
+    );
+
+    expect(problems).toHaveLength(0);
+    expect(patches).toHaveLength(7);
+  });
+
+  it("범위에 해당하는 회차가 없으면 가능한 회차를 안내한다", () => {
+    const problems: string[] = [];
+    const patches = resolvePatches(
+      {
+        semester: "정규학기",
+        region: "천안",
+        direction: "셔틀",
+        route: "천안 셔틀",
+        field: "running_days",
+        trip: "10회부터 12회까지",
+        stop: "",
+        value: "",
+        days: "월화수목금",
+      } as RawPatch,
+      [shuttleWithSevenTrips()],
+      problems,
+    );
+
+    expect(patches).toHaveLength(0);
+    expect(problems.join(" ")).toMatch(/가능한 회차/);
+  });
+
+  it("범위가 아닌 일반 요청은 그대로 단일 patch로 처리한다", () => {
+    const problems: string[] = [];
+    const patches = resolvePatches(
+      {
+        semester: "정규학기",
+        region: "천안",
+        direction: "등교",
+        route: "천안역",
+        field: "arrival_time",
+        trip: "1회",
+        stop: "터미널",
+        value: "08:05",
+        days: "",
+        newStop: "",
+        referenceStop: "",
+        position: "",
+      } as RawPatch,
+      [conversion()],
+      problems,
+    );
+    expect(patches).toHaveLength(1);
+    expect(problems).toHaveLength(0);
   });
 });
 
