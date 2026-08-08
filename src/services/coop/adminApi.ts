@@ -1,4 +1,5 @@
 import type { AdminUpdateSemesterRequest } from "./types";
+import { normalizeMealType } from "./convert";
 
 export interface CoopAdminAuth {
   baseUrl: string;
@@ -35,6 +36,22 @@ const headers = (accessToken: string) => ({
 });
 
 const apiUrl = (baseUrl: string, path: string) => `${baseUrl.replace(/\/$/, "")}${path}`;
+
+/** 기존 검수 데이터까지 포함해 Admin API에는 표준 식사 타입만 전송한다. */
+export function normalizeCoopTimetableRequest(
+  request: AdminUpdateSemesterRequest,
+): AdminUpdateSemesterRequest {
+  return {
+    coop_shops: request.coop_shops.map((shop) => ({
+      ...shop,
+      coop_shop_info: { ...shop.coop_shop_info },
+      operation_hours: shop.operation_hours.map((hour) => ({
+        ...hour,
+        ...(hour.type ? { type: normalizeMealType(hour.type) } : {}),
+      })),
+    })),
+  };
+}
 
 async function errorBody(response: Response): Promise<string> {
   return (await response.text().catch(() => "")).slice(0, 300);
@@ -99,12 +116,13 @@ export async function updateCoopTimetable(
   request: AdminUpdateSemesterRequest,
   auth: CoopAdminAuth,
 ): Promise<void> {
+  const normalized = normalizeCoopTimetableRequest(request);
   const response = await fetch(
     apiUrl(auth.baseUrl, `/admin/coopshop/timetable/${semesterId}`),
     {
       method: "PUT",
       headers: headers(auth.accessToken),
-      body: JSON.stringify(request),
+      body: JSON.stringify(normalized),
     },
   );
 
