@@ -1,4 +1,10 @@
-import { ClassTimeParseError, parsePeriodFormat, parseRangeFormat } from "./classTime";
+import {
+  ClassTimeParseError,
+  normalizePeriodInput,
+  normalizeRangeInput,
+  parsePeriodFormat,
+  parseRangeFormat,
+} from "./classTime";
 import { describeClassTime } from "./describeTime";
 import { generateStructured } from "./llm";
 import type { Lecture, TimeFormat } from "./types";
@@ -143,11 +149,17 @@ export async function planPatches(
     const where = `${lecture.code} ${lecture.lecture_class} ${lecture.name}`;
 
     if (item.field === "class_time") {
+      // 사람이 말한 형태를 엑셀 표기로 맞춘 뒤 파싱한다.
+      const normalized =
+        timeFormat === "period"
+          ? normalizePeriodInput(item.value, lecture.raw_class_time)
+          : normalizeRangeInput(item.value);
+
       try {
         const parsed =
           timeFormat === "period"
-            ? parsePeriodFormat(item.value)
-            : parseRangeFormat(item.value, SEASONAL_DAYS);
+            ? parsePeriodFormat(normalized)
+            : parseRangeFormat(normalized, SEASONAL_DAYS);
         patches.push({
           lecture,
           field: item.field,
@@ -155,13 +167,20 @@ export async function planPatches(
           before: describeClassTime(lecture.lecture_infos),
           after: describeClassTime(parsed),
           parsed,
-          rawValue: item.value,
+          rawValue: normalized,
         });
       } catch (error) {
+        // 무엇을 어떻게 써야 하는지 현재 값으로 보여준다.
         problems.push(
-          `${where}: 강의시간 "${item.value}"를 해석하지 못했습니다. ${
-            error instanceof ClassTimeParseError ? error.message : ""
-          }`.trim(),
+          [
+            `${where}: 강의시간 "${item.value}"를 해석하지 못했습니다.`,
+            error instanceof ClassTimeParseError ? error.message : "",
+            timeFormat === "period"
+              ? `현재 값은 \`${lecture.raw_class_time}\` 형태입니다. 요일과 교시를 함께 적어주세요.`
+              : "`09:00~12:00` 형태로 적어주세요.",
+          ]
+            .filter(Boolean)
+            .join(" "),
         );
       }
       continue;

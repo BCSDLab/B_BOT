@@ -134,3 +134,62 @@ export function parseRangeFormat(raw: string, days: number[]): LectureInfo[] {
   // 하루 두 구간인 강의는 요일별로 모아야 프로덕션 저장 순서와 맞는다.
   return infos.sort((a, b) => a.start_time - b.start_time);
 }
+
+const DAY_CHARS = "월화수목금토일";
+/** `9`, `09A`, `9~10`, `월9A~10B` 등 사람이 말하는 여러 형태. */
+const LOOSE_PERIOD = /^(\d{1,2})([AB])?(?:~(\d{1,2})([AB])?)?$/i;
+
+/**
+ * 사람이 말한 강의시간을 엑셀 표기로 맞춘다.
+ *
+ * 사람은 "9~10"이라고 하지 엑셀처럼 `수09A~10B`라고 하지 않는다.
+ * 빠진 부분은 규칙으로 채운다 — 요일은 원래 값에서, A/B는 교시 전체로.
+ * 결과는 적용 전에 변경 전/후로 보여주므로 사람이 확인할 수 있다.
+ */
+export function normalizePeriodInput(value: string, current: string): string {
+  const cleaned = value.replace(/\s+/g, "").replace(/교시/g, "");
+  const inheritedDay = current.match(new RegExp(`[${DAY_CHARS}]`))?.[0];
+
+  return cleaned
+    .split(",")
+    .map((token, index) => {
+      const dayMatch = new RegExp(`^([${DAY_CHARS}])`).exec(token);
+      // 요일을 말하지 않았으면 원래 값의 요일을 그대로 쓴다.
+      const day = dayMatch?.[1] ?? (index === 0 ? inheritedDay : undefined);
+      const matched = LOOSE_PERIOD.exec(dayMatch ? token.slice(1) : token);
+      if (!matched || !day) {
+        return token;
+      }
+
+      const [, start, startHalf, end, endHalf] = matched;
+      const head = `${start.padStart(2, "0")}${(startHalf ?? "A").toUpperCase()}`;
+      // `9A`처럼 반쪽을 콕 집었으면 그대로 두고, `9`라고만 했으면 9교시 전체로 본다.
+      const tail = end
+        ? `${end.padStart(2, "0")}${(endHalf ?? "B").toUpperCase()}`
+        : startHalf
+          ? null
+          : `${start.padStart(2, "0")}B`;
+
+      return `${day}${head}${tail ? `~${tail}` : ""}`;
+    })
+    .join(",");
+}
+
+/** 계절학기는 시각이라 `9~12`를 `09:00~12:00`으로 맞춘다. */
+export function normalizeRangeInput(value: string): string {
+  return value
+    .replace(/\s+/g, "")
+    .replace(/시/g, "")
+    .split("/")
+    .map((range) =>
+      range
+        .split(/[~\-–—]/)
+        .map((part) =>
+          /^\d{1,2}$/.test(part)
+            ? `${part.padStart(2, "0")}:00`
+            : part.replace(/^(\d):/, "0$1:"),
+        )
+        .join("~"),
+    )
+    .join("/");
+}
