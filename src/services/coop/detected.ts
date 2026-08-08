@@ -74,6 +74,16 @@ export function collectCoopImages(
 export function guessRegularCoopSemester(
   title: string,
 ): { year: number; termName: "1학기" | "2학기" } | null {
+  if (/(?:하계|동계)\s*방학|여름\s*학기|겨울\s*학기|계절\s*학기/.test(title)) {
+    return null;
+  }
+  const academicYear = /(20\d{2})\s*학년도.*?([12])\s*학기/.exec(title);
+  if (academicYear) {
+    return {
+      year: Number(academicYear[1]),
+      termName: `${academicYear[2]}학기` as "1학기" | "2학기",
+    };
+  }
   const semester = normalizeSemester(title);
   const matched = /^(\d{2})-([12])학기$/.exec(semester ?? "");
   if (!matched) return null;

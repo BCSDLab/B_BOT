@@ -38,6 +38,8 @@ describe("생협 공지 정규학기 판별", () => {
       .toEqual({ year: 2026, termName: "1학기" });
     expect(guessRegularCoopSemester("2026-2학기 생협 운영시간 안내"))
       .toEqual({ year: 2026, termName: "2학기" });
+    expect(guessRegularCoopSemester("2026학년도 1학기 생협 운영시간 안내"))
+      .toEqual({ year: 2026, termName: "1학기" });
   });
 
   it("계절학기·방학과 학기 없는 제목은 거절한다", () => {
