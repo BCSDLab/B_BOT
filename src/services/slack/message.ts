@@ -5,6 +5,7 @@ import CHANNEL_ID from "@/constant/CHANNEL_ID.json";
 import BASE_URL from "@/constant/BASE_URL.json";
 import { messages as googleMeetMessages } from "./domain/googleMeet";
 import { messages as lectureMessages } from "./domain/lecture";
+import { messages as coopMessages } from "./domain/coop";
 import { answerStream, logQuery } from "~/services/rag";
 
 
@@ -682,6 +683,7 @@ interface RepliesResponse {
   },
   ...googleMeetMessages,
   ...lectureMessages,
+  ...coopMessages,
 ];
 
 interface Shop {

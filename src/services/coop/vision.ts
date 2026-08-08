@@ -1,4 +1,4 @@
-import regularPrompt from "./prompts/regular-timetable.md?raw";
+import regularPrompt from "./prompts/regular-timetable";
 import { generateCoopStructured } from "./llm";
 import type { RawRegularCoopTimetable } from "./types";
 import type { StructuredImageMimeType } from "~/helper/adapter/structured";
