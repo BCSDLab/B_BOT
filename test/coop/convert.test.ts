@@ -120,16 +120,13 @@ describe("방학 학기 분리", () => {
   });
 
   it("긴급 민원 안내 행은 두 학기의 매장 및 확인 필요 항목에서 제외한다", () => {
-    const notice = {
-      groupLabel: "대학 시설 관련 긴급 민원",
-      shopLabel: "대학 기계실",
-      phone: "560-1266~7",
-      remark: "",
-      operationHours: [],
-    };
+    const notices = [
+      { groupLabel: "대학 시설 관련 긴급 민원", shopLabel: "", phone: "560-1266~7", remark: "", operationHours: [] },
+      { groupLabel: "", shopLabel: "기계실", phone: "560-1266~7", remark: "", operationHours: [] },
+    ];
     const result = convertVacationTimetable({
       ...vacationRaw,
-      shops: [...vacationRaw.shops, notice],
+      shops: [...vacationRaw.shops, ...notices],
     }, baseline, "2026-07-18");
 
     for (const period of [result.seasonal, result.vacation]) {

@@ -144,7 +144,7 @@ function isSecondCampus(shop: RawCoopShop): boolean {
 
 function isNonShopNotice(shop: RawCoopShop): boolean {
   const label = clean(`${shop.groupLabel} ${shop.shopLabel}`);
-  return label.includes("대학시설관련긴급민원") || label.includes("대학기계실");
+  return label.includes("긴급민원") || label.includes("기계실");
 }
 
 function canonicalName(shop: RawCoopShop): string | null {
