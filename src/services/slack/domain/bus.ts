@@ -75,7 +75,7 @@ export const messages: MessageSetting[] = [
 
       try {
         const bytes = await downloadSlackSpreadsheet(file);
-        const job = await registerBusAttachment(file, bytes);
+        const job = await registerBusAttachment(file, bytes, user);
         if (!job) throw new Error("반영 작업을 생성하지 못했습니다.");
 
         await client.chat.update({

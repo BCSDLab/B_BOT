@@ -26,7 +26,7 @@ describe("버스 Slack 알림", () => {
       expect.objectContaining({
         channel: "C1",
         thread_ts: "111.222",
-        text: "버스 시간표 검수 요청",
+        text: "버스 시간표 검수",
       }),
     );
   });

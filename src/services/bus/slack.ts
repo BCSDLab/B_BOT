@@ -11,7 +11,7 @@ export async function sendReviewApproval(
     channel,
     // `!버스반영` 스레드 안에서 승인 흐름이 끝나도록 같은 스레드에 잇는다.
     ...(job.slack?.ts ? { thread_ts: job.slack.ts } : {}),
-    text: "버스 시간표 검수 요청",
+    text: "버스 시간표 검수",
     blocks: buildReviewApprovalBlocks(job),
   });
 }

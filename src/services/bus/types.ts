@@ -58,6 +58,8 @@ export interface BusJob {
   article_title: string;
   attachment_url: string;
   source_hash: string;
+  source_file_name?: string;
+  requester_id?: string;
   state: JobState;
   state_version: number;
   payload_hash?: string;

@@ -7,6 +7,7 @@ import { registerCandidate } from "./workflow";
 export async function registerBusAttachment(
   file: SlackFile,
   bytes: Buffer,
+  requesterId?: string,
 ): Promise<BusJob | undefined> {
   const url = file.url_private_download ?? file.url_private;
   if (!url || !/^https:\/\/files\.slack\.com\//.test(url)) {
@@ -27,5 +28,7 @@ export async function registerBusAttachment(
     article_title: "버스 시간표 반영",
     attachment_url: url,
     source_hash: sourceHash,
+    source_file_name: file.name,
+    requester_id: requesterId,
   });
 }

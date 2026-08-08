@@ -19,40 +19,92 @@ export const busActionValue = (
     payload_hash: payloadHash,
   });
 
-/** 검수 요청 알림 블록. 승인과 수정 요청 버튼을 실어 보낸다. */
+/** 검수 요청 알림 블록. 생협과 동일한 깔끔한 스타일. */
 export function buildReviewApprovalBlocks(job: BusJob): KnownBlock[] {
-  const warningCount =
+  const totalRoutes =
     job.conversions?.reduce(
-      (count, conversion) => count + conversion.warnings.length,
+      (count, conversion) => count + conversion.payloads.reduce(
+        (pc, payload) => pc + Object.values(payload.body)[0].length, 0,
+      ),
       0,
     ) ?? 0;
-  return [
+  const issueRoutes =
+    job.conversions?.reduce((count, conversion) => {
+      const warnings = conversion.warnings.map((w) =>
+        typeof w === "string" ? w : JSON.stringify(w),
+      );
+      return count + conversion.payloads.reduce((pc, payload) => {
+        const routes = Object.values(payload.body)[0] ?? [];
+        return pc + routes.filter((route) =>
+          warnings.some((warning) => {
+            const text = String(warning);
+            return (
+              text.startsWith(`${route.region} ${route.route_type}`) ||
+              text.includes(`${route.region} ${route.route_name}`)
+            );
+          }),
+        ).length;
+      }, 0);
+    }, 0) ?? 0;
+  const title = job.conversions?.[0]?.version_update?.title ?? "버스 시간표";
+  const lines = [
+    `*${title} 버스 시간표* 변환 완료`,
+    `반영 대상 *${totalRoutes}개*`,
+  ];
+  if (issueRoutes > 0) {
+    lines.push(`:warning: 확인이 필요한 항목 *${issueRoutes}건*`);
+  }
+  const blocks: KnownBlock[] = [
     {
       type: "section",
-      text: {
-        type: "mrkdwn",
-        text: `*버스 시간표 검수 요청*\nWarnings: ${warningCount}\n${job.review_url ? `<${job.review_url}|검수 HTML>` : "검수 HTML은 artifact 저장소에서 확인"}`,
-      },
+      text: { type: "mrkdwn", text: lines.join("\n") },
     },
     {
       type: "actions",
       elements: [
+        ...(job.review_url
+          ? [{
+              type: "button" as const,
+              text: { type: "plain_text" as const, text: "검토 페이지 열기", emoji: true },
+              url: job.review_url,
+              action_id: "bus:review_link",
+            }]
+          : []),
         {
-          type: "button",
+          type: "button" as const,
           action_id: "bus:approve",
-          text: { type: "plain_text", text: "검수 승인" },
-          style: "primary",
+          text: { type: "plain_text" as const, text: "승인" },
+          style: "primary" as const,
           value: busActionValue(job, job.payload_hash),
         },
         {
-          type: "button",
+          type: "button" as const,
           action_id: "bus:revision",
-          text: { type: "plain_text", text: "수정 요청" },
+          text: { type: "plain_text" as const, text: "수정 요청" },
           value: busActionValue(job),
         },
       ],
     },
+    {
+      type: "section",
+      text: {
+        type: "mrkdwn",
+        text: [
+          "*잘못 추출된 값은 이 스레드에서 `!수정`으로 고칠 수 있습니다.*",
+          "예) `!수정 천안역 1회 터미널 시간을 08:05로 바꿔줘`",
+          "예) `!수정 천안역 1회 운행요일을 월수금으로 바꿔줘`",
+        ].join("\n"),
+      },
+    },
   ];
+  const footer =
+    `${job.source_file_name ?? "버스 시간표 파일"} · 검토 링크는 7일 후 만료됩니다` +
+    (job.requester_id ? ` · 요청: <@${job.requester_id}>` : "");
+  blocks.push({
+    type: "context",
+    elements: [{ type: "mrkdwn", text: footer }],
+  });
+  return blocks;
 }
 
 const patchLine = (patch: BusPatchPlan["patches"][number]) => {
