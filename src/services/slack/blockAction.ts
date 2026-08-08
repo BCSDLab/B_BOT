@@ -1,6 +1,13 @@
-import { submitLectures } from "~/services/lecture/adminApi";
+import { buildAdminRequest, ensureSemester, submitLectures, toAdminTerm } from "~/services/lecture/adminApi";
 import { getKoinAdminAuth } from "~/services/lecture/koinAuth";
-import { loadReview } from "~/services/lecture/reviewStore";
+import { applyPatches } from "~/services/lecture/patch";
+import { buildStoredReview } from "~/services/lecture/pipeline";
+import {
+  dropPatchPlan,
+  loadPatchPlan,
+  loadReview,
+  updateReview,
+} from "~/services/lecture/reviewStore";
 import type { BlockActionSetting } from "./type";
 
 /** 여러 명이 동시에 눌러 두 번 반영되는 걸 막는다. 되돌릴 API가 없어 특히 조심해야 한다. */
@@ -10,6 +17,78 @@ const applying = new Set<string>();
 // 등록하지 않은 action_id는 라우터에서 무시된다. 모달 안의 select와 URL 링크 버튼도
 // block_actions로 들어오는데, 그것들은 여기서 처리할 대상이 아니기 때문이다.
 export const blockActions: BlockActionSetting[] = [
+  {
+    actionId: "lecture:patch_apply",
+    async handler({ client, body, action }) {
+      if (action.type !== "button" || !body.channel) return;
+
+      const { patchToken } = JSON.parse(action.value ?? "{}") as { patchToken?: string };
+      const channel = body.channel.id;
+      const ts = body.message?.ts;
+      const actor = body.user.id;
+      if (!patchToken) return;
+
+      const say = (text: string, blocks: Parameters<typeof updateSlack>[0]["blocks"]) =>
+        updateSlack({ client, channel, ts, text, blocks });
+
+      const plan = await loadPatchPlan(patchToken);
+      if (!plan) {
+        await say("만료됨", [{ type: "section", text: { type: "mrkdwn",
+          text: ":x: 이미 처리했거나 만료된 수정 요청입니다." } }]);
+        return;
+      }
+      // 먼저 지운다. 두 명이 동시에 눌러 두 번 적용되면 안 된다.
+      await dropPatchPlan(patchToken);
+
+      try {
+        const stored = await loadReview(plan.reviewToken);
+        if (!stored) {
+          await say("검토 만료", [{ type: "section", text: { type: "mrkdwn",
+            text: ":x: 검토 링크가 만료됐습니다. 다시 변환해주세요." } }]);
+          return;
+        }
+
+        const patched = applyPatches(stored.lectures, plan.patches);
+        await updateReview(
+          plan.reviewToken,
+          buildStoredReview(patched, stored.timeFormat, {
+            year: stored.meta.year,
+            termName: stored.meta.termName,
+            fileName: stored.meta.sourceFileName,
+          }),
+        );
+
+        await say(`수정 ${plan.patches.length}건 적용`, [
+          { type: "section", text: { type: "mrkdwn",
+            text: `:white_check_mark: *수정 ${plan.patches.length}건 적용*\n검토 페이지를 새로고침하면 반영돼 있습니다.` } },
+          { type: "context", elements: [{ type: "mrkdwn", text: `작업자: <@${actor}>` }] },
+        ]);
+      } catch (error) {
+        await say("수정 실패", [{ type: "section", text: { type: "mrkdwn",
+          text: `:x: *수정 적용 실패*\n${error instanceof Error ? error.message : "알 수 없는 오류입니다"}` } }]);
+      }
+    },
+  },
+  {
+    actionId: "lecture:patch_cancel",
+    async handler({ client, body, action }) {
+      if (action.type !== "button" || !body.channel) return;
+
+      const { patchToken } = JSON.parse(action.value ?? "{}") as { patchToken?: string };
+      if (patchToken) {
+        await dropPatchPlan(patchToken);
+      }
+
+      await updateSlack({
+        client,
+        channel: body.channel.id,
+        ts: body.message?.ts,
+        text: "수정 취소됨",
+        blocks: [{ type: "section", text: { type: "mrkdwn",
+          text: `:no_entry_sign: *수정을 취소했습니다.*\n<@${body.user.id}>` } }],
+      });
+    },
+  },
   {
     actionId: "lecture:apply",
     async handler({ client, body, action }) {
@@ -52,7 +131,17 @@ export const blockActions: BlockActionSetting[] = [
             text: `:hourglass_flowing_sand: *반영 중…* ${stored.meta.lectureCount}건\n작업자: <@${actor}>` } }],
         });
 
-        await submitLectures(stored.request, await getKoinAdminAuth());
+        // 저장된 강의 목록에서 요청을 다시 만든다. 검토 화면이 보여준 것과
+        // 실제로 보내는 값이 갈라지지 않게 하려는 것이다.
+        const { request } = buildAdminRequest(stored.lectures, {
+          year: stored.meta.year,
+          term: toAdminTerm(stored.meta.termName),
+        });
+
+        const auth = await getKoinAdminAuth();
+        // 학기가 없으면 강의 생성이 404로 막힌다. 이미 있으면 서버가 무시한다.
+        await ensureSemester(request, auth);
+        await submitLectures(request, auth);
 
         await updateSlack({
           client, channel, ts,

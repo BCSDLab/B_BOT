@@ -1,5 +1,6 @@
 import { randomBytes } from "node:crypto";
-import type { AdminLectureCreateRequest } from "./adminApi";
+import type { Patch } from "./patch";
+import type { Lecture, TimeFormat } from "./types";
 
 /**
  * 검토 페이지는 로그인 없이 링크만으로 열린다. 슬랙에서 바로 눌러야 하기 때문이다.
@@ -21,11 +22,17 @@ export interface ReviewMeta {
   createdAt: string;
 }
 
-interface StoredReview {
+/**
+ * 강의 목록이 원본이고 HTML은 그걸로 만든 결과다.
+ * 어드민 요청도 반영할 때 목록에서 다시 만든다 — 검토 화면과 실제로 보낼 값이
+ * 갈라지지 않게 하려는 것이다.
+ */
+export interface StoredReview {
   html: string;
+  lectures: Lecture[];
+  /** 수정 요청의 강의시간을 어떤 규칙으로 읽을지. 파일마다 다르다. */
+  timeFormat: TimeFormat;
   meta: ReviewMeta;
-  /** 반영 버튼이 눌렸을 때 그대로 보낼 요청. 버튼 value에 담기엔 커서 여기 둔다. */
-  request: AdminLectureCreateRequest;
 }
 
 export function createReviewToken(): string {
@@ -53,6 +60,10 @@ export function buildReviewUrl(token: string): string {
 }
 
 const key = (token: string) => `lecture-review:${token}`;
+/** 스레드에 답장한 수정 요청이 어느 변환 건인지 찾으려면 필요하다. */
+const threadKey = (channel: string, threadTs: string) => `lecture-thread:${channel}:${threadTs}`;
+/** 적용 버튼을 누를 때까지 들고 있을 수정 계획. 버튼 value에 담기엔 크다. */
+const patchKey = (token: string) => `lecture-patch:${token}`;
 
 export async function saveReview(
   review: StoredReview,
@@ -60,6 +71,11 @@ export async function saveReview(
   const token = createReviewToken();
   await useStorage("kvStorage").setItem(key(token), review);
   return token;
+}
+
+/** 수정을 적용한 뒤 같은 토큰에 덮어쓴다. 링크가 바뀌지 않아 새로고침만 하면 된다. */
+export async function updateReview(token: string, review: StoredReview): Promise<void> {
+  await useStorage("kvStorage").setItem(key(token), review);
 }
 
 export async function loadReview(token: string): Promise<StoredReview | null> {
@@ -75,4 +91,47 @@ export async function loadReview(token: string): Promise<StoredReview | null> {
     return null;
   }
   return stored;
+}
+
+export async function linkThread(channel: string, threadTs: string, token: string): Promise<void> {
+  await useStorage("kvStorage").setItem(threadKey(channel, threadTs), { token });
+}
+
+export async function findTokenByThread(channel: string, threadTs: string): Promise<string | null> {
+  const stored = await useStorage("kvStorage").getItem<{ token: string }>(
+    threadKey(channel, threadTs),
+  );
+  return stored?.token ?? null;
+}
+
+export interface StoredPatchPlan {
+  reviewToken: string;
+  patches: Patch[];
+  createdAt: string;
+}
+
+export async function savePatchPlan(reviewToken: string, patches: Patch[]): Promise<string> {
+  const token = createReviewToken();
+  await useStorage("kvStorage").setItem(patchKey(token), {
+    reviewToken,
+    patches,
+    createdAt: new Date().toISOString(),
+  } satisfies StoredPatchPlan);
+  return token;
+}
+
+export async function loadPatchPlan(token: string): Promise<StoredPatchPlan | null> {
+  if (!isValidToken(token)) {
+    return null;
+  }
+  const stored = await useStorage("kvStorage").getItem<StoredPatchPlan>(patchKey(token));
+  if (!stored || isExpired(stored.createdAt, new Date())) {
+    return null;
+  }
+  return stored;
+}
+
+/** 적용됐거나 취소된 계획은 남겨두지 않는다. 두 번 눌러 두 번 적용되면 안 된다. */
+export async function dropPatchPlan(token: string): Promise<void> {
+  await useStorage("kvStorage").removeItem(patchKey(token));
 }

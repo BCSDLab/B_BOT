@@ -57,6 +57,9 @@ export default defineEventHandler(async (event) => {
   let userId = "";
   let channelId = "";
   let files: SlackFile[] | undefined;
+  // 스레드 답장인지 알아야 어느 변환 건에 대한 수정인지 찾을 수 있다.
+  // 기존 ts는 답장 자신의 ts라 부모를 따로 들고 간다.
+  let parentTs: string | undefined;
 
   if (body.event.subtype === undefined) {
     const eventBody = body.event as GenericMessageEvent;
@@ -69,6 +72,7 @@ export default defineEventHandler(async (event) => {
     channelId = eventBody.channel;
     userId = eventBody.user ?? "";
     threadTs = eventBody.ts ?? eventBody.thread_ts ?? "";
+    parentTs = eventBody.thread_ts;
 
   } else if (body.event.subtype === "file_share") {
     // 엑셀을 올리면서 명령어를 적는 흐름(!강의반영)을 위해 받는다.
@@ -106,6 +110,7 @@ export default defineEventHandler(async (event) => {
     user: userId,
     channel: channelId,
     files,
+    parentTs,
   }).catch(console.error);
 
   return { ok: true };
@@ -148,6 +153,7 @@ async function processMessage({
   user,
   channel,
   files,
+  parentTs,
 }: {
   client: WebClient;
   text: string;
@@ -155,6 +161,7 @@ async function processMessage({
   user: string;
   channel: string;
   files?: SlackFile[];
+  parentTs?: string;
 }) {
   const hasFiles = (files?.length ?? 0) > 0;
 
@@ -183,6 +190,7 @@ async function processMessage({
         user,
         channel,
         files,
+        parentTs,
       });
     } catch (error) {
       console.error('Handler error:', error);

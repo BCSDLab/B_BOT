@@ -1,10 +1,13 @@
 import type { KnownBlock } from "@slack/web-api";
 import { blockingIssues, buildAdminRequest, toAdminTerm } from "./adminApi";
 import { convertRows } from "./convert";
+import type { PatchPlan } from "./patch";
 import { renderReviewPage } from "./reviewHtml";
+import type { StoredReview } from "./reviewStore";
 import { buildReviewUrl, saveReview } from "./reviewStore";
 import { readSheetFromBuffer } from "./sheet";
 import { generateMappingSpec } from "./spec";
+import type { Lecture, TimeFormat } from "./types";
 
 export interface ConversionTarget {
   year: number;
@@ -56,36 +59,18 @@ export async function convertToReview(
     throw new Error("강의를 하나도 읽지 못했습니다. 파일이 편람이 맞는지 확인해주세요.");
   }
 
-  const { request, issues } = buildAdminRequest(converted.lectures, { year, term });
+  const { issues } = buildAdminRequest(converted.lectures, { year, term });
   const blocking = blockingIssues(issues);
 
-  const generatedAt = new Date().toLocaleString("ko-KR", { timeZone: "Asia/Seoul" });
-  const html = renderReviewPage({
-    year,
-    termName,
-    sourceFileName: fileName,
-    generatedAt,
-    lectures: converted.lectures,
-    issues,
-    parseFailures: converted.issues.map((i) => ({
-      row: i.row,
-      value: i.value,
-      message: i.message,
-    })),
-  });
-
-  const token = await saveReview({
-    html,
-    request,
-    meta: {
-      year,
-      termName,
-      sourceFileName: fileName,
-      lectureCount: converted.lectures.length,
-      issueCount: blocking.length,
-      createdAt: new Date().toISOString(),
-    },
-  });
+  const token = await saveReview(
+    buildStoredReview(converted.lectures, spec.timeFormat, { year, termName, fileName }, {
+      parseFailures: converted.issues.map((i) => ({
+        row: i.row,
+        value: i.value,
+        message: i.message,
+      })),
+    }),
+  );
 
   return {
     token,
@@ -161,4 +146,109 @@ export function buildResultBlocks(
       ],
     },
   ];
+}
+
+/**
+ * 강의 목록으로 저장할 형태를 만든다. 수정을 적용한 뒤에도 같은 함수를 쓴다 —
+ * 검토 화면과 실제로 반영할 값이 갈라지지 않게 하려는 것이다.
+ */
+export function buildStoredReview(
+  lectures: Lecture[],
+  timeFormat: TimeFormat,
+  target: ConversionTarget,
+  { parseFailures = [] }: { parseFailures?: { row: number; value: string; message: string }[] } = {},
+): StoredReview {
+  const { issues } = buildAdminRequest(lectures, {
+    year: target.year,
+    term: toAdminTerm(target.termName),
+  });
+
+  const html = renderReviewPage({
+    year: target.year,
+    termName: target.termName,
+    sourceFileName: target.fileName,
+    generatedAt: new Date().toLocaleString("ko-KR", { timeZone: "Asia/Seoul" }),
+    lectures,
+    issues,
+    parseFailures,
+  });
+
+  return {
+    html,
+    lectures,
+    timeFormat,
+    meta: {
+      year: target.year,
+      termName: target.termName,
+      sourceFileName: target.fileName,
+      lectureCount: lectures.length,
+      issueCount: blockingIssues(issues).length,
+      createdAt: new Date().toISOString(),
+    },
+  };
+}
+
+/**
+ * 적용 전 미리보기. 무엇이 무엇으로 바뀌는지 전부 보여준 뒤 한 번 더 누르게 한다.
+ * 되돌릴 API가 없어서, 틀린 수정이 조용히 들어가는 것만은 막아야 한다.
+ */
+export function buildPatchBlocks(
+  plan: PatchPlan,
+  patchToken: string,
+  requesterId: string,
+): KnownBlock[] {
+  const lines = plan.patches.map((patch) => {
+    const where = `${patch.lecture.code} ${patch.lecture.lecture_class} ${patch.lecture.name}`;
+    return [
+      `*${where}* — ${patch.label}`,
+      `  이전: ${patch.before || "(비어 있음)"}`,
+      `  이후: ${patch.after || "(비움)"}`,
+    ].join("\n");
+  });
+
+  const blocks: KnownBlock[] = [
+    {
+      type: "section",
+      text: { type: "mrkdwn", text: `*수정 ${plan.patches.length}건*\n\n${lines.join("\n\n")}` },
+    },
+  ];
+
+  if (plan.problems.length > 0) {
+    blocks.push({
+      type: "section",
+      text: {
+        type: "mrkdwn",
+        text: [":warning: *반영하지 않은 요청*", ...plan.problems.map((p) => `• ${p}`)].join("\n"),
+      },
+    });
+  }
+
+  blocks.push(
+    {
+      type: "actions",
+      elements: [
+        {
+          type: "button",
+          text: { type: "plain_text", text: "수정 적용", emoji: true },
+          style: "primary",
+          action_id: "lecture:patch_apply",
+          value: JSON.stringify({ patchToken, requesterId }),
+        },
+        {
+          type: "button",
+          text: { type: "plain_text", text: "취소", emoji: true },
+          action_id: "lecture:patch_cancel",
+          value: JSON.stringify({ patchToken, requesterId }),
+        },
+      ],
+    },
+    {
+      type: "context",
+      elements: [
+        { type: "mrkdwn", text: `적용하면 검토 페이지가 갱신됩니다. 링크는 그대로입니다.` },
+      ],
+    },
+  );
+
+  return blocks;
 }

@@ -1,4 +1,6 @@
-import { buildResultBlocks, convertToReview } from "~/services/lecture/pipeline";
+import { planPatches } from "~/services/lecture/patch";
+import { buildPatchBlocks, buildResultBlocks, convertToReview } from "~/services/lecture/pipeline";
+import { findTokenByThread, linkThread, loadReview, savePatchPlan } from "~/services/lecture/reviewStore";
 import { downloadSlackFile, findExcelFile } from "~/utils/slackFile";
 import type { MessageSetting } from "../type";
 
@@ -75,6 +77,9 @@ export const messages: MessageSetting[] = [
         const buffer = await downloadSlackFile(excel);
         const outcome = await convertToReview(buffer, target);
 
+        // 이 스레드에 온 수정 요청이 어느 변환 건인지 찾을 수 있게 해둔다.
+        await linkThread(channel, ts, outcome.token);
+
         await client.chat.update({
           channel,
           ts: messageTs,
@@ -107,3 +112,86 @@ export const messages: MessageSetting[] = [
     },
   },
 ];
+
+/**
+ * 검토 중 발견한 수정 사항을 스레드에 자연어로 적으면 받는다.
+ * 명령어 접두사를 두지 않은 건, 이미 그 스레드가 어느 변환 건인지 정해져 있어서다.
+ * 반대로 변환 스레드가 아닌 곳의 대화는 여기까지 오지 않는다.
+ */
+messages.push({
+  regex: /./,
+  async handler({ client, channel, ts, text, user, parentTs }) {
+    if (!parentTs) {
+      return;
+    }
+    const token = await findTokenByThread(channel, parentTs);
+    if (!token) {
+      return;
+    }
+
+    const stored = await loadReview(token);
+    if (!stored) {
+      return;
+    }
+
+    const placeholder = await client.chat.postMessage({
+      channel,
+      thread_ts: parentTs,
+      text: "수정 요청 확인 중",
+      blocks: [
+        { type: "section", text: { type: "mrkdwn", text: ":mag: 수정 요청을 확인하는 중…" } },
+      ],
+    });
+    const messageTs = placeholder.ts as string;
+
+    try {
+      const plan = await planPatches(text, stored.lectures, stored.timeFormat);
+
+      if (plan.patches.length === 0) {
+        await client.chat.update({
+          channel,
+          ts: messageTs,
+          text: "수정할 내용을 찾지 못했습니다",
+          blocks: [
+            {
+              type: "section",
+              text: {
+                type: "mrkdwn",
+                text: [
+                  ":grey_question: *수정할 내용을 찾지 못했습니다.*",
+                  ...plan.problems.map((p) => `• ${p}`),
+                ].join("\n"),
+              },
+            },
+          ],
+        });
+        return;
+      }
+
+      const patchToken = await savePatchPlan(token, plan.patches);
+      await client.chat.update({
+        channel,
+        ts: messageTs,
+        text: `수정 ${plan.patches.length}건 확인`,
+        blocks: buildPatchBlocks(plan, patchToken, user),
+      });
+    } catch (error) {
+      await client.chat.update({
+        channel,
+        ts: messageTs,
+        text: "수정 요청 처리 실패",
+        blocks: [
+          {
+            type: "section",
+            text: {
+              type: "mrkdwn",
+              text: `:x: *수정 요청을 처리하지 못했습니다*\n${
+                error instanceof Error ? error.message : "알 수 없는 오류입니다"
+              }`,
+            },
+          },
+        ],
+      });
+    }
+  },
+});

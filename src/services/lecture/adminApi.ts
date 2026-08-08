@@ -206,6 +206,28 @@ export interface KoinAdminAuth {
 }
 
 /**
+ * 학기가 없으면 강의 생성이 404로 막힌다. 이미 있으면 서버가 아무것도 하지 않으므로
+ * 반영 직전에 그냥 매번 부른다. 있는지 먼저 확인할 이유가 없다.
+ */
+export async function ensureSemester(
+  { year, term }: Pick<AdminLectureCreateRequest, "year" | "term">,
+  { baseUrl, accessToken }: KoinAdminAuth,
+): Promise<void> {
+  const response = await fetch(`${baseUrl.replace(/\/$/, "")}/admin/semesters`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+    body: JSON.stringify({ year, term }),
+  });
+
+  if (response.ok) {
+    return;
+  }
+
+  const body = await response.text().catch(() => "");
+  throw new Error(`학기 생성 실패 (HTTP ${response.status})\n${body.slice(0, 200)}`);
+}
+
+/**
  * 실제 반영. 중복이 하나라도 있으면 409로 요청 전체가 거절되므로
  * 여기까지 오기 전에 `buildAdminRequest`의 사전 검증을 통과시켜야 한다.
  *
@@ -232,7 +254,7 @@ export async function submitLectures(
     {
       401: "인증이 만료됐습니다. KOIN_ADMIN_TOKEN을 갱신해주세요.",
       403: "권한이 없는 계정입니다.",
-      404: `${request.year} ${request.term} 학기가 아직 없습니다. 학기를 먼저 만들어야 합니다.`,
+      404: `${request.year} ${request.term} 학기를 찾지 못했습니다.`,
       409: "이미 등록된 강의가 있습니다. 지금은 수정 API가 없어 되돌릴 수 없습니다.",
     }[response.status] ?? `HTTP ${response.status}`;
 
