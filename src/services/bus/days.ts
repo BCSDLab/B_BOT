@@ -13,6 +13,10 @@ const DAY_INDEX: Record<string, number> = {
 };
 const TOKEN =
   /(?<![0-9])(월|화|수|목|금|토|일)(?:요일)?(?=[()\s,~·\-/]|$)/g;
+/** "월화수목금"처럼 구분자 없이 연속된 요일. 2글자 이상만 매칭해 "운행일" 같은
+ *  고유명사의 단독 일(日)을 요일로 오인하지 않는다. 조사 "으로"의 "으"도 허용한다. */
+const SEQUENCE =
+  /(?<![0-9])((?:월|화|수|목|금|토|일){2,})(?:요일)?(?=[()\s,~·\-/으]|$)/g;
 const RANGE =
   /(?<![0-9])(월|화|수|목|금|토|일)(?:요일)?\s*~\s*(?<![0-9])(월|화|수|목|금|토|일)(?:요일)?/;
 
@@ -43,8 +47,16 @@ export function sourceDays(text: string): Day[] | undefined {
   }
 
   const found = new Set<Day>();
-  for (const match of normalized.matchAll(TOKEN)) {
-    found.add(DAYS[DAY_INDEX[match[1]]]);
+  for (const match of normalized.matchAll(SEQUENCE)) {
+    for (const ch of match[1]) {
+      const day = DAYS[DAY_INDEX[ch]];
+      if (day) found.add(day);
+    }
+  }
+  if (found.size === 0) {
+    for (const match of normalized.matchAll(TOKEN)) {
+      found.add(DAYS[DAY_INDEX[match[1]]]);
+    }
   }
   return found.size ? DAYS.filter((day) => found.has(day)) : undefined;
 }

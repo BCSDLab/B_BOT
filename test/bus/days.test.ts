@@ -40,6 +40,19 @@ describe("sourceDays", () => {
     ]);
   });
 
+  it("구분자 없이 연속된 요일도 읽는다", () => {
+    expect(sourceDays("월화수목금")).toEqual(["MON", "TUE", "WED", "THU", "FRI"]);
+    expect(sourceDays("월수금")).toEqual(["MON", "WED", "FRI"]);
+    expect(sourceDays("토일")).toEqual(["SAT", "SUN"]);
+    expect(sourceDays("운행요일을월화수목금으로")).toEqual([
+      "MON",
+      "TUE",
+      "WED",
+      "THU",
+      "FRI",
+    ]);
+  });
+
   it("주말·매일 키워드를 읽는다", () => {
     expect(sourceDays("주말")).toEqual(["SAT", "SUN"]);
     expect(sourceDays("매일")).toEqual([
