@@ -56,6 +56,8 @@ describe("정규학기 기본값 정규화", () => {
     expect(normalizeSemester("2026년 1학기 시설물 운영 시간")).toBe("26-1학기");
     expect(normalizeSemester("2026년 1학기 하계방학 운영 시간")).toBeNull();
     expect(normalizeDate("2026년 3월 3일(화)")).toBe("2026-03-03");
+    expect(normalizeDate("8.30.(일)", 2026)).toBe("2026-08-30");
+    expect(normalizeDate("8.30.(일)")).toBeNull();
     expect(normalizePhone("560-1278")).toBe("041-560-1278");
   });
 
@@ -74,7 +76,7 @@ describe("방학 학기 분리", () => {
     title: "2026년 하계방학 생협 사업장 운영시간 안내",
     semesterLabel: "2026년 하계방학",
     fromDate: "2026.6.22",
-    toDate: "2026.8.30",
+    toDate: "8.30.(일)",
     shops: raw.shops.slice(0, 2).map((shop, index) => ({
       ...shop,
       remark: index === 0 ? "계절학기 까지 운영" : "배달 서비스 실시",
@@ -119,6 +121,23 @@ describe("방학 학기 분리", () => {
   it("방학 시작일이 전체 운영 기간 밖이면 거부한다", () => {
     expect(() => convertVacationTimetable(vacationRaw, baseline, "2026-09-01"))
       .toThrow("방학 시작일은 전체 운영 기간 안에서");
+  });
+
+  it("동계 종료일에 연도가 없고 연말을 넘으면 다음 연도로 보정한다", () => {
+    const winterRaw: RawRegularCoopTimetable = {
+      ...vacationRaw,
+      title: "2026년 동계방학 생협 사업장 운영시간 안내",
+      semesterLabel: "2026년 동계방학",
+      fromDate: "2026.12.21.(월)",
+      toDate: "2.28.(일)",
+    };
+    const result = convertVacationTimetable(winterRaw, baseline, "2027-01-16");
+
+    expect(result.seasonal.semester).toBe("26-동계계절학기");
+    expect(result.seasonal.fromDate).toBe("2026-12-21");
+    expect(result.seasonal.toDate).toBe("2027-01-15");
+    expect(result.vacation.fromDate).toBe("2027-01-16");
+    expect(result.vacation.toDate).toBe("2027-02-28");
   });
 });
 
