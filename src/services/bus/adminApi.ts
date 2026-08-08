@@ -36,10 +36,21 @@ function splitParen(text: string): { name: string; detail: string | null } {
  * "버스 노선 구분이 잘못되었습니다"로 거부된다. 그래서 API로 나가는 값은 대상별로
  * 고정하고, 내부 route_type은 그대로 둔 채 전송 직전에만 바꿔친다.
  */
-const ADMIN_ROUTE_TYPE: Record<BusTarget, string> = {
-  commuting: "주중",
-  shuttle: "순환",
-};
+const WEEKEND_DAYS = new Set(["SAT", "SUN"]);
+
+/**
+ * 셔틀 노선이 토·일요일에만 운행하면 "주말", 아니면(평일 포함 순환) "순환"이다.
+ * `sourceDays`(days.ts)가 "주말"/"토요일" 같은 원문을 이미 SAT/SUN으로 옮겨
+ * route_info에 심어두므로, 그 결과를 다시 읽기만 하면 된다 — 별도 파서 작업이
+ * 필요 없다. 요일 정보가 없는 회차만 있으면(운행요일 미기재) 평소처럼 순환으로 둔다.
+ */
+function shuttleRouteType(route: BusRoute): string {
+  const days = route.route_info.flatMap((trip) => trip.running_days ?? []);
+  return days.length > 0 && days.every((day) => WEEKEND_DAYS.has(day)) ? "주말" : "순환";
+}
+
+const adminRouteType = (route: BusRoute, target: BusTarget): string =>
+  target === "commuting" ? "주중" : shuttleRouteType(route);
 
 /**
  * Admin API가 정의한 필드만 남긴다. running_days 같은 검수 전용 필드는 보내지 않는다.
@@ -49,7 +60,7 @@ const toAdminRoute = (route: BusRoute, target: BusTarget) => {
   const { name: routeName, detail: subName } = splitParen(route.route_name);
   return {
     region: route.region,
-    route_type: ADMIN_ROUTE_TYPE[target],
+    route_type: adminRouteType(route, target),
     route_name: routeName,
     sub_name: subName,
     node_info: route.node_info.map((node) => splitParen(node.name)),

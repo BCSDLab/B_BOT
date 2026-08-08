@@ -103,6 +103,75 @@ describe("버스 timetable 반영", () => {
     expect(body.shuttle_bus_timetables[0].route_type).toBe("순환");
   });
 
+  it("토·일요일에만 도는 셔틀 노선은 route_type을 주말로 보낸다", async () => {
+    const weekendConversion: BusConversion = {
+      ...conversion,
+      payloads: [
+        {
+          target: "shuttle",
+          semester_type: "REGULAR",
+          body: {
+            shuttle_bus_timetables: [
+              {
+                region: "천안",
+                route_type: "셔틀",
+                route_name: "천안 셔틀(토요일, 일요일)",
+                node_info: [{ name: "터미널" }],
+                route_info: [
+                  { name: "1회", arrival_time: ["09:00"], running_days: ["SAT", "SUN"] },
+                ],
+              },
+            ],
+          },
+        },
+      ],
+    };
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await submitBusTimetables([weekendConversion], auth);
+
+    const body = JSON.parse(String((fetchMock.mock.calls[0] as [URL, RequestInit])[1].body));
+    expect(body.shuttle_bus_timetables[0].route_type).toBe("주말");
+  });
+
+  it("요일이 일부 회차만 평일이면(주말 전용 아님) route_type은 순환이다", async () => {
+    const mixedConversion: BusConversion = {
+      ...conversion,
+      payloads: [
+        {
+          target: "shuttle",
+          semester_type: "REGULAR",
+          body: {
+            shuttle_bus_timetables: [
+              {
+                region: "천안",
+                route_type: "셔틀",
+                route_name: "천안 셔틀",
+                node_info: [{ name: "터미널" }],
+                route_info: [
+                  { name: "1회", arrival_time: ["09:00"], running_days: ["SAT", "SUN"] },
+                  {
+                    name: "2회",
+                    arrival_time: ["10:00"],
+                    running_days: ["MON", "TUE", "WED", "THU", "FRI"],
+                  },
+                ],
+              },
+            ],
+          },
+        },
+      ],
+    };
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await submitBusTimetables([mixedConversion], auth);
+
+    const body = JSON.parse(String((fetchMock.mock.calls[0] as [URL, RequestInit])[1].body));
+    expect(body.shuttle_bus_timetables[0].route_type).toBe("순환");
+  });
+
   it("실패 시 응답 본문을 오류 메시지에 담는다", async () => {
     const fetchMock = vi
       .fn()
