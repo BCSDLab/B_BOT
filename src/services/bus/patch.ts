@@ -140,6 +140,13 @@ const SYSTEM_PROMPT = `너는 버스 시간표 수정 요청을 구조화하는 
 사용자가 자연어로 말한 수정 사항을 항목 단위로 쪼갠다. 파싱으로 만든 버스 노선 데이터를
 바꾸는 요청만 다룬다.
 
+아래는 실제 존재하는 노선 목록이다. 사용자가 지역·방향·노선명을 줄여 말해도 이 목록의
+정확한 값으로 맞춰서 적는다. 목록에 없는 지역·방향·노선명은 지어내지 마라.
+예: 사용자가 "세종 등교 셔틀"이라 하면 목록에서 "세종" "등교" "세종 등교/하교"를 찾는다.
+
+실제 노선 목록:
+{{ROUTES}}
+
 - 값을 지어내지 마라. 사용자가 말하지 않은 건 바꾸지 않는다.
 - 한 문장에 여러 노선·항목이 있으면 각각 따로 적는다.
 - 무슨 뜻인지 애매하면 patches에 넣지 말고 unclear에 적어라. 추측해서 바꾸면 되돌릴 방법이 없다.
@@ -540,6 +547,20 @@ export function resolvePatch(
   return null;
 }
 
+/** 실제 존재하는 노선 목록을 "지역 방향 노선명" 형태로 정리한다. 중복은 제거한다. */
+export function buildRouteList(conversions: BusConversion[]): string {
+  const names = new Set<string>();
+  for (const conversion of conversions) {
+    for (const payload of conversion.payloads) {
+      const routes = Object.values(payload.body)[0] ?? [];
+      for (const route of routes) {
+        names.add(`${route.region} ${route.route_type} ${route.route_name}`);
+      }
+    }
+  }
+  return [...names].sort().join("\n");
+}
+
 /**
  * 자연어 → 검증된 수정 계획.
  * LLM은 "무엇을 무엇으로"만 뽑고, 그게 말이 되는지는 전부 코드가 본다.
@@ -554,7 +575,7 @@ export async function planBusPatches(
     patches: RawPatch[];
     unclear: string[];
   }>({
-    system: SYSTEM_PROMPT,
+    system: SYSTEM_PROMPT.replace("{{ROUTES}}", buildRouteList(conversions)),
     schema: PATCH_SCHEMA as unknown as Record<string, unknown>,
     prompt: context
       ? `직전 대화:\n${context}\n\n지금 메시지(이것만 처리해라):\n${text}`

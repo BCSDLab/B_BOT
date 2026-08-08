@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { hasLlmCredentials } from "~/services/lecture/llm";
-import { applyBusPatchesToConversions, planBusPatches, resolvePatch, type RawPatch } from "~/services/bus/patch";
+import { applyBusPatchesToConversions, buildRouteList, planBusPatches, resolvePatch, type RawPatch } from "~/services/bus/patch";
 import type { BusConversion, BusRoute } from "~/services/bus/types";
 import { validateConversion } from "~/services/bus/validation";
 
@@ -506,5 +506,20 @@ describe.skipIf(!hasLlmCredentials())("버스 수정 요청 해석", () => {
 
     expect(plan.patches).toHaveLength(0);
     expect(plan.problems.join(" ")).toMatch(/찾지 못/);
+  });
+});
+
+describe("프롬프트 노선 목록 생성", () => {
+  it("지역·방향·노선명을 정렬해서 중복 없이 만든다", () => {
+    const two = conversion();
+    (two.payloads[0].body.commuting_bus_timetables as BusRoute[]).push(
+      route({ route_name: "터미널" }),
+    );
+    const list = buildRouteList([two]);
+
+    expect(list).toContain("천안 등교 천안역");
+    expect(list).toContain("천안 등교 터미널");
+    expect(list).toContain("천안 셔틀 천안 셔틀");
+    expect(list.split("\n").length).toBe(3);
   });
 });
