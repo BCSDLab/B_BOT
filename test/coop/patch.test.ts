@@ -60,12 +60,12 @@ const conversion = (): RegularConversionResult => ({
 });
 
 describe("생협 파싱 데이터 수정", () => {
-  it("누락된 토요일 미운영을 새 운영시간으로 추가한다", () => {
+  it("누락된 토·일요일 미운영을 주말 운영시간으로 추가한다", () => {
     const result = conversion();
     const problems: string[] = [];
     const patch = resolveCoopPatch({
       shop: "복지관식당",
-      day: "토요일",
+      day: "토·일요일",
       type: "",
       field: "operation_hours",
       value: "미운영",
@@ -76,9 +76,30 @@ describe("생협 파싱 데이터 수정", () => {
     const updated = applyCoopPatches(result, [patch!]);
     expect(updated.request.coop_shops[0].operation_hours).toContainEqual({
       type: "점심",
-      day_of_week: "토요일",
+      day_of_week: "주말",
       open_time: "미운영",
       close_time: "미운영",
+    });
+  });
+
+  it("금요일 휴점을 FRIDAY 운영시간으로 추가한다", () => {
+    const result = conversion();
+    const problems: string[] = [];
+    const patch = resolveCoopPatch({
+      shop: "복지관식당",
+      day: "금요일",
+      type: "",
+      field: "operation_hours",
+      value: "휴점",
+    }, result, problems);
+
+    expect(problems).toEqual([]);
+    const updated = applyCoopPatches(result, [patch!]);
+    expect(updated.request.coop_shops[0].operation_hours).toContainEqual({
+      type: "점심",
+      day_of_week: "FRIDAY",
+      open_time: "휴점",
+      close_time: "휴점",
     });
   });
 

@@ -28,19 +28,19 @@
         },
         {
           "type": "아침",
-          "day_of_week": "토요일",
+          "day_of_week": "주말",
           "open_time": "조식 미운영",
           "close_time": "조식 미운영"
         },
         {
           "type": "점심",
-          "day_of_week": "토요일",
+          "day_of_week": "주말",
           "open_time": "11:30",
           "close_time": "13:30"
         },
         {
           "type": "저녁",
-          "day_of_week": "토요일",
+          "day_of_week": "주말",
           "open_time": "17:30",
           "close_time": "18:30"
         }
@@ -62,7 +62,7 @@
         },
         {
           "type": "점심",
-          "day_of_week": "토요일",
+          "day_of_week": "주말",
           "open_time": "미운영",
           "close_time": "미운영"
         }
@@ -82,7 +82,7 @@
           "close_time": "21:00"
         },
         {
-          "day_of_week": "토요일",
+          "day_of_week": "주말",
           "open_time": "11:00",
           "close_time": "18:30"
         }
@@ -102,7 +102,7 @@
           "close_time": "24시간"
         },
         {
-          "day_of_week": "토요일",
+          "day_of_week": "주말",
           "open_time": "24시간",
           "close_time": "24시간"
         }
@@ -121,7 +121,7 @@
           "close_time": "18:00"
         },
         {
-          "day_of_week": "토요일",
+          "day_of_week": "주말",
           "open_time": "휴점",
           "close_time": "휴점"
         }
@@ -141,7 +141,7 @@
           "close_time": "18:00"
         },
         {
-          "day_of_week": "토요일",
+          "day_of_week": "주말",
           "open_time": "휴점",
           "close_time": "휴점"
         }
@@ -161,7 +161,7 @@
           "close_time": "18:30"
         },
         {
-          "day_of_week": "토요일",
+          "day_of_week": "주말",
           "open_time": "휴점",
           "close_time": "휴점"
         }
@@ -181,7 +181,7 @@
           "close_time": "17:00"
         },
         {
-          "day_of_week": "토요일",
+          "day_of_week": "주말",
           "open_time": "휴점",
           "close_time": "휴점"
         }
@@ -201,7 +201,7 @@
           "close_time": "19:00"
         },
         {
-          "day_of_week": "토요일",
+          "day_of_week": "주말",
           "open_time": "휴점",
           "close_time": "휴점"
         }
@@ -221,7 +221,7 @@
           "close_time": "18:00"
         },
         {
-          "day_of_week": "토요일",
+          "day_of_week": "주말",
           "open_time": "휴점",
           "close_time": "휴점"
         }
@@ -240,7 +240,7 @@
           "close_time": "24시간"
         },
         {
-          "day_of_week": "토요일",
+          "day_of_week": "주말",
           "open_time": "24시간",
           "close_time": "24시간"
         }

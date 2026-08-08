@@ -15,6 +15,7 @@ const result: RegularConversionResult = {
       groupLabel: "학생", shopLabel: "식당", phone: "560-1278", remark: "<원문>",
       operationHours: [
         { dayLabel: "평일", type: "아침", openTime: "08:00", closeTime: "09:30", rawText: "08:00 - 09:30" },
+        { dayLabel: "금요일", type: "", openTime: "휴점", closeTime: "휴점", rawText: "금요일 휴점" },
         { dayLabel: "토요일", type: "", openTime: "미운영", closeTime: "미운영", rawText: "미운영" },
       ],
     },
@@ -22,7 +23,8 @@ const result: RegularConversionResult = {
       coop_shop_info: { name: "학생식당", phone: "041-560-1278", location: "학생회관 2층", remark: "<원문>" },
       operation_hours: [
         { day_of_week: "평일", type: "아침", open_time: "08:00", close_time: "09:30" },
-        { day_of_week: "토요일", open_time: "미운영", close_time: "미운영" },
+        { day_of_week: "FRIDAY", open_time: "휴점", close_time: "휴점" },
+        { day_of_week: "주말", open_time: "미운영", close_time: "미운영" },
       ],
     },
   }],
@@ -37,6 +39,8 @@ describe("생협 검토 HTML", () => {
     expect(html).toContain("상세 검증");
     expect(html).toContain("학생회관 2층");
     expect(html).toContain('<td class="state">미운영</td>');
+    expect(html).toContain("<th>FRIDAY</th>");
+    expect(html).toContain('<td class="state">휴점</td>');
     expect(html).not.toContain("반영 매장");
     expect(html).not.toContain("반영에서 제외한 2캠 사업장");
     expect(html).not.toContain("매장명 · 위치 · 전화번호 검색");

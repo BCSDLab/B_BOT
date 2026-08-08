@@ -32,7 +32,8 @@ const raw: RawRegularCoopTimetable = {
       groupLabel: "학생", shopLabel: "식당", phone: "560-1278", remark: "",
       operationHours: [
         { dayLabel: "평 일", type: "아침", openTime: "8:00", closeTime: "09:30", rawText: "08:00 - 09:30" },
-        { dayLabel: "토요일", type: "아침", openTime: "조식 미운영", closeTime: "조식 미운영", rawText: "조식 미운영" },
+        { dayLabel: "평일", type: "", openTime: "금요일 휴점", closeTime: "금요일 휴점", rawText: "금요일 휴점" },
+        { dayLabel: "토·일요일", type: "아침", openTime: "조식 미운영", closeTime: "조식 미운영", rawText: "조식 미운영" },
       ],
     },
     {
@@ -153,7 +154,11 @@ describe("정규학기 변환", () => {
     expect(result.request.coop_shops[0].operation_hours[0]).toEqual({
       type: "아침", day_of_week: "평일", open_time: "08:00", close_time: "09:30",
     });
-    expect(result.request.coop_shops[0].operation_hours[1].open_time).toBe("조식 미운영");
+    expect(result.request.coop_shops[0].operation_hours[1]).toEqual({
+      day_of_week: "FRIDAY", open_time: "휴점", close_time: "휴점",
+    });
+    expect(result.request.coop_shops[0].operation_hours[2].open_time).toBe("조식 미운영");
+    expect(result.request.coop_shops[0].operation_hours[2].day_of_week).toBe("주말");
     expect(result.excludedShops).toHaveLength(1);
     expect(result.issues).toContainEqual(expect.objectContaining({
       code: "excluded_second_campus", severity: "info",
@@ -167,15 +172,15 @@ describe("정규학기 변환", () => {
   });
 
   it("모델이 조식·중식·석식으로 읽어도 아침·점심·저녁으로 변환한다", () => {
-    const mealLabels = ["조식", "중식", "석식"];
     const source = structuredClone(raw);
-    source.shops[0].operationHours = source.shops[0].operationHours.map((hour, index) => ({
-      ...hour,
-      type: mealLabels[index] ?? hour.type,
-    }));
+    source.shops[0].operationHours = [
+      { dayLabel: "평일", type: "조식", openTime: "08:00", closeTime: "09:30", rawText: "08:00 - 09:30" },
+      { dayLabel: "평일", type: "중식", openTime: "11:30", closeTime: "13:30", rawText: "11:30 - 13:30" },
+      { dayLabel: "주말", type: "석식", openTime: "17:30", closeTime: "18:30", rawText: "17:30 - 18:30" },
+    ];
 
     const result = convertRegularTimetable(source, baseline);
     expect(result.request.coop_shops[0].operation_hours.map((hour) => hour.type))
-      .toEqual(["아침", "점심"]);
+      .toEqual(["아침", "점심", "저녁"]);
   });
 });
