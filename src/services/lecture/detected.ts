@@ -120,9 +120,21 @@ export function guessSemester(title: string): { year: number; term: string } | n
   return term ? { year, term } : null;
 }
 
+/**
+ * 공지는 **항상 프로덕션에서 읽는다.** 반영 대상과 무관하다.
+ *
+ * 배치가 넘기는 번호는 프로덕션 코인의 게시글 번호이고(링크도 koreatech.in),
+ * 스테이지는 게시글 크롤링이 돌지 않아 그 번호가 없다. 여기서 스테이지를 보면
+ * 스테이지 테스트가 통째로 막힌다.
+ *
+ * 읽기뿐이라 프로덕션을 봐도 되돌릴 일이 없다. 되돌릴 수 없는 건 강의 반영 쪽이고,
+ * 그건 여전히 채널이 정한다.
+ */
+const ARTICLE_BASE_URL = "https://api.koreatech.in";
+
 /** 게시글을 조회해 제목과 첨부를 얻는다. 배치가 넘긴 번호 하나로 나머지를 채운다. */
-export async function fetchArticle(baseUrl: string, articleId: number): Promise<Article> {
-  const response = await fetch(`${baseUrl.replace(/\/$/, "")}/articles/${articleId}`);
+export async function fetchArticle(articleId: number): Promise<Article> {
+  const response = await fetch(`${ARTICLE_BASE_URL}/articles/${articleId}`);
   if (!response.ok) {
     throw new Error(`게시글 ${articleId}을 찾지 못했습니다 (HTTP ${response.status}).`);
   }

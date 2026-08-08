@@ -33,6 +33,30 @@ import type { BlockActionSetting } from "./type";
 // 버튼·셀렉트 조작(block_actions) 핸들러 목록.
 // 등록하지 않은 action_id는 라우터에서 무시된다. 모달 안의 select와 URL 링크 버튼도
 // block_actions로 들어오는데, 그것들은 여기서 처리할 대상이 아니기 때문이다.
+/**
+ * 버튼이 달린 원본 메시지를 갈아끼운다.
+ *
+ * `chat.update`를 쓰지 않는 건 배치가 **웹훅으로** 올린 메시지이기 때문이다.
+ * 작성자가 봇 토큰이 아니라 `cant_update_message`로 거절당한다.
+ * 버튼 클릭에 딸려 오는 response_url은 그 제약이 없다.
+ */
+async function replaceOriginal(
+  responseUrl: string | undefined,
+  text: string,
+  blocks: Parameters<typeof updateSlack>[0]["blocks"],
+) {
+  if (!responseUrl) return;
+  await fetch(responseUrl, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ replace_original: true, text, blocks }),
+  });
+}
+
+const notice = (mrkdwn: string) => [
+  { type: "section" as const, text: { type: "mrkdwn" as const, text: mrkdwn } },
+];
+
 /** 버튼이 너무 많으면 읽히지 않는다. 넘치면 명령어로 직접 올리는 편이 낫다. */
 const MAX_CHOICES = 4;
 
@@ -119,27 +143,36 @@ export const blockActions: BlockActionSetting[] = [
         article_id?: number;
       };
       const channel = body.channel.id;
-      const ts = body.message?.ts;
       const actor = body.user.id;
+      const responseUrl = body.response_url;
       if (!articleId) return;
-
-      const say = (text: string, mrkdwn: string) =>
-        updateSlack({
-          client, channel, ts, text,
-          blocks: [{ type: "section", text: { type: "mrkdwn", text: mrkdwn } }],
-        });
 
       // 어느 코인에 반영할지는 채널로 정한다. 배치는 웹훅을 고르는 것으로 이미 답했다.
       const resolved = resolveTarget(channel);
       if (!resolved.ok || !resolved.target) {
-        await say("대상 아님", `:x: ${resolved.reason}`);
+        await replaceOriginal(responseUrl, "대상 아님", notice(`:x: ${resolved.reason}`));
         return;
       }
       const env = resolved.target.env;
 
+      // 배치 메시지는 여기서 역할이 끝난다. 이후 갱신은 봇이 올린 메시지에서 한다.
+      await replaceOriginal(responseUrl, "진행합니다", notice(
+        `:white_check_mark: *강의 업데이트를 진행합니다.* · ${labelOf(env)}\n<@${actor}>`,
+      ));
+
+      const posted = await client.chat.postMessage({
+        channel,
+        text: "게시글 확인 중",
+        blocks: notice(`:hourglass_flowing_sand: 게시글을 확인하고 있습니다…`),
+      });
+      const ts = posted.ts;
+
+      const say = (text: string, mrkdwn: string) =>
+        updateSlack({ client, channel, ts, text, blocks: notice(mrkdwn) });
+
       let article: Awaited<ReturnType<typeof fetchArticle>>;
       try {
-        article = await fetchArticle(resolved.target.baseUrl, articleId);
+        article = await fetchArticle(articleId);
       } catch (error) {
         await say("게시글 조회 실패",
           `:x: *게시글을 읽지 못했습니다.*\n${error instanceof Error ? error.message : ""}`);
@@ -182,12 +215,12 @@ export const blockActions: BlockActionSetting[] = [
           client, channel, ts,
           text: "변환할 파일을 골라주세요",
           blocks: [
-            { type: "section", text: { type: "mrkdwn", text: [
+            ...notice([
               `:page_facing_up: *${semester.year} ${semester.term}* · ${labelOf(env)}`,
               `엑셀 첨부가 *${files.length}개* 입니다. 변환할 파일을 골라주세요.`,
               "",
               ...files.slice(0, MAX_CHOICES).map((file, i) => `${i + 1}. ${file.name}`),
-            ].join("\n") } },
+            ].join("\n")),
             { type: "actions", elements: [
               ...files.slice(0, MAX_CHOICES).map((file, index) => ({
                 type: "button" as const,
@@ -260,14 +293,9 @@ export const blockActions: BlockActionSetting[] = [
         await dropDetected(token);
       }
 
-      await updateSlack({
-        client,
-        channel: body.channel.id,
-        ts: body.message?.ts,
-        text: "무시함",
-        blocks: [{ type: "section", text: { type: "mrkdwn",
-          text: `:no_entry_sign: *이 공지는 넘어갑니다.*\n<@${body.user.id}>` } }],
-      });
+      // 배치가 웹훅으로 올린 메시지일 수 있어 response_url로 바꾼다.
+      await replaceOriginal(body.response_url, "무시함",
+        notice(`:no_entry_sign: *이 공지는 넘어갑니다.*\n<@${body.user.id}>`));
     },
   },
   // 교시/시각 선택. LLM에 다시 묻지 않고 이미 계산해둔 두 해석 중 하나를 고른다.
