@@ -13,7 +13,8 @@ import {
   dropBusPatchPlan,
   loadBusPatchPlan,
 } from "~/services/bus/reviewStore";
-import { sendReviewApproval, sendStatus, busActionValue } from "~/services/bus/slack";
+import { sendReviewApproval, sendStatus } from "~/services/bus/slack";
+import { busActionValue } from "~/services/bus/pipeline";
 
 interface BusActionValue {
   job_id: string;

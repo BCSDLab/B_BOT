@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { messages as busMessages } from "~/services/slack/domain/bus";
-import { findBusTimetableFile } from "~/services/bus/slackAttachment";
+import { messages as busMessages, parseBusCommand } from "~/services/slack/domain/bus";
+import { findSpreadsheetFile } from "~/utils/slackFile";
 
 const file = (name: string, filetype = "binary") => ({
   id: "F1",
@@ -11,10 +11,17 @@ const file = (name: string, filetype = "binary") => ({
 
 describe("!버스반영 첨부 파일", () => {
   it("지원하는 시간표 파일만 고른다", () => {
-    expect(findBusTimetableFile([file("a.png"), file("시간표.xls")])?.name).toBe("시간표.xls");
-    expect(findBusTimetableFile([file("시간표.xlsx")])?.name).toBe("시간표.xlsx");
-    expect(findBusTimetableFile([file("시간표.csv")])?.name).toBe("시간표.csv");
-    expect(findBusTimetableFile([file("시간표.pdf")])).toBeNull();
+    expect(findSpreadsheetFile([file("a.png"), file("시간표.xls")])?.name).toBe("시간표.xls");
+    expect(findSpreadsheetFile([file("시간표.xlsx")])?.name).toBe("시간표.xlsx");
+    expect(findSpreadsheetFile([file("시간표.csv")])?.name).toBe("시간표.csv");
+    expect(findSpreadsheetFile([file("시간표.pdf")])).toBeNull();
+  });
+
+  it("버스 반영 명령어는 완전 일치만 받는다", () => {
+    expect(parseBusCommand("!버스반영")).toBe(true);
+    expect(parseBusCommand("  !버스반영  ")).toBe(true);
+    expect(parseBusCommand("!버스반영 2026")).toBe(false);
+    expect(parseBusCommand("버스반영")).toBe(false);
   });
 
   it("버스 명령어만 버스 첨부를 받는다", () => {

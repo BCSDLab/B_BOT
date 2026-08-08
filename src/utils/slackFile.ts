@@ -34,6 +34,17 @@ export function findExcelFile(files: SlackFile[] | undefined): SlackFile | null 
   );
 }
 
+/** 버스 시간표처럼 xls/xlsx/csv를 모두 받는 경우. findExcelFile은 xlsx 전용이다. */
+export function findSpreadsheetFile(files: SlackFile[] | undefined): SlackFile | null {
+  return (
+    files?.find((file) =>
+      [".xls", ".xlsx", ".csv"].some((extension) =>
+        file.name?.toLowerCase().endsWith(extension),
+      ),
+    ) ?? null
+  );
+}
+
 const IMAGE_MIME_BY_TYPE: Record<string, StructuredImageMimeType> = {
   png: "image/png",
   jpg: "image/jpeg",
@@ -90,6 +101,21 @@ export async function downloadSlackFile(file: SlackFile): Promise<ArrayBuffer> {
   }
 
   return buffer;
+}
+
+/**
+ * xls/xlsx/csv를 모두 받는다. xlsx는 zip이라 PK로 시작하므로 여기서도 검사한다.
+ * xls(BIFF)·csv는 매직 바이트 규칙이 달라 이름만으로 구분한다.
+ */
+export async function downloadSlackSpreadsheet(file: SlackFile): Promise<Buffer> {
+  const buffer = await download(file);
+  if (file.name?.toLowerCase().endsWith(".xlsx")) {
+    const head = new Uint8Array(buffer.slice(0, 2));
+    if (head[0] !== 0x50 || head[1] !== 0x4b) {
+      throw new Error("엑셀 파일이 아닙니다. 봇에 files:read 권한이 있는지 확인해주세요.");
+    }
+  }
+  return Buffer.from(buffer);
 }
 
 export async function downloadSlackImage(

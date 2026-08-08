@@ -18,12 +18,11 @@ import type {
   BusVersionUpdate,
   JobState,
 } from "./types";
-import { normalizeTime, stableJson, validateConversion } from "./validation";
-import { analyseExcel, analyseXlsx } from "./excelAnalyzer";
+import { stableJson, validateConversion } from "./validation";
 import { renderBusReviewHtml } from "./review";
-import { convertExcelDeterministically } from "./deterministicConversion";
 import { applyBusPatchesToConversions, type BusPatch } from "./patch";
 import { sendStatus } from "./slack";
+import { convertSpreadsheetToConversions } from "./pipeline";
 import { saveBusReviewPage } from "./reviewLink";
 import type { WebClient } from "@slack/web-api";
 
@@ -187,39 +186,6 @@ async function attachment(job: BusJob) {
     throw new Error("attachment hash mismatch");
   return buffer;
 }
-async function sourceContext(buffer: Buffer, extension: string) {
-  if (extension === ".csv")
-    return buffer
-      .toString("utf8")
-      .split(/\r?\n/)
-      .map((line, index) => ({
-        row: index + 1,
-        cells: line.split(",").map(normalizeTime),
-      }));
-  // These packages are optional runtime adapters so production can use the parser
-  // best suited to its deployment image while the workflow itself stays portable.
-  if (extension === ".xlsx") return analyseXlsx(buffer);
-  if (extension === ".xls") return analyseExcel(buffer);
-  throw new Error("unsupported attachment extension");
-}
-async function convert(
-  context: unknown,
-  job: BusJob,
-): Promise<BusConversion[]> {
-  if (!context || typeof context !== "object" || !("sheets" in context))
-    throw new Error("현재 deterministic 변환은 Excel 파일만 지원합니다.");
-  const conversions = convertExcelDeterministically(
-    context as ReturnType<typeof analyseExcel>,
-  ).map(validateConversion);
-  if (job.revision_note) {
-    for (const conversion of conversions) {
-      conversion.warnings.push(
-        `검수자 수정 요청: ${job.revision_note} (자동 변경 없이 재검수 필요)`,
-      );
-    }
-  }
-  return conversions;
-}
 function artifactPath(job: BusJob, ...segments: string[]) {
   return join(busConfig().artifactRoot, job.id, ...segments);
 }
@@ -259,8 +225,11 @@ export async function runConversion(id: string) {
   });
   try {
     const extension = attachmentExtension(job.attachment_url);
-    const context = await sourceContext(await attachment(job), extension);
-    const conversions = await convert(context, job);
+    const conversions = await convertSpreadsheetToConversions(
+      await attachment(job),
+      extension,
+      job.revision_note,
+    );
     const { url, token } = await writeArtifacts(job, conversions);
     return update(id, (j) => {
       j.conversions = conversions;
