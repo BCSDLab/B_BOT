@@ -32,21 +32,28 @@ const cleanConversion = {
   warnings: [],
 };
 
-const warnedCleanConversion = {
-  ...cleanConversion,
-  warnings: ["청주 셔틀 노선 확인 필요"],
+const perfectlyClean = {
+  payloads: [{
+    target: "shuttle" as const,
+    semester_type: "SEASONAL" as const,
+    body: { shuttle_bus_timetables: [
+      { region: "청주", route_type: "셔틀", route_name: "청주 셔틀", node_info: [{ name: "터미널" }], route_info: [{ name: "1회", running_days: ["MON" as const], arrival_time: ["09:00"] }] },
+    ] },
+  }],
+  version_update: { type: "shuttle_bus_timetable" as const, title: "계절학기" as const, content: "2026-06-22~2026-07-10" },
+  provenance: {},
+  warnings: [],
 };
 
 describe("버스 검수 HTML", () => {
-  it("강의 검수와 같은 전체·확인 필요 필터 구조를 제공한다", () => {
+  it("전체·확인 필요·운행요일 미지정 3개 탭을 제공한다", () => {
     const html = renderBusReviewHtml("job-1", [conversion]);
     expect(html).toContain("전체");
     expect(html).toContain("확인 필요");
+    expect(html).toContain("운행요일 미지정");
     expect(html).toContain('id="f-all"');
     expect(html).toContain('id="f-issue"');
-    expect(html).toContain('class="route issue"');
-    expect(html).toContain("하교 자동 생성을 건너뜁니다");
-    expect(html).toContain("천안역");
+    expect(html).toContain('id="f-no-days"');
     expect(html).not.toMatch(/https?:\/\//);
   });
 
@@ -56,49 +63,66 @@ describe("버스 검수 HTML", () => {
     expect(html).not.toContain("<small>MON</small>");
   });
 
-  it("경고가 있는 경우에만 확인 필요 타일을 강조한다", () => {
-    expect(renderBusReviewHtml("job-1", [conversion])).toContain(
-      'class="tile warn"',
-    );
-    expect(renderBusReviewHtml("job-1", [cleanConversion])).not.toContain(
-      'class="tile warn"',
-    );
+  it("경고·미지정 노선이 있으면 해당 타일을 강조한다", () => {
+    const html = renderBusReviewHtml("job-1", [conversion, cleanConversion]);
+    expect(html).toContain('class="tile warn"');
+    expect(html).toContain('class="tile note"');
+    const clean = renderBusReviewHtml("job-1", [perfectlyClean]);
+    expect(clean).not.toContain('class="tile warn"');
+    expect(clean).not.toContain('class="tile note"');
   });
 
-  it("영향 범위를 학기별 변환 단위로 센다", () => {
-    const html = renderBusReviewHtml("job-1", [conversion, warnedCleanConversion]);
-    expect(html).toContain("영향 범위: 1개 노선");
-    expect(html).toContain("영향 범위: 2개 노선");
+  it("확인 필요·운행요일 미지정 타일은 노선 수를 센다", () => {
+    const html = renderBusReviewHtml("job-1", [conversion, cleanConversion]);
+    expect(html).toMatch(/<div class="n">1<\/div><div class="k">확인 필요 노선<\/div>/);
+    expect(html).toMatch(/<div class="n">2<\/div><div class="k">운행요일 미지정 노선<\/div>/);
   });
 
-  it("확인 필요 필터는 경고가 있는 항목만 남긴다", () => {
+  it("경고 문구는 각 노선 카드에 직접 표시하고 학기 패널은 없다", () => {
     const html = renderBusReviewHtml("job-1", [conversion]);
-    expect(html).toContain("개 노선");
-    expect(html).toContain("warning-panel");
+    expect(html).toContain('<p class="route-warning">천안 천안역: 종착 도착시각을 읽을 수 없어 하교 자동 생성을 건너뜁니다.</p>');
+    expect(html).toContain('data-issue="true"');
+    expect(html).not.toContain("warning-panel");
+    expect(html).not.toContain("경고 내용");
   });
 
-  it("running_days가 없는 회차는 운행요일 미지정으로 표시하고 확인 필요 필터에 포함한다", () => {
+  it("색 의미 범례를 제공한다", () => {
+    const html = renderBusReviewHtml("job-1", [conversion]);
+    expect(html).toContain('class="legend"');
+    expect(html).toContain("노란색 = 경고가 걸린 노선");
+    expect(html).toContain("파란색 = 운행요일 미지정 노선");
+  });
+
+  it("탭 모드에 따라 노선 색이 정해진다", () => {
+    const html = renderBusReviewHtml("job-1", [conversion, cleanConversion]);
+    expect(html).toContain('.view-issue .route[data-issue="true"]');
+    expect(html).toContain('.view-no-days .route[data-no-days="true"]');
+    expect(html).toContain('.view-all .route-warning');
+    expect(html).toContain('.view-all .no-days-badge');
+    expect(html).toContain('.view-no-days .route-warning{display:none}');
+    expect(html).toContain('.view-issue .no-days-badge{display:none}');
+  });
+
+  it("running_days가 없는 회차는 운행요일 미지정 표시가 붙는다", () => {
     const html = renderBusReviewHtml("job-1", [cleanConversion]);
-    expect(html).toContain("운행요일 미지정");
-    expect(html).toContain("<small class=\"missing\" title=\"Slack에서 !수정 으로 운행요일을 지정하세요\">");
-    expect(html).toContain('class="route no-days"');
-    expect(html).toContain('route.classList.contains("no-days")');
+    expect(html).toContain('data-no-days="true"');
+    expect(html).toContain('class="missing"');
     expect(html).toContain("운행요일미지정");
+    expect(html).toContain('route.dataset.noDays==="true"');
   });
 
   it("running_days가 있으면 미지정 표시를 하지 않는다", () => {
     const html = renderBusReviewHtml("job-1", [conversion]);
-    expect(html).not.toContain("운행요일 미지정");
-    expect(html).not.toContain('class="route no-days"');
+    expect(html).not.toMatch(/<section class="route"[^>]*data-no-days="true"/);
+    expect(html).not.toContain('class="missing"');
+    expect(html).not.toContain('<p class="no-days-badge">');
   });
 
-  it("카운터는 경고 패널을 세지 않고 노선 카드만 센다", () => {
+  it("카운터는 노선 카드만 센다", () => {
     const html = renderBusReviewHtml("job-1", [conversion]);
-    expect(html).toContain('querySelectorAll("#groups .route"));');
-    expect(html).toContain('querySelectorAll("#groups .warning-panel"));');
-    expect(html).not.toContain(
-      'querySelectorAll("#groups .route, #groups .warning-panel"));',
-    );
+    expect(html).toContain('querySelectorAll("#groups .route")');
+    expect(html).not.toContain('querySelectorAll("#groups .route, #groups .warning-panel")');
+    expect(html).toContain('" / "+(mode==="all"?routes.length:(mode==="issue"?totalIssue:totalNoDays))+"개 노선"');
   });
 
   it("하교 자동계산 경고는 해당 지역·방향 노선만 확인 필요로 표시한다", () => {
@@ -117,9 +141,9 @@ describe("버스 검수 HTML", () => {
       warnings: ["천안 하교는 등교 노선 역순(18:10 출발)으로 자동 계산해 추가했습니다."],
     };
     const html = renderBusReviewHtml("job-1", [base]);
-    const issueSections = [...html.matchAll(/<section class="route issue[^"]*" data-search="([^"]*)"/g)].map((m) => m[1]);
+    const issueSections = [...html.matchAll(/data-issue="true"[^>]*data-search="([^"]*)"/g)].map((m) => m[1]);
     expect(issueSections).toEqual([
-      "commuting regular 천안 하교 천안역 운행요일미지정",
+      "commuting regular 천안 하교 천안역 운행요일미지정 천안 하교는 등교 노선 역순(18:10 출발)으로 자동 계산해 추가했습니다.",
     ]);
   });
 });
