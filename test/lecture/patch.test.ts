@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { hasLlmCredentials } from "~/services/lecture/llm";
-import { applyPatches, planPatches } from "~/services/lecture/patch";
+import { describeClassTime } from "~/services/lecture/describeTime";
+import { applyPatches, planPatches, resolveAmbiguities } from "~/services/lecture/patch";
 import type { Lecture } from "~/services/lecture/types";
 
 const lecture = (over: Partial<Lecture> = {}): Lecture => ({
@@ -138,19 +139,6 @@ describe.skipIf(!hasLlmCredentials())("수정 요청 해석", () => {
 describe.skipIf(!hasLlmCredentials())("교시·시각 구분", () => {
   const lectures = [lecture({ raw_class_time: "수03A~04B" })];
 
-  it("신호가 없으면 추측하지 않고 두 해석을 보여준다", async () => {
-    // 저장 구조상 둘 다 표현 가능해서 값만으로는 구분이 안 된다.
-    const plan = await planPatches("MEB321 01 강의시간을 09~10으로 바꿔줘", lectures, "period");
-
-    expect(plan.patches).toHaveLength(0);
-    const said = plan.problems.join("\n");
-    expect(said).toMatch(/교시로 읽으면/);
-    expect(said).toMatch(/시각으로 읽으면/);
-    // 실제 시각을 보여줘야 어느 쪽인지 판단할 수 있다.
-    expect(said).toMatch(/17:00~19:00/);
-    expect(said).toMatch(/09:00~10:00/);
-  });
-
   it("`교시`라고 하면 그대로 받는다", async () => {
     const plan = await planPatches(
       "MEB321 01 강의시간을 9교시~10교시로 바꿔줘",
@@ -171,5 +159,33 @@ describe.skipIf(!hasLlmCredentials())("교시·시각 구분", () => {
 
     expect(plan.patches).toHaveLength(1);
     expect(plan.patches[0].after).toContain("09:00~10:00");
+  });
+});
+
+describe.skipIf(!hasLlmCredentials())("교시·시각 선택", () => {
+  const lectures = [lecture({ raw_class_time: "수03A~04B" })];
+
+  it("신호가 없으면 두 해석을 계산해두고 고르게 한다", async () => {
+    const plan = await planPatches("MEB321 01 강의시간을 09~10으로 바꿔줘", lectures, "period");
+
+    // 추측해서 patches에 넣지 않는다.
+    expect(plan.patches).toHaveLength(0);
+    expect(plan.ambiguities).toHaveLength(1);
+
+    const [item] = plan.ambiguities;
+    expect(describeClassTime(item.asPeriod.infos)).toContain("17:00~19:00");
+    expect(describeClassTime(item.asClock.infos)).toContain("09:00~10:00");
+  });
+
+  it("고른 쪽으로 확정하는 데 LLM이 끼지 않는다", async () => {
+    const plan = await planPatches("MEB321 01 강의시간을 09~10으로 바꿔줘", lectures, "period");
+
+    const asClock = resolveAmbiguities(plan.ambiguities, "clock");
+    const asPeriod = resolveAmbiguities(plan.ambiguities, "period");
+
+    expect(asClock[0].after).toContain("09:00~10:00");
+    expect(asPeriod[0].after).toContain("17:00~19:00");
+    // 적용에 쓸 파싱 결과도 함께 들고 있어야 한다.
+    expect(asClock[0].parsed).toEqual(plan.ambiguities[0].asClock.infos);
   });
 });

@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import type { Patch } from "./patch";
+import type { Patch, TimeAmbiguity } from "./patch";
 import type { Lecture, TimeFormat } from "./types";
 
 /**
@@ -107,14 +107,19 @@ export async function findTokenByThread(channel: string, threadTs: string): Prom
 export interface StoredPatchPlan {
   reviewToken: string;
   patches: Patch[];
+  ambiguities: TimeAmbiguity[];
+  problems: string[];
   createdAt: string;
 }
 
-export async function savePatchPlan(reviewToken: string, patches: Patch[]): Promise<string> {
+export async function savePatchPlan(
+  reviewToken: string,
+  plan: Pick<StoredPatchPlan, "patches" | "ambiguities" | "problems">,
+): Promise<string> {
   const token = createReviewToken();
   await useStorage("kvStorage").setItem(patchKey(token), {
     reviewToken,
-    patches,
+    ...plan,
     createdAt: new Date().toISOString(),
   } satisfies StoredPatchPlan);
   return token;

@@ -2,6 +2,7 @@ import type { KnownBlock } from "@slack/web-api";
 import { blockingIssues, buildAdminRequest, toAdminTerm } from "./adminApi";
 import { convertRows } from "./convert";
 import type { PatchPlan } from "./patch";
+import { describeClassTime } from "./describeTime";
 import { renderReviewPage } from "./reviewHtml";
 import type { StoredReview } from "./reviewStore";
 import { buildReviewUrl, saveReview } from "./reviewStore";
@@ -211,6 +212,12 @@ export function buildPatchBlocks(
   patchToken: string,
   requesterId: string,
 ): KnownBlock[] {
+  // 교시인지 시각인지 못 정한 게 있으면 그것부터 고르게 한다.
+  // 다시 타이핑하게 하는 대신 이미 계산해둔 두 해석 중 하나를 누르면 된다.
+  if (plan.ambiguities.length > 0) {
+    return buildAmbiguityBlocks(plan, patchToken, requesterId);
+  }
+
   const lines = plan.patches.map((patch) => {
     const where = `${patch.lecture.code} ${patch.lecture.lecture_class} ${patch.lecture.name}`;
     return [
@@ -263,6 +270,67 @@ export function buildPatchBlocks(
       ],
     },
   );
+
+  return blocks;
+}
+
+function buildAmbiguityBlocks(
+  plan: PatchPlan,
+  patchToken: string,
+  requesterId: string,
+): KnownBlock[] {
+  const lines = plan.ambiguities.map((item) => {
+    const where = `${item.lecture.code} ${item.lecture.lecture_class} ${item.lecture.name}`;
+    return [
+      `*${where}* — "${item.rawValue}"`,
+      `  교시로 → ${describeClassTime(item.asPeriod.infos)}`,
+      `  시각으로 → ${describeClassTime(item.asClock.infos)}`,
+    ].join("\n");
+  });
+
+  const blocks: KnownBlock[] = [
+    {
+      type: "section",
+      text: {
+        type: "mrkdwn",
+        text: `*교시인지 시각인지 정해주세요*\n\n${lines.join("\n\n")}`,
+      },
+    },
+  ];
+
+  if (plan.patches.length > 0) {
+    blocks.push({
+      type: "context",
+      elements: [
+        { type: "mrkdwn", text: `함께 적용될 수정 ${plan.patches.length}건이 더 있습니다.` },
+      ],
+    });
+  }
+
+  blocks.push({
+    type: "actions",
+    elements: [
+      {
+        type: "button",
+        text: { type: "plain_text", text: "교시로", emoji: true },
+        action_id: "lecture:time_period",
+        value: JSON.stringify({ patchToken, requesterId }),
+      },
+      {
+        type: "button",
+        text: { type: "plain_text", text: "시각으로", emoji: true },
+        action_id: "lecture:time_clock",
+        value: JSON.stringify({ patchToken, requesterId }),
+      },
+      {
+        type: "button",
+        text: { type: "plain_text", text: "취소", emoji: true },
+        style: "danger",
+        action_id: "lecture:patch_cancel",
+        value: JSON.stringify({ patchToken, requesterId }),
+      },
+    ],
+  });
 
   return blocks;
 }

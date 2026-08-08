@@ -1,11 +1,12 @@
 import { buildAdminRequest, ensureSemester, submitLectures, toAdminTerm } from "~/services/lecture/adminApi";
 import { getKoinAdminAuth } from "~/services/lecture/koinAuth";
-import { applyPatches } from "~/services/lecture/patch";
-import { buildStoredReview } from "~/services/lecture/pipeline";
+import { applyPatches, resolveAmbiguities } from "~/services/lecture/patch";
+import { buildPatchBlocks, buildStoredReview } from "~/services/lecture/pipeline";
 import {
   dropPatchPlan,
   loadPatchPlan,
   loadReview,
+  savePatchPlan,
   updateReview,
 } from "~/services/lecture/reviewStore";
 import type { BlockActionSetting } from "./type";
@@ -17,6 +18,46 @@ const applying = new Set<string>();
 // 등록하지 않은 action_id는 라우터에서 무시된다. 모달 안의 select와 URL 링크 버튼도
 // block_actions로 들어오는데, 그것들은 여기서 처리할 대상이 아니기 때문이다.
 export const blockActions: BlockActionSetting[] = [
+  // 교시/시각 선택. LLM에 다시 묻지 않고 이미 계산해둔 두 해석 중 하나를 고른다.
+  ...(["period", "clock"] as const).map((mode) => ({
+    actionId: mode === "period" ? "lecture:time_period" : "lecture:time_clock",
+    async handler({ client, body, action }: Parameters<BlockActionSetting["handler"]>[0]) {
+      if (action.type !== "button" || !body.channel) return;
+
+      const { patchToken, requesterId } = JSON.parse(action.value ?? "{}") as {
+        patchToken?: string;
+        requesterId?: string;
+      };
+      const channel = body.channel.id;
+      const ts = body.message?.ts;
+      if (!patchToken) return;
+
+      const plan = await loadPatchPlan(patchToken);
+      if (!plan) {
+        await updateSlack({
+          client, channel, ts,
+          text: "만료됨",
+          blocks: [{ type: "section", text: { type: "mrkdwn",
+            text: ":x: 이미 처리했거나 만료된 수정 요청입니다." } }],
+        });
+        return;
+      }
+      await dropPatchPlan(patchToken);
+
+      const resolved = {
+        patches: [...plan.patches, ...resolveAmbiguities(plan.ambiguities, mode)],
+        ambiguities: [],
+        problems: plan.problems,
+      };
+      const nextToken = await savePatchPlan(plan.reviewToken, resolved);
+
+      await updateSlack({
+        client, channel, ts,
+        text: `수정 ${resolved.patches.length}건 확인`,
+        blocks: buildPatchBlocks(resolved, nextToken, requesterId ?? body.user.id),
+      });
+    },
+  })),
   {
     actionId: "lecture:patch_apply",
     async handler({ client, body, action }) {

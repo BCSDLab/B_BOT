@@ -97,6 +97,14 @@ const SYSTEM_PROMPT = `너는 강의 데이터 수정 요청을 구조화하는 
   되돌릴 방법이 없다.
 - 강의시간은 사용자가 쓴 표기를 그대로 옮긴다. 해석은 코드가 한다.
   \`월6A~6B\` 처럼 한 자리로 써도 그대로 둔다.
+- 직전 대화가 함께 주어지면 참고만 해라. **지금 메시지가 요청하는 것만** 내놓는다.
+  이미 처리된 앞선 요청을 다시 내지 마라.
+  다만 지금 메시지가 앞선 질문에 대한 답이면(예: "시각으로 해줘") 앞 대화에서
+  대상 강의와 값을 가져와 완성한다.
+- 앞 대화에서 교시인지 시각인지 되물었고 사용자가 한쪽을 골랐다면,
+  **고른 쪽이 분명히 드러나는 형태로 적어라.**
+  시각을 골랐으면 \`09:00~10:00\`처럼, 교시를 골랐으면 \`9교시~10교시\`처럼 쓴다.
+  \`09~10\` 같이 애매한 표기를 그대로 옮기면 또 되묻게 된다.
 
 바꿀 수 있는 항목: ${Object.entries(FIELDS)
   .map(([key, { label }]) => `${key}(${label})`)
@@ -113,9 +121,18 @@ export interface Patch {
   rawValue: string;
 }
 
+/** 교시인지 시각인지 정하지 못한 요청. 사람이 고르면 코드가 확정한다. */
+export interface TimeAmbiguity {
+  lecture: Lecture;
+  rawValue: string;
+  asPeriod: { normalized: string; infos: Lecture["lecture_infos"] };
+  asClock: { normalized: string; infos: Lecture["lecture_infos"] };
+}
+
 export interface PatchPlan {
   patches: Patch[];
   problems: string[];
+  ambiguities: TimeAmbiguity[];
 }
 
 /**
@@ -178,6 +195,8 @@ export async function planPatches(
   text: string,
   lectures: Lecture[],
   timeFormat: TimeFormat,
+  /** 스레드 앞부분. "시각으로 해줘" 같은 답을 알아들으려면 필요하다. */
+  context = "",
 ): Promise<PatchPlan> {
   const raw = await generateStructured<{
     patches: { identifier: string; lectureClass: string; field: FieldKey; value: string }[];
@@ -185,10 +204,13 @@ export async function planPatches(
   }>({
     system: SYSTEM_PROMPT,
     schema: PATCH_SCHEMA as unknown as Record<string, unknown>,
-    prompt: `다음 수정 요청을 구조화해줘.\n\n${text}`,
+    prompt: context
+      ? `직전 대화:\n${context}\n\n지금 메시지(이것만 처리해라):\n${text}`
+      : `다음 수정 요청을 구조화해줘.\n\n${text}`,
   });
 
   const patches: Patch[] = [];
+  const ambiguities: TimeAmbiguity[] = [];
   const problems = raw.unclear.map((line) => `무슨 뜻인지 확실하지 않아 넘겼습니다: ${line}`);
 
   for (const item of raw.patches) {
@@ -211,16 +233,17 @@ export async function planPatches(
         );
         const asClock = readAsClock(item.value, lecture.raw_class_time);
 
-        // 둘 다 말이 되면 추측하지 않는다. 실제 시각을 보여주고 고르게 한다.
+        // 둘 다 말이 되면 추측하지 않는다. 고르는 건 사람이, 확정은 코드가 한다.
         if (asPeriod && asClock) {
-          problems.push(
-            [
-              `${where}: "${item.value}"가 교시인지 시각인지 확실하지 않습니다.`,
-              `• 교시로 읽으면 → ${describeClassTime(asPeriod)}`,
-              `• 시각으로 읽으면 → ${describeClassTime(asClock)}`,
-              "원하는 쪽으로 다시 말씀해주세요. 예: `9교시~10교시` 또는 `09:00~10:00`",
-            ].join("\n"),
-          );
+          ambiguities.push({
+            lecture,
+            rawValue: item.value,
+            asPeriod: {
+              normalized: normalizePeriodInput(item.value, lecture.raw_class_time),
+              infos: asPeriod,
+            },
+            asClock: { normalized: item.value, infos: asClock },
+          });
           continue;
         }
       }
@@ -272,7 +295,29 @@ export async function planPatches(
     });
   }
 
-  return { patches, problems };
+  return { patches, problems, ambiguities };
+}
+
+/**
+ * 사람이 고른 쪽으로 확정한다.
+ * 이 단계엔 LLM이 끼지 않는다 — 이미 계산해둔 두 해석 중 하나를 고르는 것뿐이다.
+ */
+export function resolveAmbiguities(
+  ambiguities: TimeAmbiguity[],
+  mode: "period" | "clock",
+): Patch[] {
+  return ambiguities.map((item) => {
+    const chosen = mode === "period" ? item.asPeriod : item.asClock;
+    return {
+      lecture: item.lecture,
+      field: "class_time" as const,
+      label: FIELDS.class_time.label,
+      before: describeClassTime(item.lecture.lecture_infos),
+      after: describeClassTime(chosen.infos),
+      parsed: chosen.infos,
+      rawValue: chosen.normalized,
+    };
+  });
 }
 
 /** 원본을 건드리지 않고 수정본을 새로 만든다. 적용 전 미리보기와 실제 적용이 갈라지지 않게. */

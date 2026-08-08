@@ -2,6 +2,7 @@ import { planPatches } from "~/services/lecture/patch";
 import { buildPatchBlocks, buildResultBlocks, convertToReview } from "~/services/lecture/pipeline";
 import { findTokenByThread, linkThread, loadReview, savePatchPlan } from "~/services/lecture/reviewStore";
 import { downloadSlackFile, findExcelFile } from "~/utils/slackFile";
+import { readThreadContext } from "~/utils/slackThread";
 import type { MessageSetting } from "../type";
 
 const COMMAND = /^!강의반영/;
@@ -145,9 +146,10 @@ messages.push({
     const messageTs = placeholder.ts as string;
 
     try {
-      const plan = await planPatches(text, stored.lectures, stored.timeFormat);
+      const context = await readThreadContext(client, channel, parentTs, ts);
+      const plan = await planPatches(text, stored.lectures, stored.timeFormat, context);
 
-      if (plan.patches.length === 0) {
+      if (plan.patches.length === 0 && plan.ambiguities.length === 0) {
         await client.chat.update({
           channel,
           ts: messageTs,
@@ -168,7 +170,7 @@ messages.push({
         return;
       }
 
-      const patchToken = await savePatchPlan(token, plan.patches);
+      const patchToken = await savePatchPlan(token, plan);
       await client.chat.update({
         channel,
         ts: messageTs,
