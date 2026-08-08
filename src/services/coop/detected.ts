@@ -9,6 +9,8 @@ export interface CoopNoticeImage {
   mimeType: StructuredImageMimeType;
 }
 
+export type DetectedCoopTermName = "1학기" | "2학기" | "하계방학" | "동계방학";
+
 interface ArticleAttachment {
   name?: string;
   url?: string;
@@ -20,8 +22,8 @@ export interface DetectedCoopNotice {
   articleId: number;
   articleTitle: string;
   articleUrl: string;
-  year: number;
-  termName: "1학기" | "2학기" | "하계방학" | "동계방학";
+  year?: number;
+  termName?: DetectedCoopTermName;
   images: CoopNoticeImage[];
 }
 
@@ -123,7 +125,7 @@ export function guessRegularCoopSemester(
 
 export function guessCoopSemester(
   title: string,
-): { year: number; termName: DetectedCoopNotice["termName"] } | null {
+): { year: number; termName: DetectedCoopTermName } | null {
   const regular = guessRegularCoopSemester(title);
   if (regular) return regular;
   const vacation = normalizeVacationSemester(title);

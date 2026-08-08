@@ -19,8 +19,14 @@ vi.mock("~/services/coop/detected", () => ({
 }));
 
 vi.mock("~/services/coop/pipeline", () => ({
-  extractVacationCoopImage: vi.fn(),
-  convertRegularCoopToReview: vi.fn(async () => ({
+  extractCoopImage: vi.fn(async () => ({
+    title: "2026년 1학기 시설물 운영 시간",
+    semesterLabel: "26-1학기",
+    fromDate: "2026-03-03",
+    toDate: "2026-06-19",
+    shops: [],
+  })),
+  convertRegularRawCoopToReview: vi.fn(async () => ({
     token: "b".repeat(32),
     reviewUrl: "https://bot.example.com/review/token",
     shopCount: 11,
@@ -32,6 +38,10 @@ vi.mock("~/services/coop/pipeline", () => ({
     type: "section",
     text: { type: "mrkdwn", text: "변환 완료" },
   }]),
+}));
+
+vi.mock("~/services/coop/vacationStore", () => ({
+  savePendingCoopVacation: vi.fn(async () => undefined),
 }));
 
 vi.mock("~/services/coop/reviewStore", () => ({
@@ -60,12 +70,14 @@ import {
   collectCoopImages,
   downloadCoopNoticeImage,
   fetchCoopArticle,
+  guessCoopSemester,
   saveDetectedCoop,
 } from "~/services/coop/detected";
-import { convertRegularCoopToReview } from "~/services/coop/pipeline";
+import { convertRegularRawCoopToReview, extractCoopImage } from "~/services/coop/pipeline";
 import { linkCoopThread } from "~/services/coop/reviewStore";
 import { createCoopJob } from "~/services/coop/jobStore";
 import { handleCoopDetectedAction } from "~/services/slack/coopDetectedAction";
+import { savePendingCoopVacation } from "~/services/coop/vacationStore";
 
 function slackClient() {
   return {
@@ -94,9 +106,13 @@ describe("생협 공지 감지 Slack 액션", () => {
 
     expect(fetchCoopArticle).toHaveBeenCalledWith(123);
     expect(downloadCoopNoticeImage).toHaveBeenCalledWith(expect.objectContaining({ name: "2026-1학기.png" }));
-    expect(convertRegularCoopToReview).toHaveBeenCalledWith(
-      expect.any(ArrayBuffer),
-      "image/png",
+    expect(extractCoopImage).toHaveBeenCalledWith({
+      image: expect.any(ArrayBuffer),
+      mimeType: "image/png",
+      fileName: "2026-1학기.png",
+    });
+    expect(convertRegularRawCoopToReview).toHaveBeenCalledWith(
+      expect.objectContaining({ semesterLabel: "26-1학기" }),
       { env: "stage", year: 2026, termName: "1학기", fileName: "2026-1학기.png" },
     );
     expect(linkCoopThread).toHaveBeenCalledWith("C1", "100.1", "b".repeat(32));
@@ -110,6 +126,59 @@ describe("생협 공지 감지 Slack 액션", () => {
       ts: "100.1",
       text: expect.stringContaining("변환 완료"),
     }));
+  });
+
+  it("공지 제목에 학기가 없어도 선택한 이미지에서 학기를 읽어 변환한다", async () => {
+    vi.mocked(guessCoopSemester).mockReturnValueOnce(null);
+    const client = slackClient();
+
+    await handleCoopDetectedAction(client as never, {
+      channel: { id: "C1" },
+      user: { id: "U1" },
+    } as never, {
+      type: "button",
+      action_id: "coop:detected",
+      value: JSON.stringify({ article_id: 123 }),
+    } as never);
+
+    expect(extractCoopImage).toHaveBeenCalled();
+    expect(convertRegularRawCoopToReview).toHaveBeenCalledWith(
+      expect.objectContaining({ semesterLabel: "26-1학기" }),
+      expect.objectContaining({ year: 2026, termName: "1학기" }),
+    );
+    expect(JSON.stringify(client.chat.update.mock.calls.at(-1)?.[0]))
+      .not.toContain("제목에서 학기를 읽지 못했습니다");
+  });
+
+  it("공지 제목에 학기가 없어도 방학 이미지는 시작일 입력 단계로 진행한다", async () => {
+    vi.mocked(guessCoopSemester).mockReturnValueOnce(null);
+    vi.mocked(extractCoopImage).mockResolvedValueOnce({
+      title: "2026년 하계방학 생협 사업장 운영시간 안내",
+      semesterLabel: "2026년 하계방학",
+      fromDate: "2026-06-22",
+      toDate: "2026-08-30",
+      shops: [],
+    });
+    const client = slackClient();
+
+    await handleCoopDetectedAction(client as never, {
+      channel: { id: "C1" },
+      user: { id: "U1" },
+    } as never, {
+      type: "button",
+      action_id: "coop:detected",
+      value: JSON.stringify({ article_id: 123 }),
+    } as never);
+
+    expect(savePendingCoopVacation).toHaveBeenCalledWith("C1", "100.1", expect.objectContaining({
+      year: 2026,
+      season: "하계",
+      fileName: "2026-1학기.png",
+    }));
+    expect(client.chat.update).toHaveBeenLastCalledWith(expect.objectContaining({
+      text: "방학 시작일 입력 대기",
+    }));
+    expect(convertRegularRawCoopToReview).not.toHaveBeenCalled();
   });
 
   it("아니요를 누르면 원본 감지 메시지를 종료 상태로 바꾼다", async () => {

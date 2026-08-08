@@ -8,12 +8,13 @@ import {
   guessCoopSemester,
   loadDetectedCoop,
   saveDetectedCoop,
+  type DetectedCoopTermName,
   type CoopNoticeImage,
 } from "~/services/coop/detected";
 import {
   buildRegularCoopResultBlocks,
-  convertRegularCoopToReview,
-  extractVacationCoopImage,
+  convertRegularRawCoopToReview,
+  extractCoopImage,
 } from "~/services/coop/pipeline";
 import { linkCoopThread } from "~/services/coop/reviewStore";
 import { createCoopJob } from "~/services/coop/jobStore";
@@ -23,6 +24,7 @@ import {
   type CoopKoinEnv,
 } from "~/services/coop/target";
 import { savePendingCoopVacation } from "~/services/coop/vacationStore";
+import { resolveExtractedCoopSemester } from "~/services/coop/vision";
 
 const MAX_CHOICES = 4;
 const ARTICLE_URL = (articleId: number) => `https://koreatech.in/articles/${articleId}`;
@@ -54,8 +56,7 @@ async function runCoopConversion({
   ts,
   actor,
   image,
-  year,
-  termName,
+  hint,
   env,
 }: {
   client: WebClient;
@@ -63,30 +64,41 @@ async function runCoopConversion({
   ts: string | undefined;
   actor: string;
   image: CoopNoticeImage;
-  year: number;
-  termName: "1학기" | "2학기" | "하계방학" | "동계방학";
+  hint?: { year: number; termName: DetectedCoopTermName };
   env: CoopKoinEnv;
 }) {
   await client.chat.update({
     channel,
     ts,
     text: "생협 운영시간 변환 중",
-    blocks: section(`:hourglass_flowing_sand: *${year} ${termName} 생협 운영시간* 변환 중…\n${coopTargetLabel(env)} · ${image.name}\n작업자: <@${actor}>`),
+    blocks: section(`:hourglass_flowing_sand: *생협 운영시간* 이미지 분석 중…\n${coopTargetLabel(env)} · ${image.name}\n작업자: <@${actor}>`),
   });
 
   try {
     const buffer = await downloadCoopNoticeImage(image);
-    if (termName === "하계방학" || termName === "동계방학") {
-      const season = termName.startsWith("하계") ? "하계" : "동계";
-      const raw = await extractVacationCoopImage({
-        image: buffer,
-        mimeType: image.mimeType,
-        fileName: image.name,
-      });
+    const raw = await extractCoopImage({
+      image: buffer,
+      mimeType: image.mimeType,
+      fileName: image.name,
+    });
+    const semester = resolveExtractedCoopSemester(raw);
+    if (!semester) {
+      throw new Error([
+        "이미지에서 학기를 읽지 못했습니다.",
+        `읽은 학기: ${raw.semesterLabel || "(없음)"}`,
+        `읽은 제목: ${raw.title || "(없음)"}`,
+      ].join("\n"));
+    }
+    if (hint && (hint.year !== semester.year || hint.termName !== semester.termName)) {
+      throw new Error(
+        `공지 제목은 ${hint.year} ${hint.termName}인데 이미지에서는 ${semester.year} ${semester.termName}(으)로 읽었습니다.`,
+      );
+    }
+    if (semester.kind === "vacation") {
       await savePendingCoopVacation(channel, ts ?? "", {
         env,
-        year,
-        season,
+        year: semester.year,
+        season: semester.season,
         fileName: image.name,
         requesterId: actor,
         raw,
@@ -96,7 +108,7 @@ async function runCoopConversion({
         ts,
         text: "방학 시작일 입력 대기",
         blocks: section([
-          `:calendar: *${year} ${season} 운영시간을 읽었습니다.*`,
+          `:calendar: *${semester.year} ${semester.season} 운영시간을 읽었습니다.*`,
           `전체 기간: ${raw.fromDate} - ${raw.toDate}`,
           "",
           "이 메시지의 스레드에 방학 시작일을 입력해주세요.",
@@ -105,15 +117,21 @@ async function runCoopConversion({
       });
       return;
     }
-    const target = { env, year, termName, fileName: image.name };
-    const outcome = await convertRegularCoopToReview(buffer, image.mimeType, target);
+    const normalizedRaw = { ...raw, semesterLabel: semester.normalizedLabel };
+    const target = {
+      env,
+      year: semester.year,
+      termName: semester.termName,
+      fileName: image.name,
+    };
+    const outcome = await convertRegularRawCoopToReview(normalizedRaw, target);
     await linkCoopThread(channel, ts ?? "", outcome.token);
     await createCoopJob({
       token: outcome.token,
       channelId: channel,
       threadTs: ts ?? "",
-      year,
-      term: termName,
+      year: semester.year,
+      term: semester.termName,
       sourceFile: image.name,
       shopCount: outcome.shopCount,
       targetEnv: env,
@@ -121,7 +139,7 @@ async function runCoopConversion({
     await client.chat.update({
       channel,
       ts,
-      text: `${year} ${termName} 생협 운영시간 변환 완료 · ${outcome.shopCount}개`,
+      text: `${semester.year} ${semester.termName} 생협 운영시간 변환 완료 · ${outcome.shopCount}개`,
       blocks: buildRegularCoopResultBlocks(outcome, target, actor),
     });
   } catch (error) {
@@ -190,8 +208,9 @@ export async function handleCoopDetectedAction(
       ts: body.message?.ts,
       actor,
       image,
-      year: detected.year,
-      termName: detected.termName,
+      hint: detected.year && detected.termName
+        ? { year: detected.year, termName: detected.termName }
+        : undefined,
       env: detected.env,
     });
     return;
@@ -250,15 +269,7 @@ export async function handleCoopDetectedAction(
     return;
   }
 
-  const semester = guessCoopSemester(article.title ?? "");
-  if (!semester) {
-    await say("생협 학기를 확인해주세요", [
-      ":grey_question: *제목에서 학기를 읽지 못했습니다.*",
-      "이미지를 직접 올리고 `!생협반영 2026 1학기` 또는 `!생협반영 2026 하계방학`처럼 학기를 지정해주세요.",
-      ...images.map((image) => `<${image.url}|${image.name}>`),
-    ].join("\n"));
-    return;
-  }
+  const semesterHint = guessCoopSemester(article.title ?? "");
 
   if (images.length > 1) {
     const token = await saveDetectedCoop({
@@ -267,7 +278,7 @@ export async function handleCoopDetectedAction(
       articleTitle: article.title ?? `게시글 ${articleId}`,
       articleUrl,
       images,
-      ...semester,
+      ...(semesterHint ?? {}),
     });
     await client.chat.update({
       channel,
@@ -275,7 +286,9 @@ export async function handleCoopDetectedAction(
       text: "변환할 생협 이미지를 골라주세요",
       blocks: [
         ...section([
-          `:frame_with_picture: *${semester.year} ${semester.termName} 생협 운영시간*`,
+          semesterHint
+            ? `:frame_with_picture: *${semesterHint.year} ${semesterHint.termName} 생협 운영시간*`
+            : ":frame_with_picture: *생협 운영시간 이미지*",
           `이미지 첨부가 *${images.length}개*입니다. 변환할 파일을 골라주세요.`,
           "",
           ...images.slice(0, MAX_CHOICES).map((image, index) => `${index + 1}. ${image.name}`),
@@ -310,6 +323,6 @@ export async function handleCoopDetectedAction(
     actor,
     image: images[0],
     env,
-    ...semester,
+    hint: semesterHint ?? undefined,
   });
 }
