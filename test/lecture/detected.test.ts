@@ -3,46 +3,8 @@ import {
   cleanFileName,
   guessSemester,
   isAllowedFileUrl,
-  parseDetected,
   collectExcelAttachments,
 } from "~/services/lecture/detected";
-
-describe("감지 요청 검증", () => {
-  const valid = { target: "stage", article_id: 20587 };
-
-  it("게시글 번호만 있으면 된다", () => {
-    // 첨부와 학기는 삐봇이 코인 API로 알아낸다. 배치가 알 필요가 없다.
-    expect(parseDetected(valid).request).toEqual({
-      target: "stage",
-      articleId: 20587,
-      year: undefined,
-      term: undefined,
-    });
-  });
-
-  it("대상 환경을 지어내지 않는다", () => {
-    for (const target of [undefined, "", "production", "PROD"]) {
-      expect(parseDetected({ ...valid, target }).request).toBeUndefined();
-    }
-  });
-
-  it("게시글 번호가 이상하면 막는다", () => {
-    for (const article_id of [undefined, 0, -1, "글번호", 1.5]) {
-      expect(parseDetected({ ...valid, article_id }).request).toBeUndefined();
-    }
-  });
-
-  it("학기를 직접 지정할 수 있다", () => {
-    const result = parseDetected({ ...valid, year: 2026, term: "여름학기" });
-    expect(result.request?.year).toBe(2026);
-    expect(result.request?.term).toBe("여름학기");
-  });
-
-  it("모르는 학기는 통과시키지 않는다", () => {
-    expect(parseDetected({ ...valid, term: "계절학기" }).request).toBeUndefined();
-    expect(parseDetected({ ...valid, year: 1800 }).request).toBeUndefined();
-  });
-});
 
 describe("첨부에서 엑셀 모으기", () => {
   const attach = (name: string, url = "https://portal.koreatech.ac.kr/f?a=1") => ({ name, url });

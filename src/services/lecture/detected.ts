@@ -1,33 +1,27 @@
 import { createReviewToken, isValidToken } from "./reviewStore";
 import type { KoinEnv } from "./target";
 
-/**
- * 배치가 강의 공지를 감지했을 때 넘겨주는 값.
- *
- * 배치는 **게시글 번호만** 준다. 첨부파일 주소와 학기는 삐봇이 코인 API로 알아낸다.
- * 배치가 첨부를 추출하고 슬랙 블록을 조립하면 그 지식이 두 곳에 흩어진다.
- */
-export interface DetectedRequest {
-  target: KoinEnv;
-  articleId: number;
-  /** 제목으로 학기를 알아내지 못할 때 사람이 지정할 수 있게 열어둔다. */
-  year?: number;
-  term?: string;
-}
-
 export interface AttachmentFile {
   name: string;
   url: string;
 }
 
-export interface DetectedNotice extends DetectedRequest {
+/**
+ * 첨부가 여럿이라 사람이 고르는 동안 들고 있는 값.
+ *
+ * 배치는 **게시글 번호만** 준다. 첨부·학기는 버튼을 누른 뒤 삐봇이 코인 API로 알아낸다.
+ * 배치가 첨부를 추출하고 슬랙 블록을 조립하면 그 지식이 두 레포로 흩어진다.
+ */
+export interface DetectedNotice {
+  target: KoinEnv;
+  articleId: number;
   articleTitle: string;
   articleUrl: string;
-  /** 엑셀 첨부 후보. 둘 이상이면 사람이 고른다. */
+  year: number;
+  term: string;
+  /** 엑셀 첨부 후보. 이 순서가 곧 버튼 순서다. */
   files: AttachmentFile[];
 }
-
-export const TERMS = ["1학기", "2학기", "여름학기", "겨울학기"];
 
 /** 학교가 올린 파일만 받는다. 남이 넣은 주소로 봇이 아무거나 받아오게 두지 않는다. */
 const ALLOWED_FILE_HOSTS = ["koreatech.ac.kr", "koreatech.in"];
@@ -42,38 +36,6 @@ export function isAllowedFileUrl(url: string): boolean {
   } catch {
     return false;
   }
-}
-
-export interface ParseResult {
-  ok: boolean;
-  request?: DetectedRequest;
-  reason?: string;
-}
-
-/** 배치가 보낸 값을 그대로 믿지 않는다. 여기서 걸러야 버튼 누른 뒤에 깨지지 않는다. */
-export function parseDetected(body: unknown): ParseResult {
-  const raw = (body ?? {}) as Record<string, unknown>;
-  const target = raw.target;
-  const articleId = Number(raw.article_id);
-
-  if (target !== "stage" && target !== "prod") {
-    return { ok: false, reason: "target은 stage 또는 prod여야 합니다." };
-  }
-  if (!Number.isInteger(articleId) || articleId <= 0) {
-    return { ok: false, reason: "article_id는 1 이상의 정수여야 합니다." };
-  }
-
-  // 학기는 보통 제목에서 알아낸다. 보내주면 그걸 우선한다.
-  const year = raw.year === undefined ? undefined : Number(raw.year);
-  const term = raw.term === undefined ? undefined : String(raw.term);
-  if (year !== undefined && (!Number.isInteger(year) || year < 2000 || year > 2100)) {
-    return { ok: false, reason: "year가 올바르지 않습니다." };
-  }
-  if (term !== undefined && !TERMS.includes(term)) {
-    return { ok: false, reason: `term은 ${TERMS.join(" · ")} 중 하나여야 합니다.` };
-  }
-
-  return { ok: true, request: { target, articleId, year, term } };
 }
 
 interface ArticleAttachment {

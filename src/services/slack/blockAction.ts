@@ -1,13 +1,19 @@
 import { buildAdminRequest, ensureSemester, submitLectures, toAdminTerm } from "~/services/lecture/adminApi";
 import {
+  collectExcelAttachments,
   downloadNoticeFile,
   dropDetected,
+  fetchArticle,
+  guessSemester,
   loadDetected,
+  saveDetected,
 } from "~/services/lecture/detected";
+import type { AttachmentFile } from "~/services/lecture/detected";
 import { cancelJob, claimJob, createJob, finishJob } from "~/services/lecture/jobStore";
 import { getKoinAdminAuth } from "~/services/lecture/koinAuth";
 import { linkThread } from "~/services/lecture/reviewStore";
-import { labelOf, resolveTargetByEnv } from "~/services/lecture/target";
+import { labelOf, resolveTarget, resolveTargetByEnv } from "~/services/lecture/target";
+import type { KoinEnv } from "~/services/lecture/target";
 import { applyPatches, resolveAmbiguities } from "~/services/lecture/patch";
 import {
   buildPatchBlocks,
@@ -27,9 +33,188 @@ import type { BlockActionSetting } from "./type";
 // 버튼·셀렉트 조작(block_actions) 핸들러 목록.
 // 등록하지 않은 action_id는 라우터에서 무시된다. 모달 안의 select와 URL 링크 버튼도
 // block_actions로 들어오는데, 그것들은 여기서 처리할 대상이 아니기 때문이다.
+/** 버튼이 너무 많으면 읽히지 않는다. 넘치면 명령어로 직접 올리는 편이 낫다. */
+const MAX_CHOICES = 4;
+
+/** 버튼 글자가 길면 잘려서 무엇인지 알 수 없다. */
+function shorten(name: string): string {
+  return name.length > 28 ? `${name.slice(0, 27)}…` : name;
+}
+
+/**
+ * 고른 파일을 내려받아 변환하고 검토 링크까지 올린다.
+ * 첨부가 하나일 때와 골랐을 때가 여기서 만난다.
+ */
+async function runConversion({
+  client, channel, ts, actor, env, file, year, term,
+}: {
+  client: Parameters<BlockActionSetting["handler"]>[0]["client"];
+  channel: string;
+  ts: string | undefined;
+  actor: string;
+  env: KoinEnv;
+  file: AttachmentFile;
+  year: number;
+  term: string;
+}) {
+  const target = { env, year, termName: term, fileName: file.name };
+
+  await updateSlack({
+    client, channel, ts,
+    text: "변환 중",
+    blocks: [{ type: "section", text: { type: "mrkdwn",
+      text: `:hourglass_flowing_sand: *${year} ${term}* 변환 중…\n${labelOf(env)} · ${file.name}\n작업자: <@${actor}>` } }],
+  });
+
+  try {
+    const buffer = await downloadNoticeFile(file.url);
+    const outcome = await convertToReview(buffer, target);
+
+    // 이 메시지 스레드에 온 수정 요청이 어느 변환 건인지 찾을 수 있게 해둔다.
+    await linkThread(channel, ts ?? "", outcome.token);
+    await createJob({
+      token: outcome.token,
+      channelId: channel,
+      threadTs: ts ?? "",
+      year,
+      term,
+      sourceFile: file.name,
+      lectureCount: outcome.lectureCount,
+      targetEnv: env,
+    });
+
+    await updateSlack({
+      client, channel, ts,
+      text: `${year} ${term} 변환 완료 · ${outcome.lectureCount}건`,
+      blocks: buildResultBlocks(outcome, target, actor),
+    });
+  } catch (error) {
+    await updateSlack({
+      client, channel, ts,
+      text: "변환 실패",
+      blocks: [
+        { type: "section", text: { type: "mrkdwn",
+          text: `:x: *변환 실패*\n${error instanceof Error ? error.message : "알 수 없는 오류입니다"}` } },
+        { type: "context", elements: [{ type: "mrkdwn",
+          text: `${file.name} · 작업자: <@${actor}>` }] },
+      ],
+    });
+  }
+}
+
 export const blockActions: BlockActionSetting[] = [
-  // 배치가 감지한 공지에서 변환을 시작한다. 명령어로 하던 것과 같은 흐름을 탄다.
-  // 엑셀 첨부가 여럿이면 버튼도 여럿이라 action_id를 나눠 둔다.
+  {
+    /**
+     * 배치가 올린 감지 알림의 `예`.
+     *
+     * 배치가 아는 건 **이 action_id와 `article_id` 하나**뿐이다. 첨부·학기·경고 문구는
+     * 전부 여기서 만든다. 되돌릴 수 없는 작업을 막는 장치가 두 레포로 흩어지면,
+     * 한쪽만 고쳤을 때 나머지 한쪽은 옛날 그대로 남는다.
+     */
+    actionId: "lecture:detected",
+    async handler({ client, body, action }) {
+      if (action.type !== "button" || !body.channel) return;
+
+      const { article_id: articleId } = JSON.parse(action.value ?? "{}") as {
+        article_id?: number;
+      };
+      const channel = body.channel.id;
+      const ts = body.message?.ts;
+      const actor = body.user.id;
+      if (!articleId) return;
+
+      const say = (text: string, mrkdwn: string) =>
+        updateSlack({
+          client, channel, ts, text,
+          blocks: [{ type: "section", text: { type: "mrkdwn", text: mrkdwn } }],
+        });
+
+      // 어느 코인에 반영할지는 채널로 정한다. 배치는 웹훅을 고르는 것으로 이미 답했다.
+      const resolved = resolveTarget(channel);
+      if (!resolved.ok || !resolved.target) {
+        await say("대상 아님", `:x: ${resolved.reason}`);
+        return;
+      }
+      const env = resolved.target.env;
+
+      let article: Awaited<ReturnType<typeof fetchArticle>>;
+      try {
+        article = await fetchArticle(resolved.target.baseUrl, articleId);
+      } catch (error) {
+        await say("게시글 조회 실패",
+          `:x: *게시글을 읽지 못했습니다.*\n${error instanceof Error ? error.message : ""}`);
+        return;
+      }
+
+      const files = collectExcelAttachments(article.attachments);
+      if (files.length === 0) {
+        await say("첨부 없음", [
+          ":grey_question: *엑셀 첨부를 찾지 못했습니다.*",
+          `<${article.url ?? ""}|${article.title ?? `게시글 ${articleId}`}>`,
+          "파일을 직접 올리고 `!강의반영 2026 여름학기`로 실행해주세요.",
+        ].join("\n"));
+        return;
+      }
+
+      // 학기를 모르면 진행하지 않는다. 엉뚱한 학기에 넣으면 되돌릴 수 없다.
+      const semester = guessSemester(article.title ?? "");
+      if (!semester) {
+        await say("학기를 지정해주세요", [
+          ":grey_question: *제목에서 학기를 읽지 못했습니다.*",
+          "엑셀을 내려받아 `!강의반영 2026 여름학기`처럼 직접 올려주세요.",
+          ...files.map((file) => `<${file.url}|${file.name}>`),
+        ].join("\n"));
+        return;
+      }
+
+      // 엑셀이 여럿이면 사람이 고른다. 편람 외에 폐강강좌·시간표가 함께 붙는다.
+      if (files.length > 1) {
+        const token = await saveDetected({
+          target: env,
+          articleId,
+          articleTitle: article.title ?? `게시글 ${articleId}`,
+          articleUrl: article.url ?? "",
+          files,
+          ...semester,
+        });
+
+        await updateSlack({
+          client, channel, ts,
+          text: "변환할 파일을 골라주세요",
+          blocks: [
+            { type: "section", text: { type: "mrkdwn", text: [
+              `:page_facing_up: *${semester.year} ${semester.term}* · ${labelOf(env)}`,
+              `엑셀 첨부가 *${files.length}개* 입니다. 변환할 파일을 골라주세요.`,
+              "",
+              ...files.slice(0, MAX_CHOICES).map((file, i) => `${i + 1}. ${file.name}`),
+            ].join("\n") } },
+            { type: "actions", elements: [
+              ...files.slice(0, MAX_CHOICES).map((file, index) => ({
+                type: "button" as const,
+                text: { type: "plain_text" as const, text: shorten(file.name), emoji: true },
+                style: index === 0 ? ("primary" as const) : undefined,
+                action_id: `lecture:detected_start${index === 0 ? "" : `_${index}`}`,
+                value: JSON.stringify({ token, fileIndex: index }),
+              })),
+              {
+                type: "button" as const,
+                text: { type: "plain_text" as const, text: "아니요", emoji: true },
+                action_id: "lecture:detected_ignore",
+                value: JSON.stringify({ token }),
+              },
+            ] },
+          ],
+        });
+        return;
+      }
+
+      await runConversion({
+        client, channel, ts, actor,
+        env, file: files[0], ...semester,
+      });
+    },
+  },
+  // 엑셀이 여럿일 때 고른 파일로 이어간다. 버튼마다 action_id가 달라야 해서 나눠 둔다.
   ...[0, 1, 2, 3].map((slot) => ({
     actionId: slot === 0 ? "lecture:detected_start" : `lecture:detected_start_${slot}`,
     async handler({ client, body, action }: Parameters<BlockActionSetting["handler"]>[0]) {
@@ -45,7 +230,8 @@ export const blockActions: BlockActionSetting[] = [
       if (!token) return;
 
       const notice = await loadDetected(token);
-      if (!notice) {
+      const file = notice?.files[fileIndex];
+      if (!notice || !file || !notice.year || !notice.term) {
         await updateSlack({
           client, channel, ts,
           text: "만료됨",
@@ -54,77 +240,14 @@ export const blockActions: BlockActionSetting[] = [
         });
         return;
       }
-      const file = notice.files[fileIndex];
-      if (!file) {
-        return;
-      }
-
-      // 학기를 모르면 진행하지 않는다. 엉뚱한 학기에 넣으면 되돌릴 수 없다.
-      if (!notice.year || !notice.term) {
-        await updateSlack({
-          client, channel, ts,
-          text: "학기를 지정해주세요",
-          blocks: [{ type: "section", text: { type: "mrkdwn",
-            text: [
-              ":grey_question: *제목에서 학기를 읽지 못했습니다.*",
-              "엑셀을 내려받아 `!강의반영 2026 여름학기`처럼 직접 올려주세요.",
-              `<${file.url}|${file.name}>`,
-            ].join("\n") } }],
-        });
-        return;
-      }
 
       // 먼저 지운다. 두 명이 눌러 두 번 변환하면 검토 링크가 둘이 된다.
       await dropDetected(token);
 
-      const target = {
-        env: notice.target,
-        year: notice.year,
-        termName: notice.term,
-        fileName: file.name,
-      };
-
-      await updateSlack({
-        client, channel, ts,
-        text: "변환 중",
-        blocks: [{ type: "section", text: { type: "mrkdwn",
-          text: `:hourglass_flowing_sand: *${target.year} ${target.termName}* 변환 중…\n${labelOf(target.env)} · ${target.fileName}\n작업자: <@${actor}>` } }],
+      await runConversion({
+        client, channel, ts, actor,
+        env: notice.target, file, year: notice.year, term: notice.term,
       });
-
-      try {
-        const buffer = await downloadNoticeFile(file.url);
-        const outcome = await convertToReview(buffer, target);
-
-        // 이 메시지 스레드에 온 수정 요청이 어느 변환 건인지 찾을 수 있게 해둔다.
-        await linkThread(channel, ts ?? "", outcome.token);
-        await createJob({
-          token: outcome.token,
-          channelId: channel,
-          threadTs: ts ?? "",
-          year: target.year,
-          term: target.termName,
-          sourceFile: target.fileName,
-          lectureCount: outcome.lectureCount,
-          targetEnv: target.env,
-        });
-
-        await updateSlack({
-          client, channel, ts,
-          text: `${target.year} ${target.termName} 변환 완료 · ${outcome.lectureCount}건`,
-          blocks: buildResultBlocks(outcome, target, actor),
-        });
-      } catch (error) {
-        await updateSlack({
-          client, channel, ts,
-          text: "변환 실패",
-          blocks: [
-            { type: "section", text: { type: "mrkdwn",
-              text: `:x: *변환 실패*\n${error instanceof Error ? error.message : "알 수 없는 오류입니다"}` } },
-            { type: "context", elements: [{ type: "mrkdwn",
-              text: `${target.fileName} · 작업자: <@${actor}>` }] },
-          ],
-        });
-      }
     },
   })),
   {
