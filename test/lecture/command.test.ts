@@ -50,10 +50,11 @@ describe("파일 첨부 메시지 처리 범위", () => {
     const accepting = messageFunctionList.filter((m) => m.acceptsFiles);
 
     // 파일 첨부 메시지가 기존 명령어(!질문 등)에 흘러들어가면 없던 동작이 생긴다.
-    expect(accepting).toHaveLength(2);
+    expect(accepting).toHaveLength(3);
     expect(accepting.map((item) => item.regex.toString())).toEqual(expect.arrayContaining([
       expect.stringContaining("강의반영"),
       expect.stringContaining("생협반영"),
+      expect.stringContaining("버스반영"),
     ]));
   });
 });
@@ -85,7 +86,7 @@ describe("명령어 충돌", () => {
     expect(matching).toHaveLength(0);
   });
 
-  it("!수정은 수정 핸들러만 받는다", async () => {
+  it("!수정은 강의·버스 핸들러만 받는다", async () => {
     const { messageFunctionList } = await import("~/services/slack/message");
 
     const matching = messageFunctionList.filter((m) =>
@@ -94,8 +95,9 @@ describe("명령어 충돌", () => {
         : m.regex.test("!수정 유체역학 03 교수 우창규로"),
     );
 
-    expect(matching).toHaveLength(1);
-    expect(matching[0].acceptsFiles).toBeFalsy();
+    // 강의와 버스가 같은 접두사를 쓰지만 각자 소속 스레드에서만 응답한다.
+    expect(matching.length).toBeGreaterThanOrEqual(1);
+    expect(matching.every((m) => !m.acceptsFiles)).toBe(true);
   });
 });
 

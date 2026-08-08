@@ -6,6 +6,7 @@ import BASE_URL from "@/constant/BASE_URL.json";
 import { messages as googleMeetMessages } from "./domain/googleMeet";
 import { messages as lectureMessages } from "./domain/lecture";
 import { messages as coopMessages } from "./domain/coop";
+import { messages as busMessages } from "./domain/bus";
 import { answerStream, logQuery } from "~/services/rag";
 
 
@@ -684,6 +685,7 @@ interface RepliesResponse {
   ...googleMeetMessages,
   ...lectureMessages,
   ...coopMessages,
+  ...busMessages,
 ];
 
 interface Shop {
