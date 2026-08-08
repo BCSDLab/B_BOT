@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { renderRegularCoopReview } from "~/services/coop/reviewHtml";
+import { renderRegularCoopReview, renderVacationCoopReview } from "~/services/coop/reviewHtml";
 import type { RegularConversionResult } from "~/services/coop/types";
 
 const result: RegularConversionResult = {
@@ -46,5 +46,22 @@ describe("생협 검토 HTML", () => {
     const html = renderRegularCoopReview(result);
     expect(html).toContain("&lt;원문&gt;");
     expect(html).not.toContain("<원문>");
+  });
+
+  it("계절학기와 방학을 한 검토 페이지에서 구분한다", () => {
+    const vacation = structuredClone(result);
+    vacation.semester = "26-하계방학";
+    vacation.fromDate = "2026-07-18";
+    vacation.toDate = "2026-08-30";
+    const html = renderVacationCoopReview({
+      year: 2026,
+      season: "하계",
+      vacationStartDate: "2026-07-18",
+      seasonal: { ...result, semester: "26-하계계절학기", fromDate: "2026-06-22", toDate: "2026-07-17" },
+      vacation,
+    });
+    expect(html).toContain("26-하계계절학기 · 계절학기");
+    expect(html).toContain("26-하계방학 · 방학");
+    expect(html).toContain("방학 시작일 2026년 7월 18일");
   });
 });

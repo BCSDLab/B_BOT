@@ -1,6 +1,9 @@
 import {
   buildRegularCoopResultBlocks,
+  buildVacationCoopResultBlocks,
   convertRegularCoopToReview,
+  convertVacationCoopToReview,
+  extractVacationCoopImage,
 } from "~/services/coop/pipeline";
 import { buildCoopPatchBlocks, planCoopPatches } from "~/services/coop/patch";
 import {
@@ -14,23 +17,42 @@ import { readThreadContext, threadRootOf } from "~/utils/slackThread";
 import { createCoopJob } from "~/services/coop/jobStore";
 import { coopTargetLabel, resolveCoopTarget } from "~/services/coop/target";
 import type { MessageSetting } from "../type";
+import {
+  dropPendingCoopVacation,
+  loadPendingCoopVacation,
+  savePendingCoopVacation,
+} from "~/services/coop/vacationStore";
 
 const COMMAND = /^!생협반영/;
-const ARGS = /^!생협반영\s+(\d{4})\s*(1학기|2학기)\s*$/;
+const ARGS = /^!생협반영\s+(\d{4})\s*(1학기|2학기|하계방학|동계방학)\s*$/;
+
+export type CoopCommand =
+  | { year: number; kind: "regular"; termName: "1학기" | "2학기" }
+  | { year: number; kind: "vacation"; season: "하계" | "동계"; termName: "하계방학" | "동계방학" };
 
 export function parseCoopCommand(
   text: string,
-): { year: number; termName: "1학기" | "2학기" } | null {
+): CoopCommand | null {
   const matched = ARGS.exec(text.trim());
-  return matched
-    ? { year: Number(matched[1]), termName: matched[2] as "1학기" | "2학기" }
-    : null;
+  if (!matched) return null;
+  const year = Number(matched[1]);
+  const termName = matched[2];
+  if (termName === "1학기" || termName === "2학기") {
+    return { year, kind: "regular", termName };
+  }
+  return {
+    year,
+    kind: "vacation",
+    season: termName.startsWith("하계") ? "하계" : "동계",
+    termName: termName as "하계방학" | "동계방학",
+  };
 }
 
 const USAGE = [
   "*사용법* — 생협 운영시간 이미지를 올리면서 메시지에 함께 적어주세요.",
   "```!생협반영 2026 1학기```",
-  "현재는 정규학기 `1학기`와 `2학기`만 지원합니다.",
+  "```!생협반영 2026 하계방학```",
+  "방학 시간표는 이미지 추출 후 방학 시작일을 추가로 입력받습니다.",
 ].join("\n");
 
 export const messages: MessageSetting[] = [{
@@ -52,7 +74,7 @@ export const messages: MessageSetting[] = [{
             type: "mrkdwn",
             text: [
               !image ? ":frame_with_picture: 이미지 파일(PNG, JPEG, WebP, GIF)을 함께 올려주세요." : null,
-              !parsed ? ":pencil: 연도와 정규학기를 적어주세요." : null,
+              !parsed ? ":pencil: 연도와 정규학기 또는 하계·동계방학을 적어주세요." : null,
               "",
               USAGE,
             ].filter((line) => line !== null).join("\n"),
@@ -93,6 +115,40 @@ export const messages: MessageSetting[] = [{
 
     try {
       const downloaded = await downloadSlackImage(image);
+      if (parsed.kind === "vacation") {
+        const raw = await extractVacationCoopImage({
+          image: downloaded.buffer,
+          mimeType: downloaded.mimeType,
+          fileName: image.name,
+        });
+        await savePendingCoopVacation(channel, threadRoot, {
+          env: target.env,
+          year: parsed.year,
+          season: parsed.season,
+          fileName: image.name,
+          requesterId: user,
+          raw,
+        });
+        await client.chat.update({
+          channel,
+          ts: messageTs,
+          text: "방학 시작일 입력 대기",
+          blocks: [{
+            type: "section",
+            text: { type: "mrkdwn", text: [
+              `:calendar: *${parsed.year} ${parsed.season} 운영시간을 읽었습니다.*`,
+              `전체 기간: ${raw.fromDate} - ${raw.toDate}`,
+              "",
+              "계절학기와 방학을 나눌 *방학 시작일*을 이 스레드에 입력해주세요.",
+              "예) `!학기구분 2026-07-18`",
+            ].join("\n") },
+          }, {
+            type: "context",
+            elements: [{ type: "mrkdwn", text: `${image.name} · 입력 대기 24시간 · 요청: <@${user}>` }],
+          }],
+        });
+        return;
+      }
       const outcome = await convertRegularCoopToReview(
         downloaded.buffer,
         downloaded.mimeType,
@@ -138,6 +194,70 @@ export const messages: MessageSetting[] = [{
   },
 }];
 
+export function parseVacationBoundary(text: string): string | null {
+  return /^!학기구분\s+(20\d{2}-\d{2}-\d{2})\s*$/.exec(text.trim())?.[1] ?? null;
+}
+
+messages.push({
+  regex: /^!학기구분/,
+  async handler({ client, channel, text, user, parentTs }) {
+    if (!parentTs) return;
+    const pending = await loadPendingCoopVacation(channel, parentTs);
+    if (!pending) return;
+    const vacationStartDate = parseVacationBoundary(text);
+    if (!vacationStartDate) {
+      await client.chat.postMessage({
+        channel,
+        thread_ts: parentTs,
+        text: "방학 시작일 형식을 확인해주세요.",
+        blocks: [{ type: "section", text: { type: "mrkdwn", text: ":pencil: `!학기구분 YYYY-MM-DD` 형식으로 입력해주세요." } }],
+      });
+      return;
+    }
+    const placeholder = await client.chat.postMessage({
+      channel,
+      thread_ts: parentTs,
+      text: "생협 방학 시간표 분리 중",
+      blocks: [{ type: "section", text: { type: "mrkdwn", text: `:hourglass_flowing_sand: *${vacationStartDate}* 기준으로 계절학기와 방학을 나누는 중…` } }],
+    });
+    const messageTs = placeholder.ts as string;
+    try {
+      const target = {
+        env: pending.env,
+        year: pending.year,
+        season: pending.season,
+        fileName: pending.fileName,
+      };
+      const outcome = await convertVacationCoopToReview(pending.raw, vacationStartDate, target);
+      await dropPendingCoopVacation(channel, parentTs);
+      await linkCoopThread(channel, parentTs, outcome.token);
+      await createCoopJob({
+        token: outcome.token,
+        channelId: channel,
+        threadTs: messageTs,
+        year: target.year,
+        term: `${target.season}계절학기·${target.season}방학`,
+        sourceFile: target.fileName,
+        shopCount: outcome.shopCount,
+        targetEnv: target.env,
+      });
+      await client.chat.update({
+        channel,
+        ts: messageTs,
+        text: `${target.year} ${target.season} 생협 운영시간 변환 완료`,
+        blocks: buildVacationCoopResultBlocks(outcome, target, user),
+      });
+    } catch (error) {
+      await client.chat.update({
+        channel,
+        ts: messageTs,
+        text: "생협 방학 시간표 분리 실패",
+        blocks: [{ type: "section", text: { type: "mrkdwn", text: `:x: *분리 실패*\n${error instanceof Error ? error.message : "알 수 없는 오류입니다"}` } }],
+      });
+    }
+  },
+});
+
 const EDIT_COMMAND = /^!수정/;
 
 messages.push({
@@ -147,7 +267,7 @@ messages.push({
     const token = await findCoopTokenByThread(channel, parentTs);
     if (!token) return;
 
-    const request = text.replace(EDIT_COMMAND, "").trim();
+    let request = text.replace(EDIT_COMMAND, "").trim();
     const stored = await loadCoopReview(token);
     if (!stored) {
       await client.chat.postMessage({
@@ -172,6 +292,30 @@ messages.push({
         }],
       });
       return;
+    }
+    let periodIndex: number | undefined;
+    let conversion = stored.conversion;
+    if (stored.periods) {
+      const selected = /^(계절학기|방학)\s+/.exec(request);
+      if (!selected) {
+        await client.chat.postMessage({
+          channel,
+          thread_ts: parentTs,
+          text: "수정할 학기를 적어주세요.",
+          blocks: [{
+            type: "section",
+            text: { type: "mrkdwn", text: [
+              ":pencil: 방학 시간표는 수정할 학기를 먼저 적어주세요.",
+              "예) `!수정 방학 복지관식당 평일을 미운영으로 바꿔줘`",
+              "예) `!수정 계절학기 복지관식당 평일을 11:40 - 13:30으로 바꿔줘`",
+            ].join("\n") },
+          }],
+        });
+        return;
+      }
+      periodIndex = selected[1] === "계절학기" ? 0 : 1;
+      conversion = stored.periods[periodIndex].conversion;
+      request = request.slice(selected[0].length).trim();
     }
     if (!request) {
       await client.chat.postMessage({
@@ -207,7 +351,7 @@ messages.push({
 
     try {
       const context = await readThreadContext(client, channel, parentTs, ts);
-      const plan = await planCoopPatches(request, stored.conversion, context);
+      const plan = await planCoopPatches(request, conversion, context);
       if (plan.patches.length === 0) {
         await client.chat.update({
           channel,
@@ -226,7 +370,7 @@ messages.push({
         });
         return;
       }
-      const patchToken = await saveCoopPatchPlan(token, plan);
+      const patchToken = await saveCoopPatchPlan(token, { ...plan, periodIndex });
       await client.chat.update({
         channel,
         ts: messageTs,

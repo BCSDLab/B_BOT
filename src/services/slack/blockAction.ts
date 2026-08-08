@@ -39,7 +39,7 @@ import {
 } from "./coopApplyAction";
 import { applyCoopPatches } from "~/services/coop/patch";
 import { buildCoopApplyButtons } from "~/services/coop/pipeline";
-import { renderRegularCoopReview } from "~/services/coop/reviewHtml";
+import { renderRegularCoopReview, renderVacationCoopReview } from "~/services/coop/reviewHtml";
 import {
   dropCoopPatchPlan,
   loadCoopPatchPlan,
@@ -367,13 +367,35 @@ export const blockActions: BlockActionSetting[] = [
           });
           return;
         }
-        const conversion = applyCoopPatches(stored.conversion, plan.patches);
-        const blockingCount = conversion.issues.filter((issue) => issue.severity === "blocking").length;
+        const selected = plan.periodIndex === undefined
+          ? stored.conversion
+          : stored.periods?.[plan.periodIndex]?.conversion;
+        if (!selected) throw new Error("수정할 학기 데이터를 찾지 못했습니다.");
+        const conversion = applyCoopPatches(selected, plan.patches);
+        const periods = stored.periods?.map((period, index) =>
+          index === plan.periodIndex
+            ? { ...period, conversion, request: conversion.request }
+            : period);
+        const blockingCount = periods
+          ? periods.reduce((count, period) =>
+            count + period.conversion.issues.filter((issue) => issue.severity === "blocking").length, 0)
+          : conversion.issues.filter((issue) => issue.severity === "blocking").length;
+        const primary = periods?.[0]?.conversion ?? conversion;
+        const html = periods
+          ? renderVacationCoopReview({
+            year: stored.meta.year,
+            season: stored.meta.termName.startsWith("하계") ? "하계" : "동계",
+            vacationStartDate: periods[1].conversion.fromDate,
+            seasonal: periods[0].conversion,
+            vacation: periods[1].conversion,
+          })
+          : renderRegularCoopReview(conversion);
         await updateCoopReview(plan.reviewToken, {
           ...stored,
-          conversion,
-          request: conversion.request,
-          html: renderRegularCoopReview(conversion),
+          conversion: primary,
+          request: primary.request,
+          periods,
+          html,
           meta: { ...stored.meta, blockingCount },
         });
         await updateSlack({

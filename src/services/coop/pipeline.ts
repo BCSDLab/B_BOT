@@ -6,15 +6,16 @@ import {
   type CoopKoinEnv,
 } from "./target";
 import { fetchCoopShopBaseline } from "./baseline";
-import { convertRegularTimetable } from "./convert";
+import { convertRegularTimetable, convertVacationTimetable } from "./convert";
 import { buildReviewUrl, saveCoopReview } from "./reviewStore";
-import { renderRegularCoopReview } from "./reviewHtml";
+import { renderRegularCoopReview, renderVacationCoopReview } from "./reviewHtml";
 import type {
   CoopShopBaseline,
   RawRegularCoopTimetable,
   RegularConversionResult,
+  VacationSeason,
 } from "./types";
-import { extractRegularTimetable } from "./vision";
+import { extractRegularTimetable, extractVacationTimetable } from "./vision";
 
 export interface RegularCoopArtifacts {
   conversion: RegularConversionResult;
@@ -36,6 +37,17 @@ export interface RegularCoopOutcome {
   excludedCount: number;
   blockingCount: number;
   infoCount: number;
+}
+
+export interface VacationCoopTarget {
+  env: CoopKoinEnv;
+  year: number;
+  season: VacationSeason;
+  fileName: string;
+}
+
+export interface VacationCoopOutcome extends RegularCoopOutcome {
+  semesterCount: 2;
 }
 
 export function expectedRegularSemester(target: Pick<RegularCoopTarget, "year" | "termName">): string {
@@ -75,6 +87,102 @@ export async function convertRegularCoopImage({
     fileName,
   });
   return buildRegularCoopArtifacts(raw, baseline);
+}
+
+export async function extractVacationCoopImage({
+  image,
+  mimeType,
+  fileName,
+}: {
+  image: ArrayBuffer | Uint8Array;
+  mimeType: StructuredImageMimeType;
+  fileName: string;
+}): Promise<RawRegularCoopTimetable> {
+  const bytes = image instanceof Uint8Array ? image : new Uint8Array(image);
+  if (bytes.byteLength === 0) throw new Error("생협 시간표 이미지가 비어 있습니다.");
+  return await extractVacationTimetable({
+    imageBase64: Buffer.from(bytes).toString("base64"),
+    mimeType,
+    fileName,
+  });
+}
+
+export async function convertVacationCoopToReview(
+  raw: RawRegularCoopTimetable,
+  vacationStartDate: string,
+  target: VacationCoopTarget,
+): Promise<VacationCoopOutcome> {
+  if (!/^https?:\/\//.test(import.meta.env.APP_BASE_URL ?? "")) {
+    throw new Error("서버 설정이 없습니다: APP_BASE_URL");
+  }
+  const baseline = await fetchCoopShopBaseline();
+  const split = convertVacationTimetable(raw, baseline, vacationStartDate);
+  if (split.year !== target.year || split.season !== target.season) {
+    throw new Error(`명령은 ${target.year} ${target.season}방학인데 이미지에서는 ${split.year} ${split.season}방학으로 읽었습니다.`);
+  }
+  const periods = [
+    { kind: "계절학기" as const, conversion: split.seasonal, request: split.seasonal.request },
+    { kind: "방학" as const, conversion: split.vacation, request: split.vacation.request },
+  ];
+  const blockingCount = periods.reduce((count, period) =>
+    count + period.conversion.issues.filter((issue) => issue.severity === "blocking").length, 0);
+  const infoCount = periods.reduce((count, period) =>
+    count + period.conversion.issues.filter((issue) => issue.severity === "info").length, 0);
+  const token = await saveCoopReview({
+    html: renderVacationCoopReview(split),
+    request: split.seasonal.request,
+    conversion: split.seasonal,
+    periods,
+    meta: {
+      env: target.env,
+      year: target.year,
+      termName: `${target.season}계절학기·${target.season}방학`,
+      sourceFileName: target.fileName,
+      shopCount: split.seasonal.shops.length,
+      blockingCount,
+      createdAt: new Date().toISOString(),
+    },
+  });
+  return {
+    token,
+    reviewUrl: buildReviewUrl(token),
+    shopCount: split.seasonal.shops.length,
+    excludedCount: split.seasonal.excludedShops.length,
+    blockingCount,
+    infoCount,
+    semesterCount: 2,
+  };
+}
+
+export function buildVacationCoopResultBlocks(
+  outcome: VacationCoopOutcome,
+  target: VacationCoopTarget,
+  requesterId: string,
+): KnownBlock[] {
+  const lines = [
+    `*${target.year} ${target.season} 생협 운영시간* 변환 완료`,
+    `대상: ${coopTargetLabel(target.env)}`,
+    `학기 *2개* · 학기별 매장 *${outcome.shopCount}개*`,
+  ];
+  if (outcome.blockingCount > 0) lines.push(`:warning: 확인이 필요한 항목 *${outcome.blockingCount}건*`);
+  type ActionsBlock = Extract<KnownBlock, { type: "actions" }>;
+  const elements: ActionsBlock["elements"] = [{
+    type: "button", text: { type: "plain_text", text: "검토 페이지 열기", emoji: true },
+    url: outcome.reviewUrl, action_id: "coop:review_link",
+  }];
+  if (outcome.blockingCount === 0) {
+    elements.push(...buildCoopApplyButtons(outcome.token, target.env, outcome.shopCount));
+  }
+  return [
+    { type: "section", text: { type: "mrkdwn", text: lines.join("\n") } },
+    { type: "actions", elements },
+    { type: "section", text: { type: "mrkdwn", text: [
+      "*수정할 때는 적용할 학기를 먼저 적어주세요.*",
+      "예) `!수정 방학 복지관식당 평일을 미운영으로 바꿔줘`",
+      "예) `!수정 계절학기 세탁소 평일 운영시간을 11:30 - 18:30으로 바꿔줘`",
+    ].join("\n") } },
+    { type: "context", elements: [{ type: "mrkdwn", text: `${target.fileName} · 검토 링크는 7일 후 만료됩니다 · 요청: <@${requesterId}>` }] },
+  ];
 }
 
 export async function convertRegularCoopToReview(

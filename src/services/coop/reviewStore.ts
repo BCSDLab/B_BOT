@@ -31,6 +31,11 @@ export interface StoredCoopReview {
   html: string;
   request: AdminUpdateSemesterRequest;
   conversion: RegularConversionResult;
+  periods?: Array<{
+    kind: "계절학기" | "방학";
+    request: AdminUpdateSemesterRequest;
+    conversion: RegularConversionResult;
+  }>;
   meta: {
     env: CoopKoinEnv;
     year: number;
@@ -80,12 +85,13 @@ export interface StoredCoopPatchPlan {
   reviewToken: string;
   patches: CoopPatch[];
   problems: string[];
+  periodIndex?: number;
   createdAt: string;
 }
 
 export async function saveCoopPatchPlan(
   reviewToken: string,
-  plan: Pick<StoredCoopPatchPlan, "patches" | "problems">,
+  plan: Pick<StoredCoopPatchPlan, "patches" | "problems" | "periodIndex">,
 ): Promise<string> {
   const token = createCoopReviewToken();
   await useStorage("kvStorage").setItem(patchKey(token), {

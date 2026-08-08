@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildRegularCoopResultBlocks } from "~/services/coop/pipeline";
+import { buildRegularCoopResultBlocks, buildVacationCoopResultBlocks } from "~/services/coop/pipeline";
 
 const outcome = {
   token: "a".repeat(32),
@@ -43,5 +43,17 @@ describe("생협 반영 버튼", () => {
     const json = JSON.stringify(blocks);
     expect(json).toContain("프로덕션에 반영");
     expect(json).toContain("프로덕션에 반영할까요?");
+  });
+
+  it("방학 결과에는 두 학기와 학기 지정 수정법을 안내한다", () => {
+    const blocks = buildVacationCoopResultBlocks(
+      { ...outcome, semesterCount: 2 },
+      { env: "stage", year: 2026, season: "하계", fileName: "하계방학.png" },
+      "U1",
+    );
+    const json = JSON.stringify(blocks);
+    expect(json).toContain("학기 *2개*");
+    expect(json).toContain("!수정 방학");
+    expect(json).toContain("coop:apply");
   });
 });
