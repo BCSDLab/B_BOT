@@ -419,6 +419,17 @@ describe("버스 수정 요청 해석 (LLM 없이 코드 가드)", () => {
     expect(patch?.stopName).toBe("천안역 (학화호두과자 앞)");
     expect(problems).toHaveLength(0);
   });
+
+  it("정류장 부분 일치가 여러 개면 반려하고 안내한다", () => {
+    const problems: string[] = [];
+    const patch = resolvePatch(
+      { semester: "정규학기", region: "천안", direction: "등교", route: "천안역", field: "arrival_time", trip: "1회", stop: "학", value: "08:05" } as RawPatch,
+      [conversion()],
+      problems,
+    );
+    expect(patch).toBeNull();
+    expect(problems.join(" ")).toMatch(/여러 개 일치/);
+  });
 });
 
 describe.skipIf(!hasLlmCredentials())("버스 수정 요청 해석", () => {

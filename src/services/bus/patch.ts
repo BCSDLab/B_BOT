@@ -210,16 +210,26 @@ function validateTime(value: string): string | undefined {
   return undefined;
 }
 
-function findStop(nodes: BusRoute["node_info"], name: string): { index: number; name: string } | undefined {
-  const exact = nodes.findIndex((n) => clean(n.name) === clean(name));
-  if (exact !== -1) return { index: exact, name: nodes[exact].name };
-  const normalized = clean(name).toLowerCase();
-  const partial = nodes.findIndex((n) => {
-    const nLower = clean(n.name).toLowerCase();
-    return nLower.includes(normalized) || normalized.includes(nLower);
-  });
-  if (partial !== -1) return { index: partial, name: nodes[partial].name };
-  return undefined;
+type StopMatch =
+  | { kind: "exact"; index: number; name: string }
+  | { kind: "partial"; index: number; name: string }
+  | { kind: "ambiguous"; names: string[] }
+  | { kind: "none" };
+
+function findStop(nodes: BusRoute["node_info"], name: string): StopMatch {
+  const wanted = clean(name);
+  const exact = nodes.findIndex((n) => clean(n.name) === wanted);
+  if (exact !== -1) return { kind: "exact", index: exact, name: nodes[exact].name };
+  const normalized = wanted.toLowerCase();
+  const partials = nodes
+    .map((n, i) => ({ n, i }))
+    .filter(({ n }) => {
+      const nLower = clean(n.name).toLowerCase();
+      return nLower.includes(normalized) || normalized.includes(nLower);
+    });
+  if (partials.length === 1) return { kind: "partial", index: partials[0].i, name: nodes[partials[0].i].name };
+  if (partials.length > 1) return { kind: "ambiguous", names: partials.map(({ n }) => n.name) };
+  return { kind: "none" };
 }
 
 export function resolvePatch(
@@ -339,9 +349,13 @@ export function resolvePatch(
   }
 
   if (raw.field === "arrival_time") {
-    const stop = raw.stop ? findStop(route.node_info, raw.stop) : undefined;
-    if (!stop) {
+    const stopMatch = raw.stop ? findStop(route.node_info, raw.stop) : { kind: "none" } as const;
+    if (stopMatch.kind === "none") {
       problems.push(`${where}: 정류장 "${clean(raw.stop)}"를 찾지 못했습니다.`);
+      return null;
+    }
+    if (stopMatch.kind === "ambiguous") {
+      problems.push(`${where}: 정류장 "${clean(raw.stop)}"가 여러 개 일치합니다: ${stopMatch.names.join(", ")}. 정확한 이름을 적어주세요.`);
       return null;
     }
     const value = validateTime(raw.value);
@@ -349,7 +363,7 @@ export function resolvePatch(
       problems.push(`${where} ${trip!.name} ${clean(raw.stop)}: "${raw.value}"은 시각(HH:MM)이나 마커가 아닙니다.`);
       return null;
     }
-    const before = trip!.arrival_time[stop.index];
+    const before = trip!.arrival_time[stopMatch.index];
     return {
       semester: resolvedSemester,
       target: candidates[0].payload.target,
@@ -358,7 +372,7 @@ export function resolvePatch(
       routeName: route.route_name,
       kind: "arrival_time",
       tripName: trip!.name,
-      stopName: stop.name,
+      stopName: stopMatch.name,
       before: before ?? "(미운행)",
       after: value,
       rawValue: value,
@@ -411,9 +425,13 @@ export function resolvePatch(
       problems.push(`${where}: 마지막 남은 정류장은 삭제할 수 없습니다.`);
       return null;
     }
-    const stop = raw.stop ? findStop(route.node_info, raw.stop) : undefined;
-    if (!stop) {
+    const stopMatch = raw.stop ? findStop(route.node_info, raw.stop) : { kind: "none" } as const;
+    if (stopMatch.kind === "none") {
       problems.push(`${where}: 정류장 "${clean(raw.stop)}"를 찾지 못했습니다.`);
+      return null;
+    }
+    if (stopMatch.kind === "ambiguous") {
+      problems.push(`${where}: 정류장 "${clean(raw.stop)}"가 여러 개 일치합니다: ${stopMatch.names.join(", ")}. 정확한 이름을 적어주세요.`);
       return null;
     }
     return {
@@ -423,10 +441,10 @@ export function resolvePatch(
       routeType: route.route_type,
       routeName: route.route_name,
       kind: "remove_stop",
-      stopName: stop.name,
-      before: `${where} ${stop.name} 삭제`,
+      stopName: stopMatch.name,
+      before: `${where} ${stopMatch.name} 삭제`,
       after: "삭제",
-      rawValue: stop.name,
+      rawValue: stopMatch.name,
     };
   }
 
@@ -466,15 +484,23 @@ export function resolvePatch(
       problems.push(`${where}: 추가할 정류장 이름을 적어주세요.`);
       return null;
     }
-    if (findStop(route.node_info, name)) {
+    const dup = findStop(route.node_info, name);
+    if (dup.kind === "exact" || dup.kind === "partial") {
       problems.push(`${where}: 정류장 "${name}"이 이미 있습니다.`);
       return null;
     }
+    if (dup.kind === "ambiguous") {
+      problems.push(`${where}: 정류장 "${name}"와 유사한 정류장이 여러 개 있습니다: ${dup.names.join(", ")}.`);
+      return null;
+    }
     const reference = clean(raw.referenceStop);
-    const ref = reference ? findStop(route.node_info, reference) : undefined;
-    const referenceIndex = ref ? ref.index : -1;
-    if (!reference || referenceIndex === -1) {
+    const ref = reference ? findStop(route.node_info, reference) : { kind: "none" } as const;
+    if (ref.kind === "none") {
       problems.push(`${where}: 정류장 "${name}"을 어디에 추가할지 지정해주세요. (기준 정류장과 앞/뒤)`);
+      return null;
+    }
+    if (ref.kind === "ambiguous") {
+      problems.push(`${where}: 기준 정류장 "${reference}"가 여러 개 일치합니다: ${ref.names.join(", ")}. 정확한 이름을 적어주세요.`);
       return null;
     }
     const beforeStop = raw.position === "before" ? ref.name : undefined;
