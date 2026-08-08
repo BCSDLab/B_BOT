@@ -16,20 +16,35 @@ const DAY_LABELS: Record<string, string> = {
 };
 
 const daysLabel = (days?: BusRoute["route_info"][number]["running_days"]) =>
-  days?.map((day) => DAY_LABELS[day] ?? day).join(", ") ?? "";
+  days?.map((day) => DAY_LABELS[day] ?? day).join(", ") ?? "운행요일 미지정";
 
-function routeHtml(target: string, semester: string, route: BusRoute, issue: boolean) {
+function routeHtml(
+  target: string,
+  semester: string,
+  route: BusRoute,
+  issue: boolean,
+  noDays: boolean,
+) {
   const trips = route.route_info;
   const heads = trips.map((trip) =>
-    "<th>" + esc(trip.name) + "<br><small>" + esc(daysLabel(trip.running_days)) + "</small></th>",
+    "<th>" + esc(trip.name) + "<br><small" + (trip.running_days?.length ? "" : " class=\"missing\" title=\"Slack에서 !수정 으로 운행요일을 지정하세요\"") + ">" +
+      esc(daysLabel(trip.running_days)) + "</small></th>",
   ).join("");
   const rows = route.node_info.map((node, index) =>
     "<tr><th>" + esc(node.name) + "</th>" +
     trips.map((trip) => "<td>" + esc(trip.arrival_time[index]) + "</td>").join("") +
     "</tr>",
   ).join("");
-  const search = [target, semester, route.region, route.route_type, route.route_name].join(" ").toLowerCase();
-  return "<section class=\"route" + (issue ? " issue" : "") + "\" data-search=\"" + esc(search) + "\"><h2>" +
+  const classes = ["route", issue && "issue", noDays && "no-days"].filter(Boolean).join(" ");
+  const search = [
+    target,
+    semester,
+    route.region,
+    route.route_type,
+    route.route_name,
+    noDays && "운행요일미지정",
+  ].filter(Boolean).join(" ").toLowerCase();
+  return "<section class=\"" + classes + "\" data-search=\"" + esc(search) + "\"><h2>" +
     esc(route.region) + " · " + esc(route.route_type) + " · " + esc(route.route_name) +
     "</h2><p class=\"route-meta\">" + esc(target) + " · " + esc(semester) + " · 정류장 " + route.node_info.length +
     "개 · 운행 " + trips.length + "개</p><div class=\"tablebox\"><table><thead><tr><th>정류장</th>" + heads +
@@ -48,8 +63,19 @@ export function renderBusReviewHtml(id: string, conversions: BusConversion[]) {
     );
     const routes = conversion.payloads.flatMap((payload) =>
       Object.values(payload.body).flat().map((route) => {
-        const issue = warnings.some((warning) => warning.includes(route.route_name));
-        return routeHtml(payload.target, payload.semester_type, route, issue);
+        const issue = warnings.some((warning) => {
+          const text = String(warning);
+          // "천안 하교는 등교 노선 역순... 으로 자동 계산해 추가했습니다." 같은
+          // 경고는 노선명이 아닌 지역·방향 단위로 영향을 표시한다. 특정 노선을
+          // 건너뛴 경고(지역+노선명 등장)는 지역·노선명 결합으로만 부분 일치해
+          // "세종" 같은 짧은 이름이 오매칭되지 않게 한다.
+          return (
+            text.startsWith(`${route.region} ${route.route_type}`) ||
+            text.includes(`${route.region} ${route.route_name}`)
+          );
+        });
+        const noDays = route.route_info.some((trip) => !trip.running_days?.length);
+        return routeHtml(payload.target, payload.semester_type, route, issue, noDays);
       }),
     ).join("");
     const routesCount = conversion.payloads.reduce(
@@ -62,12 +88,13 @@ export function renderBusReviewHtml(id: string, conversions: BusConversion[]) {
       esc(conversion.version_update.content) + "</p><p class=\"semester-meta\">확인 필요 " + conversion.warnings.length + "건</p>" +
       (conversion.warnings.length ? "<div class=\"panel warning-panel issue\" data-search=\"확인 필요\"><h3>확인이 필요한 내용</h3><ul>" + warningItems + "</ul><details><summary>영향 범위: " + routesCount + "개 노선</summary><ul>" + scopeItems + "</ul></details></div>" : "") + routes + "</div>";
   }).join("");
-  const css = ":root{--bg:#fff;--fg:#1a1a1a;--dim:#6b7280;--line:#e5e7eb;--panel:#f9fafb;--warn-bg:#fef3c7;--warn-fg:#92400e;--warn-line:#fcd34d;--ok:#047857}@media (prefers-color-scheme:dark){:root{--bg:#0f1115;--fg:#e5e7eb;--dim:#9ca3af;--line:#262b33;--panel:#171a20;--warn-bg:#3a2c0a;--warn-fg:#fcd34d;--warn-line:#7c5e10;--ok:#34d399}}*{box-sizing:border-box}html,body{width:100%;max-width:100%;overflow-x:hidden}body{margin:0;padding:24px;background:var(--bg);color:var(--fg);font:14px/1.6 -apple-system,BlinkMacSystemFont,AppleSDGothicNeo,MalgunGothic,sans-serif}.wrap{width:100%;max-width:1400px;min-width:0;margin:0 auto}h1{font-size:20px;margin:0 0 4px}h2{font-size:16px;margin:0 0 6px}h3{font-size:14px;margin:0 0 8px}.sub,.semester-meta,.route-meta{color:var(--dim);font-size:13px}.sub{margin-bottom:20px}.period{font-weight:700;margin:0 0 2px}.tiles{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:20px}.tile{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 16px;min-width:120px}.tile .n{font-size:22px;font-weight:600}.tile .k{color:var(--dim);font-size:12px}.tile.warn{background:var(--warn-bg);border-color:var(--warn-line)}.tile.warn .n,.tile.warn .k{color:var(--warn-fg)}.panel{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px 18px;margin-bottom:20px}.panel ul{margin:0;padding-left:18px}.controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}input[type=search]{flex:1;min-width:220px;padding:8px 12px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--fg);font-size:14px}button{padding:8px 14px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--fg);font-size:13px;cursor:pointer}button[aria-pressed=true]{background:var(--fg);color:var(--bg);border-color:var(--fg)}.count{color:var(--dim);font-size:13px;margin-left:auto}.semester{width:100%;max-width:100%;min-width:0;margin:30px 0 36px}.route{width:100%;max-width:100%;min-width:0;margin:20px 0;padding:18px;border:1px solid var(--line);border-radius:8px}h1,h2,h3,p{overflow-wrap:anywhere}.route.issue,.route.scope-issue{background:var(--warn-bg);border-color:var(--warn-line)}.route-meta{margin:0 0 10px}.tablebox{width:100%;max-width:100%;min-width:0;overflow-x:auto;border:1px solid var(--line);border-radius:8px;background:var(--bg)}table{border-collapse:collapse;width:100%;min-width:max-content;font-size:13px}th,td{padding:7px 10px;text-align:center;border-bottom:1px solid var(--line);vertical-align:middle;white-space:nowrap}th{position:sticky;top:0;background:var(--panel);font-weight:600;z-index:1}tbody th{text-align:left}tbody tr:hover{background:var(--panel)}small{font-weight:400;color:var(--dim)}.dim{color:var(--dim)}footer{margin-top:24px;color:var(--dim);font-size:12px}";
+  const css = ":root{--bg:#fff;--fg:#1a1a1a;--dim:#6b7280;--line:#e5e7eb;--panel:#f9fafb;--warn-bg:#fef3c7;--warn-fg:#92400e;--warn-line:#fcd34d;--note-bg:#eff6ff;--note-fg:#1e40af;--note-line:#93c5fd;--ok:#047857}@media (prefers-color-scheme:dark){:root{--bg:#0f1115;--fg:#e5e7eb;--dim:#9ca3af;--line:#262b33;--panel:#171a20;--warn-bg:#3a2c0a;--warn-fg:#fcd34d;--warn-line:#7c5e10;--note-bg:#0b1524;--note-fg:#93c5fd;--note-line:#1e40af;--ok:#34d399}}*{box-sizing:border-box}html,body{width:100%;max-width:100%;overflow-x:hidden}body{margin:0;padding:24px;background:var(--bg);color:var(--fg);font:14px/1.6 -apple-system,BlinkMacSystemFont,AppleSDGothicNeo,MalgunGothic,sans-serif}.wrap{width:100%;max-width:1400px;min-width:0;margin:0 auto}h1{font-size:20px;margin:0 0 4px}h2{font-size:16px;margin:0 0 6px}h3{font-size:14px;margin:0 0 8px}.sub,.semester-meta,.route-meta{color:var(--dim);font-size:13px}.sub{margin-bottom:20px}.period{font-weight:700;margin:0 0 2px}.tiles{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:20px}.tile{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 16px;min-width:120px}.tile .n{font-size:22px;font-weight:600}.tile .k{color:var(--dim);font-size:12px}.tile.warn{background:var(--warn-bg);border-color:var(--warn-line)}.tile.warn .n,.tile.warn .k{color:var(--warn-fg)}.panel{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px 18px;margin-bottom:20px}.panel ul{margin:0;padding-left:18px}.controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}input[type=search]{flex:1;min-width:220px;padding:8px 12px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--fg);font-size:14px}button{padding:8px 14px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--fg);font-size:13px;cursor:pointer}button[aria-pressed=true]{background:var(--fg);color:var(--bg);border-color:var(--fg)}.count{color:var(--dim);font-size:13px;margin-left:auto}.semester{width:100%;max-width:100%;min-width:0;margin:30px 0 36px}.route{width:100%;max-width:100%;min-width:0;margin:20px 0;padding:18px;border:1px solid var(--line);border-radius:8px}h1,h2,h3,p{overflow-wrap:anywhere}.route.issue,.route.scope-issue{background:var(--warn-bg);border-color:var(--warn-line)}.route.no-days{background:var(--note-bg);border-color:var(--note-line)}.route.no-days .missing{color:var(--note-fg);font-weight:600}.route-meta{margin:0 0 10px}.tablebox{width:100%;max-width:100%;min-width:0;overflow-x:auto;border:1px solid var(--line);border-radius:8px;background:var(--bg)}table{border-collapse:collapse;width:100%;min-width:max-content;font-size:13px}th,td{padding:7px 10px;text-align:center;border-bottom:1px solid var(--line);vertical-align:middle;white-space:nowrap}th{position:sticky;top:0;background:var(--panel);font-weight:600;z-index:1}tbody th{text-align:left}tbody tr:hover{background:var(--panel)}small{font-weight:400;color:var(--dim)}.dim{color:var(--dim)}footer{margin-top:24px;color:var(--dim);font-size:12px}";
   const script = [
     "(function(){",
-    "var routes=Array.prototype.slice.call(document.querySelectorAll(\"#groups .route, #groups .warning-panel\"));",
+    "var panels=Array.prototype.slice.call(document.querySelectorAll(\"#groups .warning-panel\"));",
+    "var routes=Array.prototype.slice.call(document.querySelectorAll(\"#groups .route\"));",
     "var q=document.getElementById(\"q\"),count=document.getElementById(\"count\"),buttons={all:document.getElementById(\"f-all\"),issue:document.getElementById(\"f-issue\")},mode=\"all\";",
-    "function apply(){var term=q.value.trim().toLowerCase(),shown=0;routes.forEach(function(route){var okMode=mode===\"all\"||route.classList.contains(\"issue\")||route.classList.contains('warning-panel'),okTerm=term===\"\"||(!route.dataset.search || route.dataset.search.indexOf(term)!==-1),visible=okMode&&okTerm;route.style.display=visible?\"\":\"none\";if(visible)shown++;});count.textContent=shown+\" / \"+routes.length+\"개 항목\";} ",
+    "function apply(){var term=q.value.trim().toLowerCase(),shown=0;routes.forEach(function(route){var okMode=mode===\"all\"||route.classList.contains(\"issue\")||route.classList.contains(\"no-days\"),okTerm=term===\"\"||(!route.dataset.search || route.dataset.search.indexOf(term)!==-1),visible=okMode&&okTerm;route.style.display=visible?\"\":\"none\";if(visible)shown++;});panels.forEach(function(panel){var okTerm=term===\"\"||(!panel.dataset.search || panel.dataset.search.indexOf(term)!==-1);panel.style.display=okTerm?\"\":\"none\";});count.textContent=shown+\" / \"+routes.length+\"개 노선\";} ",
     "Object.keys(buttons).forEach(function(key){buttons[key].addEventListener(\"click\",function(){mode=key;Object.keys(buttons).forEach(function(name){buttons[name].setAttribute(\"aria-pressed\",String(name===key));});apply();});});",
     "q.addEventListener(\"input\",apply);apply();})();",
   ].join("");

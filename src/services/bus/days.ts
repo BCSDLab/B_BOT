@@ -11,7 +11,8 @@ const DAY_INDEX: Record<string, number> = {
   토: 5,
   일: 6,
 };
-const TOKEN = /(?<![0-9])(월|화|수|목|금|토|일)(?:요일|[()])?/g;
+const TOKEN =
+  /(?<![0-9])(월|화|수|목|금|토|일)(?:요일)?(?=[()\s,~·\-/]|$)/g;
 const RANGE =
   /(?<![0-9])(월|화|수|목|금|토|일)(?:요일)?\s*~\s*(?<![0-9])(월|화|수|목|금|토|일)(?:요일)?/;
 
@@ -24,7 +25,9 @@ export function sourceDays(text: string): Day[] | undefined {
   const normalized = text
     .replace(/[~～-]/g, "~")
     .replace(/[,·/、]/g, ",")
-    .replace(/\s+/g, "");
+    // 공백을 없애면 "6/22~7/12 월~금"이 "7/12월~금"이 되어 날짜 숫자 때문에
+    // 요일 범위로 읽지 못한다. 단일 공백으로만 줄인다.
+    .replace(/\s+/g, " ");
 
   if (/주중|평일/.test(normalized)) return [...WEEKDAYS];
   if (/주말/.test(normalized)) return ["SAT", "SUN"];
