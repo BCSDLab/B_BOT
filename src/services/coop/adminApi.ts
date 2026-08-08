@@ -1,5 +1,9 @@
-import type { KoinAdminAuth } from "~/services/lecture/adminApi";
 import type { AdminUpdateSemesterRequest } from "./types";
+
+export interface CoopAdminAuth {
+  baseUrl: string;
+  accessToken: string;
+}
 
 export interface CoopSemesterCreateRequest {
   semester: string;
@@ -52,7 +56,7 @@ function errorCode(body: string): string | undefined {
  */
 export async function createCoopSemester(
   request: CoopSemesterCreateRequest,
-  auth: KoinAdminAuth,
+  auth: CoopAdminAuth,
 ): Promise<void> {
   const response = await fetch(apiUrl(auth.baseUrl, "/admin/coopshop/semesters"), {
     method: "POST",
@@ -72,7 +76,7 @@ export async function createCoopSemester(
   );
 }
 
-export async function getCoopSemesters(auth: KoinAdminAuth): Promise<CoopSemesterResponse[]> {
+export async function getCoopSemesters(auth: CoopAdminAuth): Promise<CoopSemesterResponse[]> {
   const response = await fetch(apiUrl(auth.baseUrl, "/admin/coopshop/semesters"), {
     method: "GET",
     headers: headers(auth.accessToken),
@@ -93,7 +97,7 @@ export async function getCoopSemesters(auth: KoinAdminAuth): Promise<CoopSemeste
 export async function updateCoopTimetable(
   semesterId: number,
   request: AdminUpdateSemesterRequest,
-  auth: KoinAdminAuth,
+  auth: CoopAdminAuth,
 ): Promise<void> {
   const response = await fetch(
     apiUrl(auth.baseUrl, `/admin/coopshop/timetable/${semesterId}`),
@@ -117,7 +121,7 @@ export async function updateCoopTimetable(
 export async function applyCoopTimetable(
   semester: CoopSemesterCreateRequest,
   timetable: AdminUpdateSemesterRequest,
-  auth: KoinAdminAuth,
+  auth: CoopAdminAuth,
 ): Promise<number> {
   await createCoopSemester(semester, auth);
   const semesters = await getCoopSemesters(auth);

@@ -4,7 +4,7 @@ import {
   collectCoopImages,
   downloadCoopNoticeImage,
   dropDetectedCoop,
-  fetchArticle,
+  fetchCoopArticle,
   guessRegularCoopSemester,
   loadDetectedCoop,
   saveDetectedCoop,
@@ -17,10 +17,10 @@ import {
 import { linkCoopThread } from "~/services/coop/reviewStore";
 import { createCoopJob } from "~/services/coop/jobStore";
 import {
-  labelOf,
-  resolveTarget,
-  type KoinEnv,
-} from "~/services/lecture/target";
+  coopTargetLabel,
+  resolveCoopTarget,
+  type CoopKoinEnv,
+} from "~/services/coop/target";
 
 const MAX_CHOICES = 4;
 const ARTICLE_URL = (articleId: number) => `https://koreatech.in/articles/${articleId}`;
@@ -63,13 +63,13 @@ async function runCoopConversion({
   image: CoopNoticeImage;
   year: number;
   termName: "1학기" | "2학기";
-  env: KoinEnv;
+  env: CoopKoinEnv;
 }) {
   await client.chat.update({
     channel,
     ts,
     text: "생협 운영시간 변환 중",
-    blocks: section(`:hourglass_flowing_sand: *${year} ${termName} 생협 운영시간* 변환 중…\n${labelOf(env)} · ${image.name}\n작업자: <@${actor}>`),
+    blocks: section(`:hourglass_flowing_sand: *${year} ${termName} 생협 운영시간* 변환 중…\n${coopTargetLabel(env)} · ${image.name}\n작업자: <@${actor}>`),
   });
 
   try {
@@ -171,7 +171,7 @@ export async function handleCoopDetectedAction(
   };
   if (!articleId) return;
 
-  const resolved = resolveTarget(channel);
+  const resolved = resolveCoopTarget(channel);
   if (!resolved.target) {
     await replaceOriginal(
       body.response_url,
@@ -185,7 +185,7 @@ export async function handleCoopDetectedAction(
   await replaceOriginal(
     body.response_url,
     "생협 업데이트를 진행합니다.",
-    section(`:white_check_mark: *생협 업데이트를 진행합니다.* · ${labelOf(env)}\n<@${actor}>`),
+    section(`:white_check_mark: *생협 업데이트를 진행합니다.* · ${coopTargetLabel(env)}\n<@${actor}>`),
   );
   const posted = await client.chat.postMessage({
     channel,
@@ -200,9 +200,9 @@ export async function handleCoopDetectedAction(
     blocks: section(mrkdwn),
   });
 
-  let article: Awaited<ReturnType<typeof fetchArticle>>;
+  let article: Awaited<ReturnType<typeof fetchCoopArticle>>;
   try {
-    article = await fetchArticle(articleId);
+    article = await fetchCoopArticle(articleId);
   } catch (error) {
     await say("생협 게시글 조회 실패", `:x: *게시글을 읽지 못했습니다.*\n${error instanceof Error ? error.message : ""}`);
     return;

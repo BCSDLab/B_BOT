@@ -8,7 +8,7 @@ vi.mock("~/services/coop/detected", () => ({
   }]),
   downloadCoopNoticeImage: vi.fn(async () => new ArrayBuffer(4)),
   dropDetectedCoop: vi.fn(async () => undefined),
-  fetchArticle: vi.fn(async () => ({
+  fetchCoopArticle: vi.fn(async () => ({
     title: "2026학년도 1학기 생협 운영시간 안내",
     url: "https://koreatech.in/articles/123",
     attachments: [],
@@ -41,8 +41,8 @@ vi.mock("~/services/coop/jobStore", () => ({
   createCoopJob: vi.fn(async () => undefined),
 }));
 
-vi.mock("~/services/lecture/target", () => ({
-  resolveTarget: vi.fn(() => ({
+vi.mock("~/services/coop/target", () => ({
+  resolveCoopTarget: vi.fn(() => ({
     ok: true,
     target: {
       env: "stage",
@@ -52,13 +52,13 @@ vi.mock("~/services/lecture/target", () => ({
       password: "password",
     },
   })),
-  labelOf: vi.fn(() => "스테이지"),
+  coopTargetLabel: vi.fn(() => "스테이지"),
 }));
 
 import {
   collectCoopImages,
   downloadCoopNoticeImage,
-  fetchArticle,
+  fetchCoopArticle,
   saveDetectedCoop,
 } from "~/services/coop/detected";
 import { convertRegularCoopToReview } from "~/services/coop/pipeline";
@@ -91,7 +91,7 @@ describe("생협 공지 감지 Slack 액션", () => {
       value: JSON.stringify({ article_id: 123 }),
     } as never);
 
-    expect(fetchArticle).toHaveBeenCalledWith(123);
+    expect(fetchCoopArticle).toHaveBeenCalledWith(123);
     expect(downloadCoopNoticeImage).toHaveBeenCalledWith(expect.objectContaining({ name: "2026-1학기.png" }));
     expect(convertRegularCoopToReview).toHaveBeenCalledWith(
       expect.any(ArrayBuffer),

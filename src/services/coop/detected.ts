@@ -1,12 +1,7 @@
 import type { StructuredImageMimeType } from "~/helper/adapter/structured";
-import {
-  cleanFileName,
-  fetchArticle,
-  isAllowedFileUrl,
-} from "~/services/lecture/detected";
-import { createReviewToken, isValidToken } from "~/services/lecture/reviewStore";
+import { createCoopReviewToken, isValidCoopToken } from "./reviewStore";
 import { normalizeSemester } from "./convert";
-import type { KoinEnv } from "~/services/lecture/target";
+import type { CoopKoinEnv } from "./target";
 
 export interface CoopNoticeImage {
   name: string;
@@ -21,7 +16,7 @@ interface ArticleAttachment {
 }
 
 export interface DetectedCoopNotice {
-  env: KoinEnv;
+  env: CoopKoinEnv;
   articleId: number;
   articleTitle: string;
   articleUrl: string;
@@ -39,6 +34,37 @@ const IMAGE_MIME: Record<string, StructuredImageMimeType> = {
 };
 const LIKELY_NAMES = ["운영시간", "운영 시간", "생협", "시설물"];
 const MAX_BYTES = 20 * 1024 * 1024;
+const ARTICLE_BASE_URL = "https://api.koreatech.in";
+const ALLOWED_FILE_HOSTS = ["koreatech.ac.kr", "koreatech.in"];
+
+export function cleanCoopFileName(raw: string): string {
+  return raw.replace(/\s*\(\s*[\d.]+\s*[KMG]?B\s*\)\s*$/i, "").trim();
+}
+
+export function isAllowedCoopFileUrl(url: string): boolean {
+  try {
+    const { protocol, hostname } = new URL(url);
+    return protocol === "https:" && ALLOWED_FILE_HOSTS.some(
+      (host) => hostname === host || hostname.endsWith(`.${host}`),
+    );
+  } catch {
+    return false;
+  }
+}
+
+export interface CoopArticle {
+  title?: string;
+  url?: string;
+  attachments?: ArticleAttachment[];
+}
+
+export async function fetchCoopArticle(articleId: number): Promise<CoopArticle> {
+  const response = await fetch(`${ARTICLE_BASE_URL}/articles/${articleId}`);
+  if (!response.ok) {
+    throw new Error(`게시글 ${articleId}을 찾지 못했습니다 (HTTP ${response.status}).`);
+  }
+  return await response.json() as CoopArticle;
+}
 
 function mimeTypeOf(name: string): StructuredImageMimeType | null {
   const extension = name.toLowerCase().match(/\.([a-z0-9]+)$/)?.[1] ?? "";
@@ -57,9 +83,9 @@ export function collectCoopImages(
   const newest = new Map<string, { image: CoopNoticeImage; at: string }>();
   for (const attachment of attachments ?? []) {
     const url = attachment.url ?? "";
-    const name = cleanFileName(attachment.name ?? "");
+    const name = cleanCoopFileName(attachment.name ?? "");
     const mimeType = mimeTypeOf(name);
-    if (!url || !name || !mimeType || !isAllowedFileUrl(url)) continue;
+    if (!url || !name || !mimeType || !isAllowedCoopFileUrl(url)) continue;
 
     const at = attachment.created_at ?? "";
     const kept = newest.get(url);
@@ -111,7 +137,7 @@ export function hasImageSignature(
 export async function downloadCoopNoticeImage(
   image: CoopNoticeImage,
 ): Promise<ArrayBuffer> {
-  if (!isAllowedFileUrl(image.url)) {
+  if (!isAllowedCoopFileUrl(image.url)) {
     throw new Error("학교 주소가 아닌 곳에서는 파일을 받지 않습니다.");
   }
   const response = await fetch(image.url, {
@@ -135,18 +161,16 @@ export async function downloadCoopNoticeImage(
   return buffer;
 }
 
-export { fetchArticle };
-
 const key = (token: string) => `coop-detected:${token}`;
 
 export async function saveDetectedCoop(notice: DetectedCoopNotice): Promise<string> {
-  const token = createReviewToken();
+  const token = createCoopReviewToken();
   await useStorage("kvStorage").setItem(key(token), notice);
   return token;
 }
 
 export async function loadDetectedCoop(token: string): Promise<DetectedCoopNotice | null> {
-  if (!isValidToken(token)) return null;
+  if (!isValidCoopToken(token)) return null;
   return (await useStorage("kvStorage").getItem<DetectedCoopNotice>(key(token))) ?? null;
 }
 

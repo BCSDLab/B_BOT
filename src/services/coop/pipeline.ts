@@ -1,6 +1,10 @@
 import type { KnownBlock } from "@slack/web-api";
 import type { StructuredImageMimeType } from "~/helper/adapter/structured";
-import { isProduction, labelOf, type KoinEnv } from "~/services/lecture/target";
+import {
+  coopTargetLabel,
+  isCoopProduction,
+  type CoopKoinEnv,
+} from "./target";
 import { fetchCoopShopBaseline } from "./baseline";
 import { convertRegularTimetable } from "./convert";
 import { buildReviewUrl, saveCoopReview } from "./reviewStore";
@@ -19,7 +23,7 @@ export interface RegularCoopArtifacts {
 }
 
 export interface RegularCoopTarget {
-  env: KoinEnv;
+  env: CoopKoinEnv;
   year: number;
   termName: "1학기" | "2학기";
   fileName: string;
@@ -128,9 +132,9 @@ export function buildRegularCoopResultBlocks(
 ): KnownBlock[] {
   const lines = [
     `*${target.year} ${target.termName} 생협 운영시간* 변환 완료`,
-    isProduction(target.env)
-      ? `:rotating_light: 대상: *${labelOf(target.env)}*`
-      : `대상: ${labelOf(target.env)}`,
+    isCoopProduction(target.env)
+      ? `:rotating_light: 대상: *${coopTargetLabel(target.env)}*`
+      : `대상: ${coopTargetLabel(target.env)}`,
     `반영 대상 *${outcome.shopCount}개*`,
   ];
   if (outcome.blockingCount > 0) {
@@ -179,8 +183,8 @@ export function buildRegularCoopResultBlocks(
   ];
 }
 
-export function buildCoopApplyButtons(token: string, env: KoinEnv, shopCount: number) {
-  const prod = isProduction(env);
+export function buildCoopApplyButtons(token: string, env: CoopKoinEnv, shopCount: number) {
+  const prod = isCoopProduction(env);
   return [
     {
       type: "button" as const,

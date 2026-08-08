@@ -12,7 +12,7 @@ import {
 import { downloadSlackImage, findImageFile } from "~/utils/slackFile";
 import { readThreadContext, threadRootOf } from "~/utils/slackThread";
 import { createCoopJob } from "~/services/coop/jobStore";
-import { labelOf, resolveTarget } from "~/services/lecture/target";
+import { coopTargetLabel, resolveCoopTarget } from "~/services/coop/target";
 import type { MessageSetting } from "../type";
 
 const COMMAND = /^!생협반영/;
@@ -62,7 +62,7 @@ export const messages: MessageSetting[] = [{
       return;
     }
 
-    const resolved = resolveTarget(channel);
+    const resolved = resolveCoopTarget(channel);
     if (!resolved.target) {
       await client.chat.postMessage({
         channel,
@@ -85,7 +85,7 @@ export const messages: MessageSetting[] = [{
         type: "section",
         text: {
           type: "mrkdwn",
-          text: `:hourglass_flowing_sand: *${target.year} ${target.termName} 생협 운영시간* 변환 중…\n${labelOf(target.env)} · ${image.name}`,
+          text: `:hourglass_flowing_sand: *${target.year} ${target.termName} 생협 운영시간* 변환 중…\n${coopTargetLabel(target.env)} · ${image.name}`,
         },
       }],
     });
