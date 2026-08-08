@@ -189,8 +189,10 @@ function routeCandidates(
   for (const [payloadIndex, payload] of conversion.payloads.entries()) {
     const routes = Object.values(payload.body)[0] ?? [];
     for (const [routeIndex, route] of routes.entries()) {
-      const nameMatches = clean(route.route_name).toLowerCase() === wanted;
-      if (!nameMatches) continue;
+      if (wanted) {
+        const routeName = clean(route.route_name).toLowerCase();
+        if (!routeName.includes(wanted)) continue;
+      }
       if (hints.region && !route.region.includes(clean(hints.region))) continue;
       if (hints.direction && clean(route.route_type) !== clean(hints.direction)) continue;
       candidates.push({ payload, payloadIndex, route, routeIndex });
@@ -287,14 +289,18 @@ export function resolvePatch(
     route: raw.route,
   });
   if (candidates.length === 0) {
+    const label = clean(raw.route) || (clean(raw.region) || clean(raw.direction)
+      ? `${clean(raw.region)} ${clean(raw.direction)}`.trim()
+      : "지정한");
     problems.push(
-      `"${clean(raw.route)}"에 해당하는 노선을 ${conversion.payloads[0].semester_type === "REGULAR" ? "정규학기" : conversion.payloads[0].semester_type === "SEASONAL" ? "계절학기" : "방학기간"}에서 찾지 못했습니다.`,
+      `"${label}"에 해당하는 노선을 ${conversion.payloads[0].semester_type === "REGULAR" ? "정규학기" : conversion.payloads[0].semester_type === "SEASONAL" ? "계절학기" : "방학기간"}에서 찾지 못했습니다.`,
     );
     return null;
   }
   if (candidates.length > 1) {
+    const label = clean(raw.route) || `${clean(raw.region)} ${clean(raw.direction)}`.trim();
     problems.push(
-      `"${clean(raw.route)}"는 여러 노선입니다: ${candidates.map((c) => describeRoute(c.route)).join(", ")}. 방향(등교/하교)까지 지정해주세요.`,
+      `"${label}"는 여러 노선입니다: ${candidates.map((c) => describeRoute(c.route)).join(", ")}. 방향(등교/하교)까지 지정해주세요.`,
     );
     return null;
   }

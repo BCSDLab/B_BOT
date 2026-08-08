@@ -386,7 +386,7 @@ describe("버스 수정 요청 해석 (LLM 없이 코드 가드)", () => {
   it("둘 이상 노선 중 하나는 삭제할 수 있다", () => {
     const two = conversion();
     (two.payloads[0].body.commuting_bus_timetables as BusRoute[]).push(
-      route({ route_name: "천안역2" }),
+      route({ route_name: "터미널" }),
     );
     const problems: string[] = [];
     const patch = resolvePatch(raw(), [two], problems);
@@ -445,6 +445,41 @@ describe("버스 수정 요청 해석 (LLM 없이 코드 가드)", () => {
     expect(patch).not.toBeNull();
     expect(patch?.tripName).toBe("1회");
     expect(problems).toHaveLength(0);
+  });
+
+  it("route hint 없이 region+direction만으로 노선을 찾는다", () => {
+    const problems: string[] = [];
+    const patch = resolvePatch(
+      { semester: "정규학기", region: "천안", direction: "셔틀", route: "", field: "arrival_time", trip: "1회", stop: "터미널", value: "12:00" } as RawPatch,
+      [conversion()],
+      problems,
+    );
+    expect(patch).not.toBeNull();
+    expect(patch?.routeName).toBe("천안 셔틀");
+    expect(problems).toHaveLength(0);
+  });
+
+  it("route hint로 부분 매칭해서 노선을 찾는다", () => {
+    const problems: string[] = [];
+    const patch = resolvePatch(
+      { semester: "정규학기", region: "천안", direction: "셔틀", route: "셔틀", field: "arrival_time", trip: "1회", stop: "터미널", value: "12:00" } as RawPatch,
+      [conversion()],
+      problems,
+    );
+    expect(patch).not.toBeNull();
+    expect(patch?.routeName).toBe("천안 셔틀");
+    expect(problems).toHaveLength(0);
+  });
+
+  it("route hint 없고 region+direction도 모호하면 에러 메시지에 지역·방향을 표시한다", () => {
+    const problems: string[] = [];
+    const patch = resolvePatch(
+      { semester: "정규학기", region: "대전", direction: "등교", route: "", field: "arrival_time", trip: "1회", stop: "터미널", value: "08:05" } as RawPatch,
+      [conversion()],
+      problems,
+    );
+    expect(patch).toBeNull();
+    expect(problems.join(" ")).toMatch(/대전 등교.*찾지 못했습니다/);
   });
 });
 
