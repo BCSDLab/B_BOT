@@ -56,6 +56,8 @@ describe("검토 페이지", () => {
       const { issues } = buildAdminRequest(result.lectures, { year, term: toAdminTerm(term) });
 
       const html = renderReviewPage({
+        envLabel: "스테이지",
+        isProduction: false,
         year,
         termName: term,
         sourceFileName: `${name}.xlsx`,
@@ -75,6 +77,8 @@ describe("검토 페이지", () => {
       // 원본과 해석을 나란히 두는 게 이 페이지의 핵심이다.
       expect(html).toContain("원본 강의시간");
       expect(html).toContain("해석된 시간");
+      // 링크를 나중에 열었을 때 어느 코인 것인지 알 수 있어야 한다.
+      expect(html).toContain("스테이지");
 
       await mkdir(OUT_DIR, { recursive: true });
       const path = `${OUT_DIR}/${name}.html`;

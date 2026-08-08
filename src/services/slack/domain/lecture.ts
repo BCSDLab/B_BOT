@@ -1,3 +1,5 @@
+import { createJob } from "~/services/lecture/jobStore";
+import { resolveTarget } from "~/services/lecture/target";
 import { planPatches } from "~/services/lecture/patch";
 import { buildPatchBlocks, buildResultBlocks, convertToReview } from "~/services/lecture/pipeline";
 import { findTokenByThread, linkThread, loadReview, savePatchPlan } from "~/services/lecture/reviewStore";
@@ -56,6 +58,23 @@ export const messages: MessageSetting[] = [
         }
       }
 
+      // 어느 코인에 반영할지는 채널이 정한다. 모르는 채널이면 진행하지 않는다.
+      const resolved = resolveTarget(channel);
+      if (!resolved.target) {
+        await client.chat.postMessage({
+          channel,
+          thread_ts: threadRoot,
+          text: "이 채널은 강의 반영 대상이 아닙니다.",
+          blocks: [
+            {
+              type: "section",
+              text: { type: "mrkdwn", text: `:no_entry: ${resolved.reason}` },
+            },
+          ],
+        });
+        return;
+      }
+
       const parsed = parseCommand(text);
       const excel = findExcelFile(files);
 
@@ -84,7 +103,7 @@ export const messages: MessageSetting[] = [
         return;
       }
 
-      const target = { ...parsed, fileName: excel.name };
+      const target = { ...parsed, env: resolved.target.env, fileName: excel.name };
 
       // 변환은 LLM 호출과 파싱이 걸려 수십 초가 나올 수 있다.
       // 먼저 붙잡아두지 않으면 사람들이 명령어를 또 친다.
@@ -97,7 +116,7 @@ export const messages: MessageSetting[] = [
             type: "section",
             text: {
               type: "mrkdwn",
-              text: `:hourglass_flowing_sand: *${target.year} ${target.termName}* 변환 중…\n${excel.name}`,
+              text: `:hourglass_flowing_sand: *${target.year} ${target.termName}* 변환 중…\n${resolved.target.label} · ${excel.name}`,
             },
           },
         ],
@@ -110,6 +129,17 @@ export const messages: MessageSetting[] = [
 
         // 이 스레드에 온 수정 요청이 어느 변환 건인지 찾을 수 있게 해둔다.
         await linkThread(channel, threadRoot, outcome.token);
+        // 반영 권한을 한 명만 갖게 하려면 상태가 DB에 있어야 한다.
+        await createJob({
+          token: outcome.token,
+          channelId: channel,
+          threadTs: threadRoot,
+          year: target.year,
+          term: target.termName,
+          sourceFile: target.fileName,
+          lectureCount: outcome.lectureCount,
+          targetEnv: target.env,
+        });
 
         await client.chat.update({
           channel,
