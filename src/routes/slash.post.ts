@@ -1,7 +1,10 @@
 import { commands } from "~/services/slack/command";
 import type { Command } from "~/services/slack/type";
+import { assertSlackRequest } from "~/utils/slackRequest";
 
 export default defineEventHandler(async (event) => {
+  await assertSlackRequest(event);
+
   if (!getHeader(event, "content-type").includes("application/x-www-form-urlencoded")) {
     throw createError({
       statusCode: 400,

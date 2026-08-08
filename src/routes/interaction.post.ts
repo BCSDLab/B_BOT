@@ -8,10 +8,13 @@ import type {
 import { blockActions } from '~/services/slack/blockAction';
 import { shortcuts } from '~/services/slack/shortcut';
 import { viewActions } from '~/services/slack/viewAction';
+import { assertSlackRequest } from "~/utils/slackRequest";
 
 type Interaction = SlackAction | SlackShortcut | ViewSubmitAction;
 
 export default defineEventHandler(async (event) => {
+  await assertSlackRequest(event);
+
   if (!getHeader(event, "content-type").includes("application/x-www-form-urlencoded")) {
     throw createError({
       statusCode: 400,

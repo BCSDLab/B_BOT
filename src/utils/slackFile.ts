@@ -10,6 +10,20 @@ export interface SlackFile {
 
 const MAX_BYTES = 20 * 1024 * 1024;
 
+/**
+ * 봇 토큰을 붙여 요청하므로 슬랙이 아닌 주소로는 절대 보내지 않는다.
+ * 서명 검증이 있으면 여기까지 위조된 주소가 오지 않지만, 한쪽이 뚫려도
+ * 토큰은 나가지 않게 두 겹으로 둔다.
+ */
+export function isSlackFileUrl(url: string): boolean {
+  try {
+    const { protocol, hostname } = new URL(url);
+    return protocol === "https:" && (hostname === "slack.com" || hostname.endsWith(".slack.com"));
+  } catch {
+    return false;
+  }
+}
+
 export function findExcelFile(files: SlackFile[] | undefined): SlackFile | null {
   return (
     files?.find(
@@ -27,6 +41,9 @@ export async function downloadSlackFile(file: SlackFile): Promise<ArrayBuffer> {
   const url = file.url_private_download ?? file.url_private;
   if (!url) {
     throw new Error("파일 다운로드 주소가 없습니다.");
+  }
+  if (!isSlackFileUrl(url)) {
+    throw new Error("슬랙이 아닌 주소로는 파일을 받지 않습니다.");
   }
   if (file.size > MAX_BYTES) {
     throw new Error(`파일이 너무 큽니다 (${Math.round(file.size / 1024 / 1024)}MB).`);

@@ -11,6 +11,7 @@ import { messageFunctionList } from "~/services/slack/message";
 import { botUserId } from "~/utils/slackBot";
 import type { SlackFile } from "~/utils/slackFile";
 import { setFeedback } from "~/services/rag";
+import { assertSlackRequest } from "~/utils/slackRequest";
 
 type Body = {
   type: "event_callback";
@@ -26,6 +27,8 @@ interface Context {
 }
 
 export default defineEventHandler(async (event) => {
+  await assertSlackRequest(event);
+
   const body = await readBody<Body>(event);
   if (body.type === "url_verification") {
     if (body.challenge) {
