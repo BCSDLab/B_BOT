@@ -28,8 +28,16 @@ import {
   savePatchPlan,
   updateReview,
 } from "~/services/lecture/reviewStore";
+import { handleBusAction } from "./busAction";
 import type { BlockActionSetting } from "./type";
 
+/** 버스 시간표 워크플로 버튼. 값 검증·상태 전이는 busAction이 담당한다. */
+const busAction = (actionId: string): BlockActionSetting => ({
+  actionId,
+  async handler({ client, body, action }) {
+    await handleBusAction(client, body, action);
+  },
+});
 // 버튼·셀렉트 조작(block_actions) 핸들러 목록.
 // 등록하지 않은 action_id는 라우터에서 무시된다. 모달 안의 select와 URL 링크 버튼도
 // block_actions로 들어오는데, 그것들은 여기서 처리할 대상이 아니기 때문이다.
@@ -607,4 +615,5 @@ export const blockActions: BlockActionSetting[] = [
       });
     },
   },
+  ...["bus:start", "bus:cancel", "bus:approve", "bus:revision", "bus:patch_apply", "bus:patch_cancel", "bus:retry"].map(busAction),
 ];
