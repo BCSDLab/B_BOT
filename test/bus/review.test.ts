@@ -101,6 +101,8 @@ describe("버스 검수 HTML", () => {
     expect(html).toContain('.view-all .no-days-badge');
     expect(html).toContain('.view-no-days .route-warning{display:none}');
     expect(html).toContain('.view-issue .no-days-badge{display:none}');
+    expect(html).toContain('"no-days":document.getElementById("f-no-days")');
+    expect(html).toContain('mode==="no-days"&&route.dataset.noDays==="true"');
   });
 
   it("running_days가 없는 회차는 운행요일 미지정 표시가 붙는다", () => {
