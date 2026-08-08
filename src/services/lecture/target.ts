@@ -23,6 +23,8 @@ export interface KoinTarget {
 const CHANNEL_ENV: Record<string, KoinEnv> = {
   [CHANNEL_ID.코인_이벤트알림_stage]: "stage",
   [CHANNEL_ID.코인_이벤트알림]: "prod",
+  // 개발 중 확인용. 스테이지로만 간다. 자동화가 자리잡으면 뺀다.
+  [CHANNEL_ID.sprint_ai_코인_업무자동화]: "stage",
 };
 
 const LABEL: Record<KoinEnv, string> = { stage: "스테이지", prod: "프로덕션" };

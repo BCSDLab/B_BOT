@@ -35,6 +35,16 @@ describe("대상 코인 결정", () => {
     }
   });
 
+  it("작업용 채널은 스테이지로만 간다", () => {
+    // 개발 중 확인용이라 열어두되, 실수로 프로덕션에 닿지 않게 한다.
+    const sprint = resolveTarget(CHANNEL_ID.sprint_ai_코인_업무자동화);
+    const prod = resolveTarget(CHANNEL_ID.코인_이벤트알림);
+    const stage = resolveTarget(CHANNEL_ID.코인_이벤트알림_stage);
+
+    expect(sprint.target?.env ?? sprint.reason).toEqual(stage.target?.env ?? stage.reason);
+    expect(sprint.target?.env ?? sprint.reason).not.toEqual(prod.target?.env ?? prod.reason);
+  });
+
   it("사람에게 보여줄 이름과 위험 표시", () => {
     expect(labelOf("stage")).toBe("스테이지");
     expect(labelOf("prod")).toBe("프로덕션");
