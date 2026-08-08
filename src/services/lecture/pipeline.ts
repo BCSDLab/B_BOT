@@ -2,6 +2,7 @@ import type { KnownBlock } from "@slack/web-api";
 import { blockingIssues, buildAdminRequest, toAdminTerm } from "./adminApi";
 import { convertRows } from "./convert";
 import type { PatchPlan } from "./patch";
+import { isProduction, labelOf, type KoinEnv } from "./target";
 import { describeClassTime } from "./describeTime";
 import { renderReviewPage } from "./reviewHtml";
 import type { StoredReview } from "./reviewStore";
@@ -11,6 +12,8 @@ import { generateMappingSpec } from "./spec";
 import type { Lecture, TimeFormat } from "./types";
 
 export interface ConversionTarget {
+  /** 채널로 정해진 대상. 변환부터 반영까지 바뀌지 않는다. */
+  env: KoinEnv;
   year: number;
   /** `여름학기`처럼 사람이 쓰는 이름. enum 변환은 안쪽에서 한다. */
   termName: string;
@@ -47,7 +50,7 @@ export interface ConversionOutcome {
  */
 export async function convertToReview(
   buffer: ArrayBuffer,
-  { year, termName, fileName }: ConversionTarget,
+  { env, year, termName, fileName }: ConversionTarget,
 ): Promise<ConversionOutcome> {
   const term = toAdminTerm(termName);
   // LLM 호출과 파싱은 수십 초가 걸린다. 설정 때문에 실패할 거면 그 전에 알린다.
@@ -64,7 +67,7 @@ export async function convertToReview(
   const blocking = blockingIssues(issues);
 
   const token = await saveReview(
-    buildStoredReview(converted.lectures, spec.timeFormat, { year, termName, fileName }, {
+    buildStoredReview(converted.lectures, spec.timeFormat, { env, year, termName, fileName }, {
       parseFailures: converted.issues.map((i) => ({
         row: i.row,
         value: i.value,
@@ -95,8 +98,13 @@ export function buildResultBlocks(
 ): KnownBlock[] {
   const warn = outcome.blockingCount > 0 || outcome.parseFailureCount > 0;
 
+  const prod = isProduction(target.env);
   const lines = [
     `*${target.year} ${target.termName}* 변환 완료`,
+    // 어디에 들어가는지가 가장 중요한 정보다. 프로덕션은 되돌릴 수 없다.
+    prod
+      ? `:rotating_light: 대상: *${labelOf(target.env)}*`
+      : `대상: ${labelOf(target.env)}`,
     `강의 *${outcome.lectureCount}건* · 시간 없음 ${outcome.withoutTimeCount}건`,
   ];
   if (outcome.parseFailureCount > 0) {
@@ -123,8 +131,13 @@ export function buildResultBlocks(
         },
         {
           type: "button",
-          text: { type: "plain_text", text: warn ? "그래도 반영" : "반영", emoji: true },
-          style: warn ? undefined : "primary",
+          // 누르는 순간에도 어디에 넣는지 보이게 한다.
+          text: {
+            type: "plain_text",
+            text: `${prod ? "프로덕션에 " : ""}${warn ? "그래도 반영" : "반영"}`,
+            emoji: true,
+          },
+          style: warn || prod ? undefined : "primary",
           action_id: "lecture:apply",
           value: JSON.stringify({ token: outcome.token, requesterId }),
         },
@@ -179,6 +192,8 @@ export function buildStoredReview(
   });
 
   const html = renderReviewPage({
+    envLabel: labelOf(target.env),
+    isProduction: isProduction(target.env),
     year: target.year,
     termName: target.termName,
     sourceFileName: target.fileName,
@@ -193,6 +208,7 @@ export function buildStoredReview(
     lectures,
     timeFormat,
     meta: {
+      env: target.env,
       year: target.year,
       termName: target.termName,
       sourceFileName: target.fileName,

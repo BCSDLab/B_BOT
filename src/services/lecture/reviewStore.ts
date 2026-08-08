@@ -1,5 +1,6 @@
 import { randomBytes } from "node:crypto";
 import type { Patch, TimeAmbiguity } from "./patch";
+import type { KoinEnv } from "./target";
 import type { Lecture, TimeFormat } from "./types";
 
 /**
@@ -14,6 +15,8 @@ const TOKEN_BYTES = 16;
 const EXPIRE_DAYS = 7;
 
 export interface ReviewMeta {
+  /** 어느 코인에 반영할 건지. 검토·반영 내내 바뀌지 않아야 한다. */
+  env: KoinEnv;
   year: number;
   termName: string;
   sourceFileName: string;

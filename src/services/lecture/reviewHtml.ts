@@ -3,6 +3,9 @@ import { describeClassTime } from "./describeTime";
 import type { Lecture } from "./types";
 
 export interface ReviewPageInput {
+  /** 어느 코인에 반영될 건지. 링크를 나중에 열었을 때도 알 수 있어야 한다. */
+  envLabel: string;
+  isProduction: boolean;
   year: number;
   /** `2학기`, `여름학기` 같은 한글 학기명. 사람이 읽는 값이라 enum이 아니다. */
   termName: string;
@@ -36,7 +39,7 @@ const ISSUE_LABEL: Record<PreflightIssue["kind"], string> = {
  * 확인이 필요한 행을 맨 위로 올린다.
  */
 export function renderReviewPage(input: ReviewPageInput): string {
-  const { year, termName, sourceFileName, generatedAt, lectures, issues, parseFailures } = input;
+  const { envLabel, isProduction, year, termName, sourceFileName, generatedAt, lectures, issues, parseFailures } = input;
 
   const issuesByLecture = new Map<string, PreflightIssue[]>();
   for (const issue of issues) {
@@ -162,6 +165,11 @@ tr.issue:hover { filter: brightness(0.97); }
 .dim { color: var(--dim); }
 .raw { color: var(--dim); }
 .parsed { color: var(--ok); }
+.env {
+  display: inline-block; margin-left: 8px; padding: 2px 10px; border-radius: 999px;
+  background: var(--line); color: var(--dim); font-size: 12px; vertical-align: middle;
+}
+.env.prod { background: var(--warn-line); color: var(--warn-fg); font-weight: 600; }
 .chip {
   display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 4px;
   font-size: 11px; white-space: nowrap;
@@ -174,7 +182,7 @@ footer { margin-top: 24px; color: var(--dim); font-size: 12px; }
 </head>
 <body>
 <div class="wrap">
-<h1>${year} ${escapeHtml(termName)} 강의 검토</h1>
+<h1>${year} ${escapeHtml(termName)} 강의 검토 <span class="env${isProduction ? " prod" : ""}">${escapeHtml(envLabel)}</span></h1>
 <div class="sub">${escapeHtml(sourceFileName)} · ${escapeHtml(generatedAt)} 생성</div>
 
 <div class="tiles">

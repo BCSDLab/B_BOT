@@ -28,6 +28,7 @@ const job = (token: string) => ({
   term: "여름학기",
   sourceFile: "편람.xlsx",
   lectureCount: 21,
+  targetEnv: "stage",
 });
 
 describe.skipIf(!hasTestDb)("강의 반영 작업 상태", () => {

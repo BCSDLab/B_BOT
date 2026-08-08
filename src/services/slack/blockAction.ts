@@ -1,6 +1,7 @@
 import { buildAdminRequest, ensureSemester, submitLectures, toAdminTerm } from "~/services/lecture/adminApi";
 import { cancelJob, claimJob, finishJob } from "~/services/lecture/jobStore";
 import { getKoinAdminAuth } from "~/services/lecture/koinAuth";
+import { labelOf, resolveTargetByEnv } from "~/services/lecture/target";
 import { applyPatches, resolveAmbiguities } from "~/services/lecture/patch";
 import { buildPatchBlocks, buildStoredReview } from "~/services/lecture/pipeline";
 import {
@@ -91,6 +92,7 @@ export const blockActions: BlockActionSetting[] = [
         await updateReview(
           plan.reviewToken,
           buildStoredReview(patched, stored.timeFormat, {
+            env: stored.meta.env,
             year: stored.meta.year,
             termName: stored.meta.termName,
             fileName: stored.meta.sourceFileName,
@@ -179,7 +181,12 @@ export const blockActions: BlockActionSetting[] = [
           term: toAdminTerm(stored.meta.termName),
         });
 
-        const auth = await getKoinAdminAuth();
+        // 변환할 때 정해진 환경으로 붙는다. 채널이 바뀌어도 대상은 바뀌지 않는다.
+        const resolved = resolveTargetByEnv(stored.meta.env);
+        if (!resolved.target) {
+          throw new Error(resolved.reason ?? "대상 환경을 찾지 못했습니다.");
+        }
+        const auth = await getKoinAdminAuth(resolved.target);
         // 학기가 없으면 강의 생성이 404로 막힌다. 이미 있으면 서버가 무시한다.
         await ensureSemester(request, auth);
         await submitLectures(request, auth);
@@ -190,7 +197,7 @@ export const blockActions: BlockActionSetting[] = [
           text: "반영 완료",
           blocks: [
             { type: "section", text: { type: "mrkdwn",
-              text: `:white_check_mark: *${stored.meta.year} ${stored.meta.termName} 반영 완료*\n강의 *${stored.meta.lectureCount}건*` } },
+              text: `:white_check_mark: *${stored.meta.year} ${stored.meta.termName} 반영 완료*\n${labelOf(stored.meta.env)} · 강의 *${stored.meta.lectureCount}건*` } },
             { type: "context", elements: [{ type: "mrkdwn",
               text: `작업자: <@${actor}> · ${stored.meta.sourceFileName}` }] },
           ],
