@@ -32,9 +32,15 @@ interface ImportMetaEnv {
   readonly OPENAI_API_KEY?: string;
   readonly OPENAI_MODEL?: string;
   readonly LECTURE_LLM_PROVIDER?: "openai" | "anthropic";
+  readonly COOP_LLM_PROVIDER?: "openai" | "anthropic";
   readonly NOTION_TOKEN?: string;
   readonly GDRIVE_FOLDER_IDS?: string;
 }
 interface ImportMeta {
   env: ImportMetaEnv;
+}
+
+declare module "*.md?raw" {
+  const content: string;
+  export default content;
 }

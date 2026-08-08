@@ -1,4 +1,9 @@
 import OpenAI from "openai";
+import {
+  toDataUrl,
+  validateStructuredImages,
+  type StructuredGenerationRequest,
+} from "./structured";
 
 // 강의 편람처럼 학기마다 형식이 바뀌는 입력을 읽어낼 때만 쓴다.
 // RAG 응답 생성은 계속 로컬 모델(ollama.ts) 담당이다.
@@ -22,19 +27,26 @@ export async function generateStructured<T>({
   system,
   prompt,
   schema,
+  images = [],
   maxTokens = 4096,
-}: {
-  system: string;
-  prompt: string;
-  schema: Record<string, unknown>;
-  maxTokens?: number;
-}): Promise<T> {
+}: StructuredGenerationRequest): Promise<T> {
+  const checkedImages = validateStructuredImages(images);
+  const userContent = checkedImages.length === 0
+    ? prompt
+    : [
+        { type: "text" as const, text: prompt },
+        ...checkedImages.map((image) => ({
+          type: "image_url" as const,
+          image_url: { url: toDataUrl(image) },
+        })),
+      ];
+
   const response = await getClient().chat.completions.create({
     model: import.meta.env.OPENAI_MODEL || DEFAULT_MODEL,
     max_completion_tokens: maxTokens,
     messages: [
       { role: "system", content: system },
-      { role: "user", content: prompt },
+      { role: "user", content: userContent },
     ],
     response_format: {
       type: "json_schema",

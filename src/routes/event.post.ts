@@ -89,6 +89,7 @@ export default defineEventHandler(async (event) => {
     channelId = eventBody.channel;
     userId = eventBody.user ?? "";
     threadTs = eventBody.ts ?? eventBody.thread_ts ?? "";
+    parentTs = eventBody.thread_ts;
     files = eventBody.files;
 
   } else if (body.event.subtype === "message_changed") {

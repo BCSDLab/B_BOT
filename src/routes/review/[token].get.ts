@@ -1,4 +1,5 @@
-import { loadReview } from "~/services/lecture/reviewStore";
+import { loadCoopReview } from "~/services/coop/reviewStore";
+import { loadReview as loadLectureReview } from "~/services/lecture/reviewStore";
 
 /**
  * 강의 검토 페이지. 슬랙 메시지의 링크로 바로 열린다.
@@ -6,7 +7,7 @@ import { loadReview } from "~/services/lecture/reviewStore";
  */
 export default defineEventHandler(async (event) => {
   const token = getRouterParam(event, "token") ?? "";
-  const stored = await loadReview(token);
+  const stored = await loadLectureReview(token) ?? await loadCoopReview(token);
 
   setResponseHeader(event, "X-Robots-Tag", "noindex, nofollow");
   setResponseHeader(event, "Cache-Control", "no-store");
