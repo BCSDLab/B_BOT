@@ -11,6 +11,8 @@ import {
 } from "~/services/coop/reviewStore";
 import { downloadSlackImage, findImageFile } from "~/utils/slackFile";
 import { readThreadContext, threadRootOf } from "~/utils/slackThread";
+import { createCoopJob } from "~/services/coop/jobStore";
+import { coopTargetLabel, resolveCoopTarget } from "~/services/coop/target";
 import type { MessageSetting } from "../type";
 
 const COMMAND = /^!생협반영/;
@@ -60,7 +62,21 @@ export const messages: MessageSetting[] = [{
       return;
     }
 
-    const target = { ...parsed, fileName: image.name };
+    const resolved = resolveCoopTarget(channel);
+    if (!resolved.target) {
+      await client.chat.postMessage({
+        channel,
+        thread_ts: threadRoot,
+        text: "생협 반영 대상 채널이 아닙니다.",
+        blocks: [{
+          type: "section",
+          text: { type: "mrkdwn", text: `:x: ${resolved.reason ?? "반영 대상을 찾지 못했습니다."}` },
+        }],
+      });
+      return;
+    }
+
+    const target = { ...parsed, env: resolved.target.env, fileName: image.name };
     const placeholder = await client.chat.postMessage({
       channel,
       thread_ts: threadRoot,
@@ -69,7 +85,7 @@ export const messages: MessageSetting[] = [{
         type: "section",
         text: {
           type: "mrkdwn",
-          text: `:hourglass_flowing_sand: *${target.year} ${target.termName} 생협 운영시간* 변환 중…\n${image.name}`,
+          text: `:hourglass_flowing_sand: *${target.year} ${target.termName} 생협 운영시간* 변환 중…\n${coopTargetLabel(target.env)} · ${image.name}`,
         },
       }],
     });
@@ -83,6 +99,16 @@ export const messages: MessageSetting[] = [{
         target,
       );
       await linkCoopThread(channel, threadRoot, outcome.token);
+      await createCoopJob({
+        token: outcome.token,
+        channelId: channel,
+        threadTs: messageTs,
+        year: target.year,
+        term: target.termName,
+        sourceFile: target.fileName,
+        shopCount: outcome.shopCount,
+        targetEnv: target.env,
+      });
       await client.chat.update({
         channel,
         ts: messageTs,

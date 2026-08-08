@@ -8,7 +8,7 @@ vi.mock("~/services/coop/detected", () => ({
   }]),
   downloadCoopNoticeImage: vi.fn(async () => new ArrayBuffer(4)),
   dropDetectedCoop: vi.fn(async () => undefined),
-  fetchArticle: vi.fn(async () => ({
+  fetchCoopArticle: vi.fn(async () => ({
     title: "2026학년도 1학기 생협 운영시간 안내",
     url: "https://koreatech.in/articles/123",
     attachments: [],
@@ -37,21 +37,40 @@ vi.mock("~/services/coop/reviewStore", () => ({
   linkCoopThread: vi.fn(async () => undefined),
 }));
 
+vi.mock("~/services/coop/jobStore", () => ({
+  createCoopJob: vi.fn(async () => undefined),
+}));
+
+vi.mock("~/services/coop/target", () => ({
+  resolveCoopTarget: vi.fn(() => ({
+    ok: true,
+    target: {
+      env: "stage",
+      label: "스테이지",
+      baseUrl: "https://api.stage.example.com",
+      email: "admin@example.com",
+      password: "password",
+    },
+  })),
+  coopTargetLabel: vi.fn(() => "스테이지"),
+}));
+
 import {
   collectCoopImages,
   downloadCoopNoticeImage,
-  fetchArticle,
+  fetchCoopArticle,
   saveDetectedCoop,
 } from "~/services/coop/detected";
 import { convertRegularCoopToReview } from "~/services/coop/pipeline";
 import { linkCoopThread } from "~/services/coop/reviewStore";
+import { createCoopJob } from "~/services/coop/jobStore";
 import { handleCoopDetectedAction } from "~/services/slack/coopDetectedAction";
 
 function slackClient() {
   return {
     chat: {
       postMessage: vi.fn(async () => ({ ts: "100.1" })),
-      update: vi.fn(async () => ({})),
+      update: vi.fn(async (_request: unknown) => ({})),
     },
   };
 }
@@ -72,14 +91,19 @@ describe("생협 공지 감지 Slack 액션", () => {
       value: JSON.stringify({ article_id: 123 }),
     } as never);
 
-    expect(fetchArticle).toHaveBeenCalledWith(123);
+    expect(fetchCoopArticle).toHaveBeenCalledWith(123);
     expect(downloadCoopNoticeImage).toHaveBeenCalledWith(expect.objectContaining({ name: "2026-1학기.png" }));
     expect(convertRegularCoopToReview).toHaveBeenCalledWith(
       expect.any(ArrayBuffer),
       "image/png",
-      { year: 2026, termName: "1학기", fileName: "2026-1학기.png" },
+      { env: "stage", year: 2026, termName: "1학기", fileName: "2026-1학기.png" },
     );
     expect(linkCoopThread).toHaveBeenCalledWith("C1", "100.1", "b".repeat(32));
+    expect(createCoopJob).toHaveBeenCalledWith(expect.objectContaining({
+      token: "b".repeat(32),
+      targetEnv: "stage",
+      shopCount: 11,
+    }));
     expect(client.chat.update).toHaveBeenLastCalledWith(expect.objectContaining({
       channel: "C1",
       ts: "100.1",
