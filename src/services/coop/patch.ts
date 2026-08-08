@@ -1,6 +1,6 @@
 import type { KnownBlock } from "@slack/web-api";
 import { generateCoopStructured } from "./llm";
-import { normalizeDate, normalizePhone } from "./convert";
+import { normalizeDate, normalizeMealType, normalizePhone } from "./convert";
 import type { AdminOperationHour, RegularConversionResult } from "./types";
 
 export type CoopPatchField =
@@ -185,12 +185,12 @@ export function resolveCoopPatch(
     return null;
   }
   const knownTypes = [...new Set(shop.admin.operation_hours
-    .map((hour) => hour.type)
+    .map((hour) => hour.type ? normalizeMealType(hour.type) : hour.type)
     .filter((type): type is string => Boolean(type)))];
-  const resolvedType = raw.type || (knownTypes.length === 1 ? knownTypes[0] : "");
+  const resolvedType = normalizeMealType(raw.type) || (knownTypes.length === 1 ? knownTypes[0] : "");
   const sameDay = shop.admin.operation_hours.filter((hour) => hour.day_of_week === raw.day);
   const existing = resolvedType
-    ? sameDay.find((hour) => (hour.type ?? "") === resolvedType)
+    ? sameDay.find((hour) => normalizeMealType(hour.type ?? "") === resolvedType)
     : sameDay.length === 1
       ? sameDay[0]
       : sameDay.find((hour) => !hour.type);
@@ -262,13 +262,15 @@ export function applyCoopPatches(
     }
 
     const found = shop.admin.operation_hours.find((hour) =>
-      hour.day_of_week === patch.dayOfWeek && (hour.type ?? "") === patch.type);
+      hour.day_of_week === patch.dayOfWeek &&
+      normalizeMealType(hour.type ?? "") === normalizeMealType(patch.type));
     if (found) {
+      if (found.type) found.type = normalizeMealType(found.type);
       found.open_time = patch.openTime!;
       found.close_time = patch.closeTime!;
     } else {
       shop.admin.operation_hours.push({
-        ...(patch.type ? { type: patch.type } : {}),
+        ...(patch.type ? { type: normalizeMealType(patch.type) } : {}),
         day_of_week: patch.dayOfWeek,
         open_time: patch.openTime!,
         close_time: patch.closeTime!,

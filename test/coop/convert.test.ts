@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   convertRegularTimetable,
   normalizeDate,
+  normalizeMealType,
   normalizePhone,
   normalizeSemester,
 } from "~/services/coop/convert";
@@ -55,6 +56,14 @@ describe("정규학기 기본값 정규화", () => {
     expect(normalizeDate("2026년 3월 3일(화)")).toBe("2026-03-03");
     expect(normalizePhone("560-1278")).toBe("041-560-1278");
   });
+
+  it("식사 구분을 Admin API 표준 명칭으로 바꾼다", () => {
+    expect(normalizeMealType("조식")).toBe("아침");
+    expect(normalizeMealType(" 중식 ")).toBe("점심");
+    expect(normalizeMealType("석식")).toBe("저녁");
+    expect(normalizeMealType("아침")).toBe("아침");
+    expect(normalizeMealType("")).toBe("");
+  });
 });
 
 describe("정규학기 변환", () => {
@@ -80,5 +89,18 @@ describe("정규학기 변환", () => {
   it("기존 매장이 빠지면 반영을 막는다", () => {
     const result = convertRegularTimetable({ ...raw, shops: raw.shops.slice(0, 1) }, baseline);
     expect(result.issues).toContainEqual(expect.objectContaining({ code: "missing_shop", shop: "대즐" }));
+  });
+
+  it("모델이 조식·중식·석식으로 읽어도 아침·점심·저녁으로 변환한다", () => {
+    const mealLabels = ["조식", "중식", "석식"];
+    const source = structuredClone(raw);
+    source.shops[0].operationHours = source.shops[0].operationHours.map((hour, index) => ({
+      ...hour,
+      type: mealLabels[index] ?? hour.type,
+    }));
+
+    const result = convertRegularTimetable(source, baseline);
+    expect(result.request.coop_shops[0].operation_hours.map((hour) => hour.type))
+      .toEqual(["아침", "점심"]);
   });
 });

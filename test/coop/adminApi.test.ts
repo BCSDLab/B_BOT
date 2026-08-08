@@ -3,6 +3,7 @@ import {
   applyCoopTimetable,
   CoopAdminApiError,
   createCoopSemester,
+  updateCoopTimetable,
 } from "~/services/coop/adminApi";
 
 const auth = { baseUrl: "https://api.stage.example.com/", accessToken: "token" };
@@ -64,6 +65,33 @@ describe("생협 Admin API", () => {
       .mockResolvedValueOnce(new Response(null, { status: 200 }));
 
     await expect(applyCoopTimetable(semester, timetable, auth)).resolves.toBe(17);
+  });
+
+  it("시간표 전송 직전에 조식·중식·석식을 표준 타입으로 보정한다", async () => {
+    const request = {
+      coop_shops: [{
+        coop_shop_info: {
+          name: "학생식당",
+          phone: "041-560-1278",
+          location: "학생회관 2층",
+        },
+        operation_hours: [
+          { type: "조식", day_of_week: "평일", open_time: "08:00", close_time: "09:30" },
+          { type: "중식", day_of_week: "평일", open_time: "11:30", close_time: "13:30" },
+          { type: "석식", day_of_week: "평일", open_time: "17:30", close_time: "18:30" },
+        ],
+      }],
+    };
+    const fetchMock = vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(new Response(null, { status: 200 }));
+
+    await updateCoopTimetable(17, request, auth);
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1]?.body as string);
+    expect(body.coop_shops[0].operation_hours.map((hour: { type: string }) => hour.type))
+      .toEqual(["아침", "점심", "저녁"]);
+    expect(request.coop_shops[0].operation_hours.map((hour) => hour.type))
+      .toEqual(["조식", "중식", "석식"]);
   });
 
   it("다른 원인의 409는 학기 생성 실패로 처리한다", async () => {

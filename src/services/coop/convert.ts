@@ -28,6 +28,18 @@ const NAME_ALIASES: Record<string, string> = {
 
 const clean = (value: string): string => value.replace(/[\s·.()\-]/g, "").trim();
 
+const MEAL_TYPE: Record<string, string> = {
+  조식: "아침",
+  중식: "점심",
+  석식: "저녁",
+};
+
+/** 이미지와 수정 명령의 식사 구분을 Admin API 표준 명칭으로 맞춘다. */
+export function normalizeMealType(value: string): string {
+  const type = value.trim();
+  return MEAL_TYPE[type] ?? type;
+}
+
 export function normalizeSemester(label: string): string | null {
   if (/(?:하계|동계)\s*방학|여름\s*학기|겨울\s*학기|계절\s*학기/.test(label)) {
     return null;
@@ -136,7 +148,7 @@ function convertHours(source: RawCoopShop, issues: ConversionIssue[]): AdminOper
         detail: `운영시간을 해석하지 못했습니다: ${hour.rawText || `${hour.openTime} - ${hour.closeTime}`}` });
       continue;
     }
-    const type = hour.type.trim();
+    const type = normalizeMealType(hour.type);
     const key = `${day}|${type}`;
     if (seen.has(key)) {
       issues.push({ code: "duplicate_operation_hour", severity: "blocking", shop: label,
