@@ -219,20 +219,17 @@ export async function handleBusPatchAction(
     });
     await updateBusReview(plan.reviewToken, rebuilt);
 
-    await client.chat.postMessage({
-      channel,
-      thread_ts: ts,
-      text: "버스 시간표 수정 적용",
-      blocks: [
-        ...section(
-          `:white_check_mark: *수정 ${plan.patches.length}건 적용*\n검토 페이지가 갱신됐습니다. 다시 확인해주세요.`,
-        ),
-        {
-          type: "context",
-          elements: [{ type: "mrkdwn", text: `요청: <@${requesterId ?? body.user.id}>` }],
-        },
-      ],
-    });
+    // 버튼이 달린 원본 미리보기 메시지를 그대로 두면 이미 적용한 뒤에도 다시
+    // 누를 수 있어 보인다. bus:apply/bus:cancel과 똑같이 원본을 갱신해 버튼을 없앤다.
+    await update(client, channel, ts, "버스 시간표 수정 적용", [
+      ...section(
+        `:white_check_mark: *수정 ${plan.patches.length}건 적용*\n검토 페이지가 갱신됐습니다. 다시 확인해주세요.`,
+      ),
+      {
+        type: "context",
+        elements: [{ type: "mrkdwn", text: `요청: <@${requesterId ?? body.user.id}>` }],
+      },
+    ]);
   } catch (error) {
     const message = error instanceof Error ? error.message : "알 수 없는 오류입니다";
     await update(

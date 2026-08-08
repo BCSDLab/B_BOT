@@ -259,6 +259,12 @@ describe("bus:patch_apply", () => {
     // 적용 전 HTML을 그대로 두면 검토 페이지가 수정 전 값을 보여준다.
     expect((rebuilt as { html: string }).html).not.toBe(storedReview.html);
     expect((rebuilt as { html: string }).html).toContain("09:00");
+    // 버튼이 달린 원본 미리보기 메시지를 갱신해 버튼을 없애야 한다. 새 메시지만
+    // 추가로 남기면 이미 적용한 뒤에도 버튼이 그대로 남아 다시 누를 수 있어 보인다.
+    expect(mock.chat.update).toHaveBeenCalledWith(
+      expect.objectContaining({ text: "버스 시간표 수정 적용" }),
+    );
+    expect(mock.chat.postMessage).not.toHaveBeenCalled();
   });
 
   it("이미 반영된 작업이면 검토 페이지를 고치지 않는다", async () => {
