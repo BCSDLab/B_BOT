@@ -14,7 +14,7 @@ import {
   loadBusPatchPlan,
 } from "~/services/bus/reviewStore";
 import { sendReviewApproval, sendStatus } from "~/services/bus/slack";
-import { busActionValue } from "~/services/bus/pipeline";
+import { busActionValue, buildReviewApprovalBlocks } from "~/services/bus/pipeline";
 
 interface BusActionValue {
   job_id: string;
@@ -174,23 +174,20 @@ export async function handleBusAction(
       plan.request,
       value.payload_hash,
     );
-    if (updated.review_url) {
-      await client.chat.postMessage({
-        channel: body.channel.id,
-        thread_ts: body.message?.ts,
-        text: "수정 적용 완료 · 재검수 필요",
-        blocks: [
-          {
-            type: "section",
-            text: {
-              type: "mrkdwn",
-              text: `:white_check_mark: *수정 ${plan.patches.length}건 적용*\n<${updated.review_url}|검수 HTML>이 갱신됐습니다. 다시 확인해주세요.`,
-            },
-          },
-        ],
-      });
-    }
-    await sendReviewApproval(client, body.channel.id, updated);
+    const blocks = buildReviewApprovalBlocks(updated);
+    blocks.unshift({
+      type: "section",
+      text: {
+        type: "mrkdwn",
+        text: `:white_check_mark: *수정 ${plan.patches.length}건 적용*\n검수 HTML이 갱신됐습니다. 다시 확인해주세요.`,
+      },
+    });
+    await client.chat.postMessage({
+      channel: body.channel.id,
+      thread_ts: body.message?.ts,
+      text: "버스 시간표 검수",
+      blocks,
+    });
     return;
   }
 }
