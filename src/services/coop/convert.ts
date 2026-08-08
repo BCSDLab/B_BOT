@@ -62,17 +62,36 @@ export function normalizeVacationSemester(
   };
 }
 
-export function normalizeDate(value: string): string | null {
-  const match = /(20\d{2})\D+(\d{1,2})\D+(\d{1,2})/.exec(value.trim());
-  if (!match) return null;
-  const year = Number(match[1]);
-  const month = Number(match[2]);
-  const day = Number(match[3]);
+export function normalizeDate(value: string, fallbackYear?: number): string | null {
+  const trimmed = value.trim();
+  const full = /(20\d{2})\D+(\d{1,2})\D+(\d{1,2})/.exec(trimmed);
+  if (!full && /20\d{2}/.test(trimmed)) return null;
+  const partial = full
+    ? null
+    : /^\D*(\d{1,2})\D+(\d{1,2})(?:\D|$)/.exec(trimmed);
+  const year = full ? Number(full[1]) : fallbackYear;
+  const month = Number(full?.[2] ?? partial?.[1]);
+  const day = Number(full?.[3] ?? partial?.[2]);
+  if (!year || !month || !day) return null;
   const date = new Date(Date.UTC(year, month - 1, day));
   if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) {
     return null;
   }
   return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+function normalizeVacationPeriod(
+  fromValue: string,
+  toValue: string,
+  semesterYear: number,
+): { fromDate: string | null; toDate: string | null } {
+  const fromDate = normalizeDate(fromValue, semesterYear);
+  const fromYear = fromDate ? Number(fromDate.slice(0, 4)) : semesterYear;
+  let toDate = normalizeDate(toValue, fromYear);
+  if (fromDate && toDate && toDate < fromDate && !/20\d{2}/.test(toValue)) {
+    toDate = normalizeDate(toValue, fromYear + 1);
+  }
+  return { fromDate, toDate };
 }
 
 export function normalizePhone(value: string): string | null {
@@ -319,11 +338,16 @@ export function convertVacationTimetable(
     throw new Error(`하계·동계 방학 학기를 해석하지 못했습니다: ${raw.semesterLabel || raw.title}`);
   }
 
-  const fromDate = normalizeDate(raw.fromDate);
-  const toDate = normalizeDate(raw.toDate);
+  const { fromDate, toDate } = normalizeVacationPeriod(
+    raw.fromDate,
+    raw.toDate,
+    vacationSemester.year,
+  );
   const vacationStartDate = normalizeDate(vacationStartDateValue);
   if (!fromDate || !toDate || !vacationStartDate) {
-    throw new Error("전체 운영 기간 또는 방학 시작일을 해석하지 못했습니다.");
+    throw new Error(
+      `전체 운영 기간 또는 방학 시작일을 해석하지 못했습니다: ${raw.fromDate} - ${raw.toDate} / ${vacationStartDateValue}`,
+    );
   }
   if (fromDate >= vacationStartDate || vacationStartDate > toDate) {
     throw new Error(`방학 시작일은 전체 운영 기간 안에서 시작일보다 늦어야 합니다: ${fromDate} - ${toDate}`);
