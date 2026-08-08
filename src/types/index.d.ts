@@ -26,6 +26,8 @@ interface ImportMetaEnv {
   readonly KOIN_PROD_API_BASE_URL?: string;
   readonly KOIN_PROD_ADMIN_EMAIL?: string;
   readonly KOIN_PROD_ADMIN_PASSWORD?: string;
+  readonly BUS_WORKFLOW_STATE_DB_PATH?: string;
+  readonly BUS_WORKFLOW_ARTIFACT_ROOT?: string;
   readonly OLLAMA_BASE_URL?: string;
   readonly OLLAMA_GEN_MODEL?: string;
   readonly ANTHROPIC_API_KEY?: string;

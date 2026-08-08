@@ -57,4 +57,10 @@ describe("sourceDays", () => {
     expect(sourceDays("등교")).toBeUndefined();
     expect(sourceDays("08:30")).toBeUndefined();
   });
+
+  it("숫자 뒤의 월·일을 요일로 오인하지 않는다", () => {
+    expect(sourceDays("2026.6.22~7.10")).toBeUndefined();
+    expect(sourceDays("6월22일~7월10일")).toBeUndefined();
+    expect(sourceDays("2026.12.20.(일) ~ 2.28.(일)")).toEqual(["SUN"]);
+  });
 });

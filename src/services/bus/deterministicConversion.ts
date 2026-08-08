@@ -26,17 +26,22 @@ const iso = (year: string, month: string, day: string) => {
   return `${fullYear}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
 };
 
+/** 합성(등교 역순)으로 만든 하교 노선도 원래 노선과 같은 target으로 분류한다. */
+const routeKey = (route: BusRoute) =>
+  `${route.region}:${route.route_type}:${route.route_name}`;
+
 export function sourcePeriods(text: string): string[] {
   const pattern =
     /(20\d{2}|\d{2})\s*[.년\-/]\s*(\d{1,2})\s*[.월\-/]\s*(\d{1,2})\s*(?:[.일]?)\s*(?:\([^)]*\))?\s*[.]?\s*~\s*(?:(20\d{2}|\d{2})\s*[.년\-/]\s*)?(\d{1,2})\s*[.월\-/]\s*(\d{1,2})\s*(?:[.일]?)\s*(?:\([^)]*\))?/g;
   return [
     ...new Set(
-      [...text.matchAll(pattern)].map((match) =>
-        [
-          iso(match[1], match[2], match[3]),
-          iso(match[4] ?? match[1], match[5], match[6]),
-        ].join("~"),
-      ),
+      [...text.matchAll(pattern)].map((match) => {
+        const start = iso(match[1], match[2], match[3]);
+        const end = iso(match[4] ?? match[1], match[5], match[6]);
+        if (match[4] || end >= start) return `${start}~${end}`;
+        const nextYear = String(Number(start.slice(0, 4)) + 1);
+        return `${start}~${iso(nextYear, match[5], match[6])}`;
+      }),
     ),
   ];
 }
@@ -155,7 +160,7 @@ export function convertExcelDeterministically(
     const warnings: string[] = [];
     const parsed = parseStructuredWorkbook(regular);
     const targets = new Map(
-      parsed.map(({ route }, index) => [route, parsed[index].target]),
+      parsed.map(({ route, target }) => [routeKey(route), target]),
     );
     const routes = synthesizeReturnRoutes(
       parsed.map(({ route }) => route),
@@ -169,7 +174,7 @@ export function convertExcelDeterministically(
         payloads(
           "REGULAR",
           routes.map((route) => ({
-            target: targets.get(route) ?? "commuting",
+            target: targets.get(routeKey(route)) ?? "commuting",
             route,
           })),
         ),

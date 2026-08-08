@@ -61,12 +61,12 @@ const job = (over: Partial<BusJob> = {}): BusJob => ({
 function withStateFile(over: Partial<BusJob> = {}) {
   tempDir = mkdtempSync(join(tmpdir(), "bus-workflow-test-"));
   stateDbPath = join(tempDir, "jobs.json");
-  process.env.BUS_WORKFLOW_STATE_DB_PATH = stateDbPath;
+  vi.stubEnv("BUS_WORKFLOW_STATE_DB_PATH", stateDbPath);
   writeFileSync(stateDbPath, JSON.stringify([job(over)], null, 2));
 }
 
 afterEach(() => {
-  delete process.env.BUS_WORKFLOW_STATE_DB_PATH;
+  vi.unstubAllEnvs();
   vi.unstubAllGlobals();
   if (tempDir) rmSync(tempDir, { recursive: true, force: true });
   tempDir = "";

@@ -173,6 +173,25 @@ function regionalMatrices(
             row.value !== undefined,
         );
       if (!selected.length) continue;
+      const values = selected.map((row) => row.value);
+      const hasJoined = values.some(
+        (value) => typeof value === "string" && value.includes("/"),
+      );
+      const routeInfo: BusRoute["route_info"] = hasJoined
+        ? splitColumnTrip(column.label, values, column.heading).map(
+            (trip, index) => ({
+              name: `${index + 1}회`,
+              running_days: [...WEEKDAYS] as BusRoute["route_info"][number]["running_days"],
+              arrival_time: trip.arrival_time,
+            }),
+          )
+        : [
+            {
+              name: "1회",
+              running_days: [...WEEKDAYS] as BusRoute["route_info"][number]["running_days"],
+              arrival_time: values,
+            },
+          ];
       routes.push({
         target: "commuting",
         route: {
@@ -180,13 +199,7 @@ function regionalMatrices(
           route_type: "등교",
           route_name: column.label,
           node_info: selected.map((row) => ({ name: row.name })),
-          route_info: [
-            {
-              name: "1회",
-              running_days: [...WEEKDAYS],
-              arrival_time: selected.map((row) => row.value),
-            },
-          ],
+          route_info: routeInfo,
         },
       });
     }

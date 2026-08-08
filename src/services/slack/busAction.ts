@@ -57,8 +57,13 @@ export async function handleBusAction(
   const expectedHash = job.payload_hash ?? job.source_hash;
   if (action.action_id !== "bus:patch_cancel" && value.payload_hash !== expectedHash)
     throw new Error("payload hash mismatch");
-  if (action.action_id !== "bus:patch_apply" && action.action_id !== "bus:patch_cancel") {
-    await bindSlackThread(job.id, body.channel.id, body.message?.ts ?? "");
+  const messageTs = body.message?.ts;
+  if (
+    messageTs &&
+    action.action_id !== "bus:patch_apply" &&
+    action.action_id !== "bus:patch_cancel"
+  ) {
+    await bindSlackThread(job.id, body.channel.id, messageTs);
   }
   if (action.action_id === "bus:cancel") {
     await cancelJob(job.id);

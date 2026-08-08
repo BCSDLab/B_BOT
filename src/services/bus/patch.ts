@@ -556,6 +556,7 @@ function applyPatch(conversion: BusConversion, patch: BusPatch) {
 
   if (patch.kind === "remove_stop") {
     const index = route.node_info.findIndex((node) => clean(node.name) === patch.stopName);
+    if (index === -1) throw new Error(`정류장을 찾지 못했습니다: ${patch.stopName}`);
     route.node_info.splice(index, 1);
     for (const trip of route.route_info) trip.arrival_time.splice(index, 1);
     return;
@@ -563,10 +564,10 @@ function applyPatch(conversion: BusConversion, patch: BusPatch) {
 
   if (patch.kind === "add_stop") {
     const addStop = patch.addStop!;
-    const index = addStop.afterStop
-      ? route.node_info.findIndex((node) => clean(node.name) === addStop.afterStop) + 1
-      : route.node_info.findIndex((node) => clean(node.name) === addStop.beforeStop);
-    if (index === -1) throw new Error(`정류장 위치를 찾지 못했습니다: ${patch.addStop?.name}`);
+    const reference = addStop.afterStop ?? addStop.beforeStop;
+    const found = route.node_info.findIndex((node) => clean(node.name) === reference);
+    if (found === -1) throw new Error(`정류장 위치를 찾지 못했습니다: ${addStop.name}`);
+    const index = addStop.afterStop ? found + 1 : found;
     route.node_info.splice(index, 0, { name: addStop.name });
     for (const trip of route.route_info) trip.arrival_time.splice(index, 0, null);
     return;
@@ -586,6 +587,7 @@ function applyPatch(conversion: BusConversion, patch: BusPatch) {
 
   if (patch.kind === "arrival_time") {
     const index = route.node_info.findIndex((node) => clean(node.name) === patch.stopName);
+    if (index === -1) throw new Error(`정류장을 찾지 못했습니다: ${patch.stopName}`);
     trip.arrival_time[index] = patch.value!;
     return;
   }

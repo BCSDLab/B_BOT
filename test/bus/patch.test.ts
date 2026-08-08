@@ -297,6 +297,65 @@ describe("버스 수정 적용", () => {
     expect(commuting.route_info[0].arrival_time[0]).toBe("08:10");
     expect(shuttle.route_info[0].arrival_time[0]).toBe("12:00");
   });
+
+  it("없는 정류장을 삭제하면 오류를 던진다", () => {
+    expect(() =>
+      applyBusPatchesToConversions([conversion()], [
+        {
+          semester: "REGULAR",
+          target: "commuting",
+          region: "천안",
+          routeType: "등교",
+          routeName: "천안역",
+          kind: "remove_stop",
+          stopName: "없는 정류장",
+          before: "삭제",
+          after: "삭제",
+          rawValue: "없는 정류장",
+        },
+      ]),
+    ).toThrow(/정류장을 찾지 못했습니다/);
+  });
+
+  it("없는 기준 정류장에 정류장을 추가하면 오류를 던진다", () => {
+    expect(() =>
+      applyBusPatchesToConversions([conversion()], [
+        {
+          semester: "REGULAR",
+          target: "commuting",
+          region: "천안",
+          routeType: "등교",
+          routeName: "천안역",
+          kind: "add_stop",
+          before: "-",
+          after: "두정역 추가",
+          rawValue: "두정역",
+          addStop: { name: "두정역", afterStop: "없는 기준" },
+        },
+      ]),
+    ).toThrow(/정류장 위치를 찾지 못했습니다/);
+  });
+
+  it("없는 정류장의 도착시각을 바꾸면 오류를 던진다", () => {
+    expect(() =>
+      applyBusPatchesToConversions([conversion()], [
+        {
+          semester: "REGULAR",
+          target: "commuting",
+          region: "천안",
+          routeType: "등교",
+          routeName: "천안역",
+          kind: "arrival_time",
+          tripName: "1회",
+          stopName: "없는 정류장",
+          before: "08:10",
+          after: "08:05",
+          rawValue: "08:05",
+          value: "08:05",
+        },
+      ]),
+    ).toThrow(/정류장을 찾지 못했습니다/);
+  });
 });
 
 describe("버스 수정 요청 해석 (LLM 없이 코드 가드)", () => {

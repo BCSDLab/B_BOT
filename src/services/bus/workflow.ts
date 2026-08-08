@@ -273,6 +273,22 @@ export async function publish(id: string, payloadHash: string) {
     transition(current, "PUBLISHING");
   });
   try {
+    // 원격 PUT을 시작하기 전에 일정을 검증해 확정한다. 여기서 실패하면
+    // 시간표 반영이 부분 완료된 채로 남지 않는다.
+    const versionSchedules = job.conversions.map((conversion) => {
+      const [start] = conversion.version_update.content.split("~");
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(start.trim()))
+        throw new Error(
+          `version_update.content 형식이 올바르지 않습니다: ${conversion.version_update.content}`,
+        );
+      const scheduled = new Date(
+        new Date(`${start.trim()}T00:05:00+09:00`).getTime() - 86_400_000,
+      );
+      return {
+        version_update: conversion.version_update,
+        scheduled_at: scheduled.toISOString(),
+      };
+    });
     const { baseUrl, accessToken } = await getBusAdminAuth();
     const base = baseUrl.replace(/\/$/, "");
     for (const p of job.conversions.flatMap(
@@ -304,15 +320,6 @@ export async function publish(id: string, payloadHash: string) {
         );
       }
     }
-    const versionSchedules = job.conversions.map((conversion) => {
-      const [start] = conversion.version_update.content.split("~");
-      const scheduled = new Date(`${start}T00:05:00+09:00`);
-      scheduled.setDate(scheduled.getDate() - 1);
-      return {
-        version_update: conversion.version_update,
-        scheduled_at: scheduled.toISOString(),
-      };
-    });
     return update(id, (j) => {
       j.version_schedules = versionSchedules;
       transition(j, "VERSION_SCHEDULED");

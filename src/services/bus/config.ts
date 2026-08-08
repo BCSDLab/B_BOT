@@ -31,10 +31,10 @@ function optionalString(value: string | undefined): string | undefined {
 export function busConfig(): BusConfig {
   return {
     stateDbPath:
-      optionalString(process.env.BUS_WORKFLOW_STATE_DB_PATH) ??
+      optionalString(import.meta.env.BUS_WORKFLOW_STATE_DB_PATH) ??
       ".data/bus-workflow/jobs.json",
     artifactRoot:
-      optionalString(process.env.BUS_WORKFLOW_ARTIFACT_ROOT) ??
+      optionalString(import.meta.env.BUS_WORKFLOW_ARTIFACT_ROOT) ??
       ".data/bus-workflow/update-jobs",
   };
 }

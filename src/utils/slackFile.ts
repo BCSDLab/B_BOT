@@ -80,9 +80,14 @@ async function download(file: SlackFile): Promise<ArrayBuffer> {
 
   const response = await fetch(url, {
     headers: { Authorization: `Bearer ${import.meta.env.SLACK_BOT_TOKEN}` },
+    signal: AbortSignal.timeout(30_000),
   });
   if (!response.ok) {
     throw new Error(`파일을 받지 못했습니다 (HTTP ${response.status}).`);
+  }
+  const declared = Number(response.headers.get("content-length") ?? 0);
+  if (declared > MAX_BYTES) {
+    throw new Error(`파일이 너무 큽니다 (${Math.round(declared / 1024 / 1024)}MB).`);
   }
   return response.arrayBuffer();
 }

@@ -63,7 +63,7 @@ const job = {
 
 function stateFile() {
   tempDir = mkdtempSync(join(tmpdir(), "bus-publish-test-"));
-  process.env.BUS_WORKFLOW_STATE_DB_PATH = join(tempDir, "jobs.json");
+  vi.stubEnv("BUS_WORKFLOW_STATE_DB_PATH", join(tempDir, "jobs.json"));
   writeFileSync(join(tempDir, "jobs.json"), JSON.stringify([job], null, 2));
 }
 
