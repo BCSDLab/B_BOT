@@ -174,7 +174,9 @@ interface RawPatch {
 }
 export type { RawPatch };
 
-const TITLE_OF: Record<SemesterType, string> = {
+/** SemesterType ↔ 표시용 한글 학기명. 같은 노선명이 여러 학기에 걸쳐 있을 수 있어
+ *  검토·수정 미리보기에서 어느 학기를 고쳤는지 반드시 같이 보여줘야 한다. */
+export const TITLE_OF: Record<SemesterType, string> = {
   REGULAR: "정규학기",
   SEASONAL: "계절학기",
   VACATION: "방학기간",

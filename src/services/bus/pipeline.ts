@@ -1,7 +1,7 @@
 import type { KnownBlock } from "@slack/web-api";
 import { convertExcelDeterministically } from "./deterministicConversion";
 import { analyseExcel, analyseXlsx } from "./excelAnalyzer";
-import type { BusPatchPlan } from "./patch";
+import { TITLE_OF, type BusPatchPlan } from "./patch";
 import { busLabelOf, isBusProduction, type BusKoinEnv } from "./target";
 import { renderBusReviewHtml } from "./reviewHtml";
 import type { BusReviewMeta, StoredBusReview } from "./reviewStore";
@@ -174,10 +174,13 @@ export function buildReviewApprovalBlocks(
 }
 
 const patchLine = (patch: BusPatchPlan["patches"][number]) => {
+  // 같은 노선명이 여러 학기(정규/계절/방학)에 걸쳐 있을 수 있어, 어느 학기를
+  // 고쳤는지 안 보여주면 사용자가 의도한 학기가 맞는지 확인할 방법이 없다.
+  const semesterTitle = TITLE_OF[patch.semester];
   const where =
     patch.kind === "period"
-      ? "적용 기간"
-      : `${patch.region} ${patch.routeType} "${patch.routeName}"`;
+      ? `${semesterTitle} 적용 기간`
+      : `${semesterTitle} ${patch.region} ${patch.routeType} "${patch.routeName}"`;
   const label = {
     arrival_time: `회차 ${patch.tripName} · ${patch.stopName} 도착시각`,
     route_name: "노선명",
