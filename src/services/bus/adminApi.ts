@@ -29,14 +29,27 @@ function splitParen(text: string): { name: string; detail: string | null } {
 }
 
 /**
+ * 우리 내부 `route_type`(등교/하교/셔틀)은 검토 화면 표시와 `!수정` 매칭에 쓰는
+ * 방향/종류 라벨일 뿐, KOIN Admin API의 `route_type`과는 다른 값이다. 실제 API는
+ * `ShuttleRouteType`(순환/주중/주말) 세 값만 받고, commuting 엔드포인트는 그중
+ * "주중"만 허용한다(`validateCommuting()`) — "등교"/"하교"/"셔틀"을 그대로 보내면
+ * "버스 노선 구분이 잘못되었습니다"로 거부된다. 그래서 API로 나가는 값은 대상별로
+ * 고정하고, 내부 route_type은 그대로 둔 채 전송 직전에만 바꿔친다.
+ */
+const ADMIN_ROUTE_TYPE: Record<BusTarget, string> = {
+  commuting: "주중",
+  shuttle: "순환",
+};
+
+/**
  * Admin API가 정의한 필드만 남긴다. running_days 같은 검수 전용 필드는 보내지 않는다.
  * route_name과 정류장/회차 이름에서 괄호 안 내용을 분리해 sub_name/detail로 보낸다.
  */
-const toAdminRoute = (route: BusRoute) => {
+const toAdminRoute = (route: BusRoute, target: BusTarget) => {
   const { name: routeName, detail: subName } = splitParen(route.route_name);
   return {
     region: route.region,
-    route_type: route.route_type,
+    route_type: ADMIN_ROUTE_TYPE[target],
     route_name: routeName,
     sub_name: subName,
     node_info: route.node_info.map((node) => splitParen(node.name)),
@@ -100,7 +113,9 @@ export async function submitBusTimetables(
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        [target.bodyKey]: Object.values(payload.body)[0].map(toAdminRoute),
+        [target.bodyKey]: Object.values(payload.body)[0].map((route) =>
+          toAdminRoute(route, payload.target),
+        ),
       }),
     });
     if (!response.ok) {

@@ -67,6 +67,40 @@ describe("버스 timetable 반영", () => {
     expect(route.node_info[0]).toEqual({ name: "터미널", detail: null });
     expect(route.node_info[1]).toEqual({ name: "대학", detail: "본교" });
     expect(route.route_info[0]).toEqual({ name: "1회", detail: null, arrival_time: ["08:10", "08:50"] });
+    // KOIN Admin API의 route_type은 ShuttleRouteType(순환/주중/주말)만 허용하고,
+    // commuting 엔드포인트는 그중 "주중"만 통과시킨다. 내부 direction 라벨("등교")을
+    // 그대로 보내면 "버스 노선 구분이 잘못되었습니다"로 거부된다.
+    expect(route.route_type).toBe("주중");
+  });
+
+  it("shuttle 대상은 route_type을 순환으로 보낸다", async () => {
+    const shuttleConversion: BusConversion = {
+      ...conversion,
+      payloads: [
+        {
+          target: "shuttle",
+          semester_type: "REGULAR",
+          body: {
+            shuttle_bus_timetables: [
+              {
+                region: "청주",
+                route_type: "셔틀",
+                route_name: "청주 셔틀",
+                node_info: [{ name: "터미널" }],
+                route_info: [{ name: "1회", arrival_time: ["09:00"] }],
+              },
+            ],
+          },
+        },
+      ],
+    };
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await submitBusTimetables([shuttleConversion], auth);
+
+    const body = JSON.parse(String((fetchMock.mock.calls[0] as [URL, RequestInit])[1].body));
+    expect(body.shuttle_bus_timetables[0].route_type).toBe("순환");
   });
 
   it("실패 시 응답 본문을 오류 메시지에 담는다", async () => {
