@@ -58,12 +58,15 @@ export async function handleBusAction(
   if (action.action_id !== "bus:patch_cancel" && value.payload_hash !== expectedHash)
     throw new Error("payload hash mismatch");
   const messageTs = body.message?.ts;
+  // 스레드 답글에서 버튼을 누르면 thread_ts가 스레드 루트를 가리킨다.
+  // !수정은 threadRootOf(ts, parentTs)로 루트를 조회하므로 저장도 루트로 맞춰야 한다.
+  const threadRoot = body.message?.thread_ts ?? messageTs;
   if (
     messageTs &&
     action.action_id !== "bus:patch_apply" &&
     action.action_id !== "bus:patch_cancel"
   ) {
-    await bindSlackThread(job.id, body.channel.id, messageTs);
+    await bindSlackThread(job.id, body.channel.id, threadRoot);
   }
   if (action.action_id === "bus:cancel") {
     await cancelJob(job.id);
