@@ -28,7 +28,12 @@ import {
   savePatchPlan,
   updateReview,
 } from "~/services/lecture/reviewStore";
-import { handleBusAction } from "./busAction";
+import {
+  BUS_APPLY_ACTION_IDS,
+  BUS_PATCH_ACTION_IDS,
+  handleBusApplyAction,
+  handleBusPatchAction,
+} from "./busAction";
 import {
   COOP_DETECTED_ACTION_IDS,
   handleCoopDetectedAction,
@@ -48,11 +53,16 @@ import {
 } from "~/services/coop/reviewStore";
 import type { BlockActionSetting } from "./type";
 
-/** 버스 시간표 워크플로 버튼. 값 검증·상태 전이는 busAction이 담당한다. */
-const busAction = (actionId: string): BlockActionSetting => ({
+const busApplyAction = (actionId: string): BlockActionSetting => ({
   actionId,
   async handler({ client, body, action }) {
-    await handleBusAction(client, body, action);
+    await handleBusApplyAction(client, body, action);
+  },
+});
+const busPatchAction = (actionId: string): BlockActionSetting => ({
+  actionId,
+  async handler({ client, body, action }) {
+    await handleBusPatchAction(client, body, action);
   },
 });
 const coopDetectedAction = (actionId: string): BlockActionSetting => ({
@@ -777,5 +787,6 @@ export const blockActions: BlockActionSetting[] = [
       });
     },
   },
-  ...["bus:start", "bus:cancel", "bus:approve", "bus:revision", "bus:patch_apply", "bus:patch_cancel", "bus:retry"].map(busAction),
+  ...BUS_APPLY_ACTION_IDS.map(busApplyAction),
+  ...BUS_PATCH_ACTION_IDS.map(busPatchAction),
 ];

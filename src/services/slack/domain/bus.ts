@@ -1,9 +1,18 @@
-import { registerBusAttachment } from "~/services/bus/attachmentCommand";
-import { busActionValue, buildBusPatchBlocks } from "~/services/bus/pipeline";
-import { downloadSlackSpreadsheet, findSpreadsheetFile } from "~/utils/slackFile";
-import { findJobByThread } from "~/services/bus/workflow";
-import { saveBusPatchPlan } from "~/services/bus/reviewStore";
+import { createBusJob } from "~/services/bus/jobStore";
 import { planBusPatches } from "~/services/bus/patch";
+import {
+  buildBusPatchBlocks,
+  buildReviewApprovalBlocks,
+  convertBusToReview,
+} from "~/services/bus/pipeline";
+import {
+  findBusTokenByThread,
+  linkBusThread,
+  loadBusReview,
+  saveBusPatchPlan,
+} from "~/services/bus/reviewStore";
+import { resolveBusTarget } from "~/services/bus/target";
+import { downloadSlackSpreadsheet, findSpreadsheetFile } from "~/utils/slackFile";
 import { readThreadContext, threadRootOf } from "~/utils/slackThread";
 import type { MessageSetting } from "../type";
 
@@ -30,8 +39,47 @@ export const messages: MessageSetting[] = [
       // 스레드 안에서 다시 실행할 수도 있다. 그때 ts는 그 답글 자신의 것이라
       // 스레드를 대표하는 값(루트)으로 맞춰야 !수정이 찾아갈 수 있다.
       const threadRoot = threadRootOf(ts, parentTs);
-      const file = findSpreadsheetFile(files);
 
+      // 한 스레드에 변환이 둘이면 !수정이 어느 것에 적용되는지 헷갈린다.
+      if (parentTs) {
+        const existing = await findBusTokenByThread(channel, threadRoot);
+        if (existing && (await loadBusReview(existing))) {
+          await client.chat.postMessage({
+            channel,
+            thread_ts: threadRoot,
+            text: "이 스레드에는 이미 변환 결과가 있습니다.",
+            blocks: [
+              {
+                type: "section",
+                text: {
+                  type: "mrkdwn",
+                  text: [
+                    ":no_entry: *이 스레드에는 이미 변환 결과가 있습니다.*",
+                    "새 메시지로 시작해주세요. 한 스레드에 둘이 있으면 `!수정`이 어느 것에 적용되는지 알 수 없습니다.",
+                  ].join("\n"),
+                },
+              },
+            ],
+          });
+          return;
+        }
+      }
+
+      // 어느 코인에 반영할지는 채널이 정한다. 모르는 채널이면 진행하지 않는다.
+      const resolved = resolveBusTarget(channel);
+      if (!resolved.target) {
+        await client.chat.postMessage({
+          channel,
+          thread_ts: threadRoot,
+          text: "이 채널은 버스 반영 대상이 아닙니다.",
+          blocks: [
+            { type: "section", text: { type: "mrkdwn", text: `:no_entry: ${resolved.reason}` } },
+          ],
+        });
+        return;
+      }
+
+      const file = findSpreadsheetFile(files);
       if (!parseBusCommand(text) || !file) {
         await client.chat.postMessage({
           channel,
@@ -57,16 +105,17 @@ export const messages: MessageSetting[] = [
         return;
       }
 
+      const target = { env: resolved.target.env, fileName: file.name };
       const placeholder = await client.chat.postMessage({
         channel,
         thread_ts: threadRoot,
-        text: "파일 검증 중",
+        text: "변환 중",
         blocks: [
           {
             type: "section",
             text: {
               type: "mrkdwn",
-              text: `:hourglass_flowing_sand: *버스 시간표 파일 검증 중…*\n${file.name}`,
+              text: `:hourglass_flowing_sand: *버스 시간표* 변환 중…\n${resolved.target.label} · ${file.name}`,
             },
           },
         ],
@@ -75,57 +124,39 @@ export const messages: MessageSetting[] = [
 
       try {
         const bytes = await downloadSlackSpreadsheet(file);
-        const job = await registerBusAttachment(file, bytes, user);
-        if (!job) throw new Error("반영 작업을 생성하지 못했습니다.");
+        const extension = `.${file.name.split(".").pop()?.toLowerCase()}`;
+        const outcome = await convertBusToReview(bytes, extension, target);
+
+        // 이 스레드에 온 수정 요청이 어느 변환 건인지 찾을 수 있게 해둔다.
+        await linkBusThread(channel, threadRoot, outcome.token);
+        // 반영 권한을 한 명만 갖게 하려면 상태가 DB에 있어야 한다.
+        await createBusJob({
+          token: outcome.token,
+          channelId: channel,
+          threadTs: threadRoot,
+          sourceFile: target.fileName,
+          routeCount: outcome.routeCount,
+          semesterTypes: outcome.semesterTypes,
+          targetEnv: target.env,
+        });
 
         await client.chat.update({
           channel,
           ts: messageTs,
-          text: "버스 시간표 반영: 변환 시작 승인 대기",
-          blocks: [
-            {
-              type: "section",
-              text: {
-                type: "mrkdwn",
-                text: `*버스 시간표 반영*\n첨부: ${file.name}\nSHA-256: \`${job.source_hash}\`\n변환을 시작할까요?`,
-              },
-            },
-            {
-              type: "actions",
-              elements: [
-                {
-                  type: "button",
-                  action_id: "bus:start",
-                  text: { type: "plain_text", text: "예" },
-                  style: "primary",
-                  value: busActionValue(job),
-                },
-                {
-                  type: "button",
-                  action_id: "bus:cancel",
-                  text: { type: "plain_text", text: "아니요" },
-                  style: "danger",
-                  value: busActionValue(job),
-                },
-              ],
-            },
-            {
-              type: "context",
-              elements: [{ type: "mrkdwn", text: `${file.name} · 요청: <@${user}>` }],
-            },
-          ],
+          text: `버스 시간표 변환 완료 · ${outcome.routeCount}개`,
+          blocks: buildReviewApprovalBlocks(outcome, target, user),
         });
       } catch (error) {
         await client.chat.update({
           channel,
           ts: messageTs,
-          text: "파일 검증 실패",
+          text: "변환 실패",
           blocks: [
             {
               type: "section",
               text: {
                 type: "mrkdwn",
-                text: `:x: *파일 검증 실패*\n${
+                text: `:x: *변환 실패*\n${
                   error instanceof Error ? error.message : "알 수 없는 오류입니다"
                 }`,
               },
@@ -142,27 +173,25 @@ export const messages: MessageSetting[] = [
 ];
 
 /**
- * 검수 중 발견한 수정 사항을 스레드에 자연어로 적으면 받는다.
- * 스레드가 어느 job에 바인딩됐는지로 대상을 찾는다. 검수 메시지의 "수정 요청" 버튼을
- * 누르면 그 메시지의 스레드가 job에 묶이므로, 먼저 버튼을 눌러야 한다.
+ * 검토 중 발견한 수정 사항을 스레드에 자연어로 적으면 받는다.
+ * 명령어 접두사를 두지 않은 건, 이미 그 스레드가 어느 변환 건인지 정해져 있어서다.
  */
 const EDIT_COMMAND = /^!수정/;
 
 messages.push({
   regex: EDIT_COMMAND,
-    async handler({ client, channel, ts, text, user, parentTs }) {
-      const request = text.replace(EDIT_COMMAND, "").trim();
-      const threadTs = threadRootOf(ts, parentTs);
+  async handler({ client, channel, ts, text, user, parentTs }) {
+    const request = text.replace(EDIT_COMMAND, "").trim();
+    const token = parentTs ? await findBusTokenByThread(channel, parentTs) : null;
+    const stored = token ? await loadBusReview(token) : null;
 
-    // 강의 변환 스레드는 lecture 도메인이 처리한다. 여기 오는 건 버스 스레드거나
-    // 어느 쪽도 아닌 스레드인데, 후자는 lecture 핸들러가 안내하므로 조용히 빠진다.
-    const job = await findJobByThread(channel, threadTs);
-    if (!job) return;
+    // 강의·생협 검수 스레드의 `!수정`은 그쪽 도메인이 처리한다. 여기서는 조용히 빠진다.
+    if (!stored) return;
 
     if (request === "") {
       await client.chat.postMessage({
         channel,
-        thread_ts: threadTs,
+        thread_ts: parentTs,
         text: "무엇을 바꿀지 적어주세요.",
         blocks: [
           {
@@ -180,36 +209,9 @@ messages.push({
       return;
     }
 
-    if (!["REVIEW_PENDING", "REVISION_REQUESTED"].includes(job.state)) {
-      await client.chat.postMessage({
-        channel,
-        thread_ts: threadTs,
-        text: "검수 중인 상태에서만 수정할 수 있습니다.",
-        blocks: [
-          {
-            type: "section",
-            text: {
-              type: "mrkdwn",
-              text: ":no_entry: *지금은 수정할 수 없습니다.*\n검수 메시지의 버튼으로 승인·반영이 끝난 뒤엔 수정이 불가능합니다.",
-            },
-          },
-        ],
-      });
-      return;
-    }
-
-    if (!job.conversions?.length) {
-      await client.chat.postMessage({
-        channel,
-        thread_ts: threadTs,
-        text: "변환 결과가 없습니다.",
-      });
-      return;
-    }
-
     const placeholder = await client.chat.postMessage({
       channel,
-      thread_ts: threadTs,
+      thread_ts: parentTs,
       text: "수정 요청 확인 중",
       blocks: [
         { type: "section", text: { type: "mrkdwn", text: ":mag: 수정 요청을 확인하는 중…" } },
@@ -218,8 +220,8 @@ messages.push({
     const messageTs = placeholder.ts as string;
 
     try {
-      const context = await readThreadContext(client, channel, threadTs, ts);
-      const plan = await planBusPatches(request, job.conversions, context);
+      const context = await readThreadContext(client, channel, parentTs!, ts);
+      const plan = await planBusPatches(request, stored.conversions, context);
 
       if (plan.patches.length === 0) {
         await client.chat.update({
@@ -242,22 +244,16 @@ messages.push({
         return;
       }
 
-      const patchToken = await saveBusPatchPlan(job.id, {
+      const patchToken = await saveBusPatchPlan(token!, {
         patches: plan.patches,
         problems: plan.problems,
         request,
-      });
-      const value = JSON.stringify({
-        job_id: job.id,
-        state_version: job.state_version,
-        payload_hash: job.payload_hash ?? job.source_hash,
-        patch_token: patchToken,
       });
       await client.chat.update({
         channel,
         ts: messageTs,
         text: `수정 ${plan.patches.length}건 확인`,
-        blocks: buildBusPatchBlocks(plan, value, user),
+        blocks: buildBusPatchBlocks(plan, patchToken, user),
       });
     } catch (error) {
       await client.chat.update({

@@ -17,7 +17,8 @@ interface ImportMetaEnv {
   readonly GOOGLE_PROJECT_ID: string;
   readonly CREDENTIALS_PATH: string;
   readonly ADMIN_NAME: string;
-  readonly KOIN_API_BASE_URL: string;
+  /** 생협 기존 매장 조회 등 공개 API 기본 주소. 어드민 쓰기 API는 STAGE/PROD로 나뉜다. */
+  readonly KOIN_API_BASE_URL?: string;
   readonly KOIN_ADMIN_EMAIL: string;
   readonly KOIN_ADMIN_PASSWORD: string;
   readonly KOIN_STAGE_API_BASE_URL?: string;
@@ -26,8 +27,6 @@ interface ImportMetaEnv {
   readonly KOIN_PROD_API_BASE_URL?: string;
   readonly KOIN_PROD_ADMIN_EMAIL?: string;
   readonly KOIN_PROD_ADMIN_PASSWORD?: string;
-  readonly BUS_WORKFLOW_STATE_DB_PATH?: string;
-  readonly BUS_WORKFLOW_ARTIFACT_ROOT?: string;
   readonly OLLAMA_BASE_URL?: string;
   readonly OLLAMA_GEN_MODEL?: string;
   readonly ANTHROPIC_API_KEY?: string;

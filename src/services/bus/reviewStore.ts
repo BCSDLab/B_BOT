@@ -1,30 +1,36 @@
 import { randomBytes } from "node:crypto";
 import type { BusPatch } from "./patch";
+import type { BusKoinEnv } from "./target";
+import type { BusConversion } from "./types";
 
 /**
- * 버스 검토 페이지는 강의와 달리 읽기 전용으로 열린다. 반영 버튼은 Slack 액션으로만
- * 이루어지므로 페이지에는 HTML만 담는다.
+ * 검토 페이지는 로그인 없이 링크만으로 열린다. 슬랙에서 바로 눌러야 하기 때문이다.
+ * 대신 토큰을 추측할 수 없게 만들고 기한을 둔다.
  *
- * 슬랙에서 바로 눌러야 해서 로그인 없이 링크만으로 열린다. 대신 토큰을 추측할 수
- * 없게 만들고 기한을 둔다. **이건 인증이 아니다** — 링크를 아는 사람은 누구나 본다.
+ * **이건 인증이 아니다.** 링크를 아는 사람은 누구나 볼 수 있다.
  */
 const TOKEN_BYTES = 16;
 const EXPIRE_DAYS = 7;
 
 export interface BusReviewMeta {
+  /** 어느 코인에 반영할 건지. 검토·반영 내내 바뀌지 않아야 한다. */
+  env: BusKoinEnv;
   sourceFileName: string;
+  routeCount: number;
   issueCount: number;
   createdAt: string;
 }
 
+/**
+ * conversions가 원본이고 HTML은 그걸로 만든 결과다.
+ * 어드민 요청도 반영할 때 conversions에서 다시 만든다 — 검토 화면과 실제로 보낼 값이
+ * 갈라지지 않게 하려는 것이다.
+ */
 export interface StoredBusReview {
   html: string;
+  conversions: BusConversion[];
   meta: BusReviewMeta;
 }
-
-const key = (token: string) => `bus-review:${token}`;
-/** 버스 검토 페이지의 토큰을 job에 남겨 수정 후 같은 링크에 덮어쓴다. */
-const patchKey = (token: string) => `bus-patch:${token}`;
 
 export function createBusReviewToken(): string {
   return randomBytes(TOKEN_BYTES).toString("hex");
@@ -35,10 +41,26 @@ export function isValidBusReviewToken(token: string): boolean {
   return new RegExp(`^[0-9a-f]{${TOKEN_BYTES * 2}}$`).test(token);
 }
 
-function isExpired(createdAt: string, now: Date): boolean {
+export function isBusReviewExpired(createdAt: string, now: Date): boolean {
   const age = now.getTime() - new Date(createdAt).getTime();
   return !Number.isFinite(age) || age > EXPIRE_DAYS * 24 * 60 * 60 * 1000;
 }
+
+export function buildBusReviewUrl(token: string): string {
+  const base = import.meta.env.APP_BASE_URL ?? "";
+  // 슬랙 버튼의 url은 절대 주소여야 한다. 비어 있으면 변환을 다 마친 뒤
+  // 메시지를 올리는 단계에서 invalid_blocks로 실패해 원인이 보이지 않는다.
+  if (!/^https?:\/\//.test(base)) {
+    throw new Error("APP_BASE_URL이 절대 주소로 설정되어 있지 않습니다.");
+  }
+  return `${base.endsWith("/") ? base : `${base}/`}bus-review/${token}`;
+}
+
+const key = (token: string) => `bus-review:${token}`;
+/** 스레드에 답장한 수정 요청이 어느 변환 건인지 찾으려면 필요하다. */
+const threadKey = (channel: string, threadTs: string) => `bus-thread:${channel}:${threadTs}`;
+/** 적용 버튼을 누를 때까지 들고 있을 수정 계획. 버튼 value에 담기엔 크다. */
+const patchKey = (token: string) => `bus-patch:${token}`;
 
 export async function saveBusReview(review: StoredBusReview): Promise<string> {
   const token = createBusReviewToken();
@@ -59,25 +81,26 @@ export async function loadBusReview(token: string): Promise<StoredBusReview | nu
   if (!stored) {
     return null;
   }
-  if (isExpired(stored.meta.createdAt, new Date())) {
+  if (isBusReviewExpired(stored.meta.createdAt, new Date())) {
     await useStorage("kvStorage").removeItem(key(token));
     return null;
   }
   return stored;
 }
 
-export function buildBusReviewUrl(token: string): string {
-  const base = import.meta.env.APP_BASE_URL ?? "";
-  // 슬랙 버튼·메시지의 url은 절대 주소여야 한다. 비어 있으면 검수 메시지를 올리는
-  // 단계에서 실패해 원인이 보이지 않는다.
-  if (!/^https?:\/\//.test(base)) {
-    throw new Error("APP_BASE_URL이 절대 주소로 설정되어 있지 않습니다.");
-  }
-  return `${base.endsWith("/") ? base : `${base}/`}bus-review/${token}`;
+export async function linkBusThread(channel: string, threadTs: string, token: string): Promise<void> {
+  await useStorage("kvStorage").setItem(threadKey(channel, threadTs), { token });
+}
+
+export async function findBusTokenByThread(channel: string, threadTs: string): Promise<string | null> {
+  const stored = await useStorage("kvStorage").getItem<{ token: string }>(
+    threadKey(channel, threadTs),
+  );
+  return stored?.token ?? null;
 }
 
 export interface StoredBusPatchPlan {
-  jobId: string;
+  reviewToken: string;
   patches: BusPatch[];
   problems: string[];
   /** 감사 로그용으로 남기는 원래 자연어 요청. */
@@ -86,12 +109,12 @@ export interface StoredBusPatchPlan {
 }
 
 export async function saveBusPatchPlan(
-  jobId: string,
+  reviewToken: string,
   plan: Pick<StoredBusPatchPlan, "patches" | "problems" | "request">,
 ): Promise<string> {
   const token = createBusReviewToken();
   await useStorage("kvStorage").setItem(patchKey(token), {
-    jobId,
+    reviewToken,
     ...plan,
     createdAt: new Date().toISOString(),
   } satisfies StoredBusPatchPlan);
@@ -103,7 +126,7 @@ export async function loadBusPatchPlan(token: string): Promise<StoredBusPatchPla
     return null;
   }
   const stored = await useStorage("kvStorage").getItem<StoredBusPatchPlan>(patchKey(token));
-  if (!stored || isExpired(stored.createdAt, new Date())) {
+  if (!stored || isBusReviewExpired(stored.createdAt, new Date())) {
     return null;
   }
   return stored;
