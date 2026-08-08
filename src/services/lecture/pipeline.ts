@@ -141,6 +141,20 @@ export function buildResultBlocks(
       elements: [
         {
           type: "mrkdwn",
+          text: [
+            "*수정이 필요하면 이 스레드에 말씀해주세요.*",
+            "예) `유체역학 03 담당교수를 우창규로 바꿔줘`",
+            "예) `MEB321 01 강의시간을 월9교시~10교시로 바꿔줘`",
+            "시각으로 지정하려면 `09:00~10:00`처럼 적어주세요.",
+          ].join("\n"),
+        },
+      ],
+    },
+    {
+      type: "context",
+      elements: [
+        {
+          type: "mrkdwn",
           text: `${target.fileName} · 검토 링크는 7일 후 만료됩니다 · 요청: <@${requesterId}>`,
         },
       ],

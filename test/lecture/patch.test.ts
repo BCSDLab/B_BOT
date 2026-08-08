@@ -134,3 +134,42 @@ describe.skipIf(!hasLlmCredentials())("수정 요청 해석", () => {
     expect(plan.problems.join(" ")).toMatch(/찾지 못/);
   });
 });
+
+describe.skipIf(!hasLlmCredentials())("교시·시각 구분", () => {
+  const lectures = [lecture({ raw_class_time: "수03A~04B" })];
+
+  it("신호가 없으면 추측하지 않고 두 해석을 보여준다", async () => {
+    // 저장 구조상 둘 다 표현 가능해서 값만으로는 구분이 안 된다.
+    const plan = await planPatches("MEB321 01 강의시간을 09~10으로 바꿔줘", lectures, "period");
+
+    expect(plan.patches).toHaveLength(0);
+    const said = plan.problems.join("\n");
+    expect(said).toMatch(/교시로 읽으면/);
+    expect(said).toMatch(/시각으로 읽으면/);
+    // 실제 시각을 보여줘야 어느 쪽인지 판단할 수 있다.
+    expect(said).toMatch(/17:00~19:00/);
+    expect(said).toMatch(/09:00~10:00/);
+  });
+
+  it("`교시`라고 하면 그대로 받는다", async () => {
+    const plan = await planPatches(
+      "MEB321 01 강의시간을 9교시~10교시로 바꿔줘",
+      lectures,
+      "period",
+    );
+
+    expect(plan.patches).toHaveLength(1);
+    expect(plan.patches[0].after).toContain("17:00~19:00");
+  });
+
+  it("시각으로 적으면 시각으로 읽는다", async () => {
+    const plan = await planPatches(
+      "MEB321 01 강의시간을 수요일 09:00~10:00으로 바꿔줘",
+      lectures,
+      "period",
+    );
+
+    expect(plan.patches).toHaveLength(1);
+    expect(plan.patches[0].after).toContain("09:00~10:00");
+  });
+});

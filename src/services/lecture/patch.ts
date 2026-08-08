@@ -1,5 +1,4 @@
 import {
-  ClassTimeParseError,
   normalizePeriodInput,
   normalizeRangeInput,
   parsePeriodFormat,
@@ -11,6 +10,38 @@ import type { Lecture, TimeFormat } from "./types";
 
 /** 계절학기는 요일이 없어 월~금으로 전개한다. 변환 때와 같은 규칙이다. */
 const SEASONAL_DAYS = [0, 1, 2, 3, 4];
+
+const DAY_INDEX: Record<string, number> = { 월: 0, 화: 1, 수: 2, 목: 3, 금: 4, 토: 5, 일: 6 };
+
+/**
+ * 정규학기 강의시간은 교시로도 시각으로도 말할 수 있다.
+ * 슬롯 0이 09:00이라 저장 구조상 둘 다 표현되므로, 값만 봐서는 구분되지 않는다.
+ * `교시`나 A/B가 있으면 교시, `:`나 `시`가 있으면 시각, 아무 신호도 없으면 물어본다.
+ */
+function timeSignal(value: string): "period" | "clock" | "unknown" {
+  if (/교시/.test(value) || /[ABab]/.test(value)) {
+    return "period";
+  }
+  // `9교시`의 `시`를 시각 신호로 오해하지 않도록 교시를 먼저 걷어낸다.
+  if (/:/.test(value) || /시/.test(value.replace(/교시/g, ""))) {
+    return "clock";
+  }
+  return "unknown";
+}
+
+/** 같은 입력을 시각으로 읽으면 어떻게 되는지. 요일은 입력이나 원래 값에서 가져온다. */
+function readAsClock(value: string, current: string): Lecture["lecture_infos"] | null {
+  const dayChar = (value.match(/[월화수목금토일]/) ?? current.match(/[월화수목금토일]/))?.[0];
+  if (!dayChar) {
+    return null;
+  }
+  try {
+    const withoutDay = value.replace(/[월화수목금토일]|요일/g, "").trim();
+    return parseRangeFormat(normalizeRangeInput(withoutDay), [DAY_INDEX[dayChar]]);
+  } catch {
+    return null;
+  }
+}
 
 const FIELDS = {
   name: { label: "교과목명", limit: 50 },
@@ -101,6 +132,14 @@ function hint(lecture: Lecture, timeFormat: TimeFormat): string {
     : "이 강의는 원래 강의시간이 없어 요일을 물려받을 수 없습니다. `수09A~10B`처럼 요일을 함께 적어주세요.";
 }
 
+function tryParse(read: () => Lecture["lecture_infos"]): Lecture["lecture_infos"] | null {
+  try {
+    return read();
+  } catch {
+    return null;
+  }
+}
+
 function findLecture(
   lectures: Lecture[],
   identifier: string,
@@ -163,29 +202,58 @@ export async function planPatches(
     const where = `${lecture.code} ${lecture.lecture_class} ${lecture.name}`;
 
     if (item.field === "class_time") {
-      // 사람이 말한 형태를 엑셀 표기로 맞춘 뒤 파싱한다.
-      const normalized =
-        timeFormat === "period"
-          ? normalizePeriodInput(item.value, lecture.raw_class_time)
-          : normalizeRangeInput(item.value);
+      // 계절학기는 교시 개념이 없어 항상 시각이다.
+      const signal = timeFormat === "range" ? "clock" : timeSignal(item.value);
 
-      try {
-        const parsed =
-          timeFormat === "period"
-            ? parsePeriodFormat(normalized)
-            : parseRangeFormat(normalized, SEASONAL_DAYS);
-        patches.push({
-          lecture,
-          field: item.field,
-          label: spec.label,
-          before: describeClassTime(lecture.lecture_infos),
-          after: describeClassTime(parsed),
-          parsed,
-          rawValue: normalized,
-        });
-      } catch (error) {
-        problems.push([`${where}: 강의시간 "${item.value}"를 해석하지 못했습니다.`, hint(lecture, timeFormat)].join(" "));
+      if (signal === "unknown") {
+        const asPeriod = tryParse(() =>
+          parsePeriodFormat(normalizePeriodInput(item.value, lecture.raw_class_time)),
+        );
+        const asClock = readAsClock(item.value, lecture.raw_class_time);
+
+        // 둘 다 말이 되면 추측하지 않는다. 실제 시각을 보여주고 고르게 한다.
+        if (asPeriod && asClock) {
+          problems.push(
+            [
+              `${where}: "${item.value}"가 교시인지 시각인지 확실하지 않습니다.`,
+              `• 교시로 읽으면 → ${describeClassTime(asPeriod)}`,
+              `• 시각으로 읽으면 → ${describeClassTime(asClock)}`,
+              "원하는 쪽으로 다시 말씀해주세요. 예: `9교시~10교시` 또는 `09:00~10:00`",
+            ].join("\n"),
+          );
+          continue;
+        }
       }
+
+      const normalized =
+        signal === "clock"
+          ? item.value
+          : normalizePeriodInput(item.value, lecture.raw_class_time);
+
+      const parsed =
+        signal === "clock"
+          ? timeFormat === "range"
+            ? tryParse(() => parseRangeFormat(normalizeRangeInput(item.value), SEASONAL_DAYS))
+            : readAsClock(item.value, lecture.raw_class_time)
+          : tryParse(() => parsePeriodFormat(normalized));
+
+      if (!parsed) {
+        problems.push(
+          [`${where}: 강의시간 "${item.value}"를 해석하지 못했습니다.`, hint(lecture, timeFormat)].join(" "),
+        );
+        continue;
+      }
+
+      patches.push({
+        lecture,
+        field: item.field,
+        label: spec.label,
+        before: describeClassTime(lecture.lecture_infos),
+        after: describeClassTime(parsed),
+        parsed,
+        // 검토 화면의 "원본" 열에 들어갈 값. 사람이 말한 대로 남긴다.
+        rawValue: signal === "clock" ? item.value : normalized,
+      });
       continue;
     }
 
