@@ -142,6 +142,9 @@ describe("bus:apply", () => {
       "t1",
       [expect.objectContaining({ scheduled_at: "2026-02-28T15:05:00.000Z" })],
     );
+    // "예약했습니다"라고만 하면 정확히 언제인지 알 수 없다 — KST 시각을 그대로 보여줘야 한다.
+    const [[updateCall]] = mock.chat.update.mock.calls.slice(-1);
+    expect(JSON.stringify(updateCall.blocks)).toContain("2026-03-01 00:05 KST");
   });
 
   it("클레임에 실패하면 이유를 개인 메시지로만 보여주고 반영을 시도하지 않는다", async () => {

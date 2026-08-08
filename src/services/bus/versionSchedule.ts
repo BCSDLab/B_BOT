@@ -27,6 +27,30 @@ function assertRealCalendarDate(dateText: string, original: string) {
   }
 }
 
+const KST_FORMATTER = new Intl.DateTimeFormat("ko-KR", {
+  timeZone: "Asia/Seoul",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: false,
+});
+
+/** "2026-02-28T15:05:00.000Z" → "2026-03-01 00:05 KST" 처럼 사람이 읽을 시각으로 바꾼다. */
+export function formatBusVersionScheduleKst(iso: string): string {
+  const parts = KST_FORMATTER.formatToParts(new Date(iso));
+  const get = (type: string) => parts.find((part) => part.type === type)?.value ?? "";
+  return `${get("year")}-${get("month")}-${get("day")} ${get("hour")}:${get("minute")} KST`;
+}
+
+/** Slack 메시지에 "언제 바뀌는지"를 정확히 보여주기 위한 한 줄씩의 설명. */
+export function describeBusVersionSchedules(schedules: BusVersionSchedule[]): string {
+  return schedules
+    .map((s) => `${s.version_update.title} 버전 문구 → ${formatBusVersionScheduleKst(s.scheduled_at)}`)
+    .join("\n");
+}
+
 export function computeBusVersionSchedules(conversions: BusConversion[]): BusVersionSchedule[] {
   return conversions.map((conversion) => {
     const [start] = conversion.version_update.content.split("~");
@@ -48,13 +72,19 @@ export function computeBusVersionSchedules(conversions: BusConversion[]): BusVer
  * 예약 시각이 지난 버전 갱신을 실제로 반영한다. 5분 간격 크론(`bus:versionUpdate`)이
  * 이 함수를 부른다. 한 작업 안의 스케줄은 순서대로 처리하고, 하나가 실패하면
  * 그 뒤는 다음 주기로 미룬다 — 순서가 뒤바뀌어 반영되면 안 된다.
+ *
+ * `signal`은 다음 주기가 이전 실행을 대신하려 할 때 협조적으로 멈추는 용도다.
+ * 이미 완료 처리한 스케줄은 그때마다 저장해뒀으니, 중간에 멈춰도 다음 실행이
+ * 이어서 하면 된다 — 반씩 처리된 채로 남는 게 문제되지 않는다.
  */
-export async function runDueBusVersionUpdates(client?: WebClient): Promise<void> {
+export async function runDueBusVersionUpdates(client?: WebClient, signal?: AbortSignal): Promise<void> {
   for (const job of await findBusJobsWithPendingVersionSchedules()) {
+    if (signal?.aborted) return;
     const schedules = job.version_schedules;
     let changed = false;
 
     for (const schedule of schedules) {
+      if (signal?.aborted) break;
       if (schedule.completed_at) continue;
       // 아직 때가 안 된 일정을 만나면 멈춘다. 순서를 건너뛰면 뒤 학기가 먼저 노출될 수 있다.
       if (new Date(schedule.scheduled_at) > new Date()) break;

@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { computeBusVersionSchedules } from "~/services/bus/versionSchedule";
+import {
+  computeBusVersionSchedules,
+  describeBusVersionSchedules,
+  formatBusVersionScheduleKst,
+} from "~/services/bus/versionSchedule";
 import type { BusConversion } from "~/services/bus/types";
 
 afterEach(() => {
@@ -36,6 +40,24 @@ describe("버전 갱신 예약 계산", () => {
   it("형식이 올바르지 않으면 예약을 만들지 않고 실패한다", () => {
     expect(() => computeBusVersionSchedules([conversion("잘못된 기간")])).toThrow(
       /content 형식이 올바르지 않습니다/,
+    );
+  });
+});
+
+describe("버전 갱신 예약 안내 문구", () => {
+  it("KST 시각으로 사람이 읽을 수 있게 바꾼다", () => {
+    expect(formatBusVersionScheduleKst("2026-02-28T15:05:00.000Z")).toBe("2026-03-01 00:05 KST");
+  });
+
+  it("여러 학기 예약을 한 줄씩 나열한다", () => {
+    const text = describeBusVersionSchedules(
+      computeBusVersionSchedules([
+        conversion("2026-03-02~2026-06-19"),
+        conversion("2026-06-22~2026-07-10"),
+      ]),
+    );
+    expect(text).toBe(
+      "정규학기 버전 문구 → 2026-03-01 00:05 KST\n정규학기 버전 문구 → 2026-06-21 00:05 KST",
     );
   });
 });
@@ -141,6 +163,41 @@ describe("예약된 버전 갱신 실행", () => {
       expect.objectContaining({ channel: "C1", thread_ts: "111.222" }),
     );
     expect(setBusVersionSchedules).toHaveBeenCalledWith("job-1", []);
+
+    vi.doUnmock("~/services/bus/jobStore");
+    vi.doUnmock("~/services/bus/koinAuth");
+    vi.doUnmock("~/services/bus/target");
+    vi.doUnmock("~/services/bus/adminApi");
+    vi.resetModules();
+  });
+
+  // 5분 주기가 겹쳤을 때 다음 실행이 이전 실행을 취소하는 협조적 취소(cooperative
+  // cancellation) 계약: signal이 이미 abort된 채로 들어오면 아무 것도 처리하지 않는다.
+  it("signal이 이미 취소됐으면 아무 작업도 처리하지 않는다", async () => {
+    const findBusJobsWithPendingVersionSchedules = vi.fn(async () => [job()]);
+    const setBusVersionSchedules = vi.fn(async () => undefined);
+    vi.doMock("~/services/bus/jobStore", () => ({
+      findBusJobsWithPendingVersionSchedules,
+      setBusVersionSchedules,
+    }));
+    vi.doMock("~/services/bus/koinAuth", () => ({
+      getBusAdminAuth: vi.fn(async () => ({ baseUrl: "https://api.stage.koreatech.in", accessToken: "t" })),
+    }));
+    vi.doMock("~/services/bus/target", () => ({
+      resolveBusTargetByEnv: () => ({ ok: true, target: { env: "stage" } }),
+    }));
+    const updateBusVersionViaAdminApi = vi.fn(async () => undefined);
+    vi.doMock("~/services/bus/adminApi", () => ({ updateBusVersionViaAdminApi }));
+
+    vi.resetModules();
+    const { runDueBusVersionUpdates } = await import("~/services/bus/versionSchedule");
+    const controller = new AbortController();
+    controller.abort();
+
+    await runDueBusVersionUpdates(undefined, controller.signal);
+
+    expect(updateBusVersionViaAdminApi).not.toHaveBeenCalled();
+    expect(setBusVersionSchedules).not.toHaveBeenCalled();
 
     vi.doUnmock("~/services/bus/jobStore");
     vi.doUnmock("~/services/bus/koinAuth");

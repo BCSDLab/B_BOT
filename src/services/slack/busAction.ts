@@ -19,7 +19,7 @@ import {
 } from "~/services/bus/reviewStore";
 import { busLabelOf, resolveBusTargetByEnv } from "~/services/bus/target";
 import { validateConversion } from "~/services/bus/validation";
-import { computeBusVersionSchedules } from "~/services/bus/versionSchedule";
+import { computeBusVersionSchedules, describeBusVersionSchedules } from "~/services/bus/versionSchedule";
 
 const section = (text: string): KnownBlock[] => [
   { type: "section", text: { type: "mrkdwn", text } },
@@ -125,7 +125,7 @@ export async function handleBusApplyAction(
       ...section(
         `:white_check_mark: *버스 시간표 반영 완료*\n` +
           `${busLabelOf(stored.meta.env)} · 노선 *${stored.meta.routeCount}개*\n` +
-          `적용 전날 버전 문구 갱신을 예약했습니다.`,
+          `버전 문구 갱신 예약:\n${describeBusVersionSchedules(versionSchedules)}`,
       ),
       {
         type: "context",
