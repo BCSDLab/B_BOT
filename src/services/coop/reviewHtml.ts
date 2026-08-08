@@ -113,8 +113,8 @@ function shopCard(shop: ConvertedCoopShop, allIssues: ConversionIssue[]): string
       <div class="compare">
         <section><h3>이미지 원문</h3><ul>${rawHours(shop)}</ul></section>
         <section><h3>최종 변환</h3><ul>${normalizedHours(shop)}</ul></section>
-      </div>
-      ${issueList(issues)}
+      </div>${issues.length > 0 ? `
+      ${issueList(issues)}` : ""}
     </details>
   </article>`;
 }
