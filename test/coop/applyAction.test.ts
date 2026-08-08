@@ -117,6 +117,50 @@ describe("생협 반영 Slack 액션", () => {
     }));
   });
 
+  it("확인 필요 항목이 남아 있어도 저장된 데이터로 반영한다", async () => {
+    vi.mocked(loadCoopReview).mockResolvedValueOnce({
+      html: "<html></html>",
+      request: { coop_shops: [] },
+      conversion: {
+        semester: "26-1학기",
+        fromDate: "2026-03-03",
+        toDate: "2026-06-19",
+        request: { coop_shops: [] },
+        shops: [],
+        excludedShops: [],
+        issues: [{
+          code: "unmatched_shop",
+          severity: "blocking",
+          shop: "기계실",
+          detail: "기존 표준 매장과 연결하지 못했습니다.",
+        }],
+      },
+      meta: {
+        env: "stage",
+        year: 2026,
+        termName: "1학기",
+        sourceFileName: "시설물-운영시간.png",
+        shopCount: 11,
+        blockingCount: 1,
+        createdAt: "2026-08-08T00:00:00.000Z",
+      },
+    });
+    const slack = client();
+
+    await handleCoopApplyAction(slack as never, body as never, {
+      type: "button",
+      action_id: "coop:apply",
+      value: JSON.stringify({ token: "a".repeat(32) }),
+    } as never);
+
+    expect(applyCoopTimetable).toHaveBeenCalled();
+    expect(finishCoopJob).toHaveBeenCalledWith(
+      "a".repeat(32),
+      "APPLIED",
+      { semesterId: 17 },
+    );
+  });
+
   it("취소 버튼은 대기 작업만 취소한다", async () => {
     const slack = client();
     await handleCoopApplyAction(slack as never, body as never, {

@@ -188,9 +188,7 @@ export function buildVacationCoopResultBlocks(
     type: "button", text: { type: "plain_text", text: "검토 페이지 열기", emoji: true },
     url: outcome.reviewUrl, action_id: "coop:review_link",
   }];
-  if (outcome.blockingCount === 0) {
-    elements.push(...buildCoopApplyButtons(outcome.token, target.env, outcome.shopCount));
-  }
+  elements.push(...buildCoopApplyButtons(outcome.token, target.env, outcome.shopCount));
   return [
     { type: "section", text: { type: "mrkdwn", text: lines.join("\n") } },
     { type: "actions", elements },
@@ -282,13 +280,11 @@ export function buildRegularCoopResultBlocks(
     url: outcome.reviewUrl,
     action_id: "coop:review_link",
   }];
-  if (outcome.blockingCount === 0) {
-    actionElements.push(...buildCoopApplyButtons(
-      outcome.token,
-      target.env,
-      outcome.shopCount,
-    ));
-  }
+  actionElements.push(...buildCoopApplyButtons(
+    outcome.token,
+    target.env,
+    outcome.shopCount,
+  ));
 
   return [
     { type: "section", text: { type: "mrkdwn", text: lines.join("\n") } },

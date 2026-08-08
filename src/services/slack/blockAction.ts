@@ -403,14 +403,17 @@ export const blockActions: BlockActionSetting[] = [
           text: `생협 수정 ${plan.patches.length}건 적용`,
           blocks: [
             ...notice(`:white_check_mark: *생협 수정 ${plan.patches.length}건 적용*\n검토 페이지를 새로고침하면 반영돼 있습니다.`),
-            ...(blockingCount === 0 ? [{
+            ...(blockingCount > 0
+              ? notice(`:warning: 확인이 필요한 항목이 *${blockingCount}건* 남아 있습니다.`)
+              : []),
+            {
               type: "actions" as const,
               elements: buildCoopApplyButtons(
                 plan.reviewToken,
                 stored.meta.env,
                 stored.meta.shopCount,
               ),
-            }] : notice(`:warning: 확인이 필요한 항목이 *${blockingCount}건* 남아 있습니다.`)),
+            },
             { type: "context", elements: [{ type: "mrkdwn", text: `작업자: <@${actor}>` }] },
           ],
         });

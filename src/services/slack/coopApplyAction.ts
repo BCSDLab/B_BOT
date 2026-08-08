@@ -81,11 +81,6 @@ export async function handleCoopApplyAction(
 
     const conversions = stored.periods?.map((period) => period.conversion)
       ?? [stored.conversion];
-    const blockingCount = conversions.reduce((count, conversion) =>
-      count + conversion.issues.filter((issue) => issue.severity === "blocking").length, 0);
-    if (blockingCount > 0) {
-      throw new Error(`확인이 필요한 항목 ${blockingCount}건을 먼저 수정해주세요.`);
-    }
     if (conversions.some(({ semester, fromDate, toDate }) => !semester || !fromDate || !toDate)) {
       throw new Error("학기 이름 또는 운영 기간이 비어 있습니다. 검토 페이지에서 확인해주세요.");
     }
