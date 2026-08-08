@@ -149,10 +149,16 @@ export const messages: MessageSetting[] = [{
         });
         return;
       }
+      const regularTarget = {
+        env: target.env,
+        year: parsed.year,
+        termName: parsed.termName,
+        fileName: image.name,
+      };
       const outcome = await convertRegularCoopToReview(
         downloaded.buffer,
         downloaded.mimeType,
-        target,
+        regularTarget,
       );
       await linkCoopThread(channel, threadRoot, outcome.token);
       await createCoopJob({
@@ -169,7 +175,7 @@ export const messages: MessageSetting[] = [{
         channel,
         ts: messageTs,
         text: `${target.year} ${target.termName} 생협 운영시간 변환 완료 · ${outcome.shopCount}개`,
-        blocks: buildRegularCoopResultBlocks(outcome, target, user),
+        blocks: buildRegularCoopResultBlocks(outcome, regularTarget, user),
       });
     } catch (error) {
       await client.chat.update({
