@@ -430,6 +430,22 @@ describe("버스 수정 요청 해석 (LLM 없이 코드 가드)", () => {
     expect(patch).toBeNull();
     expect(problems.join(" ")).toMatch(/여러 개 일치/);
   });
+
+  it("회차가 하나뿐이면 이름을 쓰지 않아도 자동으로 고른다", () => {
+    const single = conversion();
+    (single.payloads[0].body.commuting_bus_timetables as BusRoute[])[0].route_info = [
+      { name: "1회", running_days: ["MON"], arrival_time: ["08:10", "08:50"] },
+    ];
+    const problems: string[] = [];
+    const patch = resolvePatch(
+      { semester: "정규학기", region: "천안", direction: "등교", route: "천안역", field: "arrival_time", trip: "", stop: "터미널", value: "08:05" } as RawPatch,
+      [single],
+      problems,
+    );
+    expect(patch).not.toBeNull();
+    expect(patch?.tripName).toBe("1회");
+    expect(problems).toHaveLength(0);
+  });
 });
 
 describe.skipIf(!hasLlmCredentials())("버스 수정 요청 해석", () => {

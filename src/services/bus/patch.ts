@@ -302,7 +302,11 @@ export function resolvePatch(
   const where = describeRoute(route);
 
   const trips = route.route_info;
-  const trip = raw.trip ? trips.find((t) => clean(t.name) === clean(raw.trip)) : undefined;
+  const trip = raw.trip
+    ? trips.find((t) => clean(t.name) === clean(raw.trip))
+    : trips.length === 1
+      ? trips[0]
+      : undefined;
 
   if (raw.field === "route_name") {
     const after = clean(raw.value);
@@ -344,7 +348,10 @@ export function resolvePatch(
   }
 
   if (!trip && raw.field !== "add_trip" && raw.field !== "add_stop" && raw.field !== "remove_stop") {
-    problems.push(`${where}: 회차 "${clean(raw.trip)}"를 찾지 못했습니다.`);
+    const msg = raw.trip
+      ? `회차 "${clean(raw.trip)}"를 찾지 못했습니다.`
+      : `회차를 지정해주세요. (가능한 회차: ${trips.map((t) => t.name).join(", ")})`;
+    problems.push(`${where}: ${msg}`);
     return null;
   }
 
