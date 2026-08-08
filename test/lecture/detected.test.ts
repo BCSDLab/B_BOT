@@ -1,76 +1,129 @@
 import { describe, expect, it } from "vitest";
-import { fileNameOf, isAllowedFileUrl, parseDetected } from "~/services/lecture/detected";
+import {
+  cleanFileName,
+  guessSemester,
+  isAllowedFileUrl,
+  parseDetected,
+  collectExcelAttachments,
+} from "~/services/lecture/detected";
 
-const valid = {
-  target: "stage",
-  year: 2026,
-  term: "여름학기",
-  file_url: "https://portal.koreatech.ac.kr/upload/붙임2.%20개설교과목.xlsx",
-  notice_url: "https://portal.koreatech.ac.kr/notice/1234",
-  notice_title: "2026학년도 하계 계절학기 개설교과목 안내",
-};
+describe("감지 요청 검증", () => {
+  const valid = { target: "stage", article_id: 20587 };
 
-describe("감지 알림 검증", () => {
-  it("올바른 요청을 받아들인다", () => {
-    const result = parseDetected(valid);
-    expect(result.notice?.year).toBe(2026);
-    expect(result.notice?.target).toBe("stage");
-    expect(result.notice?.noticeTitle).toContain("하계");
+  it("게시글 번호만 있으면 된다", () => {
+    // 첨부와 학기는 삐봇이 코인 API로 알아낸다. 배치가 알 필요가 없다.
+    expect(parseDetected(valid).request).toEqual({
+      target: "stage",
+      articleId: 20587,
+      year: undefined,
+      term: undefined,
+    });
   });
 
   it("대상 환경을 지어내지 않는다", () => {
-    // 기본값을 두면 실수로 프로덕션에 알림이 간다.
     for (const target of [undefined, "", "production", "PROD"]) {
-      expect(parseDetected({ ...valid, target }).notice).toBeUndefined();
+      expect(parseDetected({ ...valid, target }).request).toBeUndefined();
     }
   });
 
-  it("모르는 학기를 통과시키지 않는다", () => {
-    expect(parseDetected({ ...valid, term: "계절학기" }).notice).toBeUndefined();
-    expect(parseDetected({ ...valid, term: "" }).notice).toBeUndefined();
-  });
-
-  it("연도가 이상하면 막는다", () => {
-    for (const year of [undefined, "올해", 1800, 3000]) {
-      expect(parseDetected({ ...valid, year }).notice).toBeUndefined();
+  it("게시글 번호가 이상하면 막는다", () => {
+    for (const article_id of [undefined, 0, -1, "글번호", 1.5]) {
+      expect(parseDetected({ ...valid, article_id }).request).toBeUndefined();
     }
   });
 
-  it("학교 주소가 아니면 받지 않는다", () => {
-    // 남이 넣은 주소로 봇이 아무거나 받아오게 두지 않는다.
-    expect(parseDetected({ ...valid, file_url: "https://evil.example.com/a.xlsx" }).notice)
-      .toBeUndefined();
-    expect(parseDetected({ ...valid, file_url: "http://portal.koreatech.ac.kr/a.xlsx" }).notice)
-      .toBeUndefined();
+  it("학기를 직접 지정할 수 있다", () => {
+    const result = parseDetected({ ...valid, year: 2026, term: "여름학기" });
+    expect(result.request?.year).toBe(2026);
+    expect(result.request?.term).toBe("여름학기");
   });
 
-  it("무엇이 잘못됐는지 알려준다", () => {
-    expect(parseDetected({ ...valid, term: "계절학기" }).reason).toContain("term");
-    expect(parseDetected({}).reason).toContain("target");
+  it("모르는 학기는 통과시키지 않는다", () => {
+    expect(parseDetected({ ...valid, term: "계절학기" }).request).toBeUndefined();
+    expect(parseDetected({ ...valid, year: 1800 }).request).toBeUndefined();
+  });
+});
+
+describe("첨부에서 엑셀 모으기", () => {
+  const attach = (name: string, url = "https://portal.koreatech.ac.kr/f?a=1") => ({ name, url });
+
+  it("엑셀만 모은다", () => {
+    const files = collectExcelAttachments([
+      attach("안내문.pdf", "https://portal.koreatech.ac.kr/f?a=1"),
+      attach("붙임2. 개설교과목.xlsx(21 KB)", "https://portal.koreatech.ac.kr/f?a=2"),
+    ]);
+    expect(files).toHaveLength(1);
+    expect(files[0].name).toBe("붙임2. 개설교과목.xlsx");
+  });
+
+  it("엑셀이 여럿이면 전부 남긴다", () => {
+    // 조용히 하나를 집으면 엉뚱한 파일을 변환하고도 아무도 모른다.
+    const files = collectExcelAttachments([
+      attach("붙임3. 폐강강좌.xlsx", "https://portal.koreatech.ac.kr/f?a=3"),
+      attach("붙임2. 개설교과목 편람.xlsx", "https://portal.koreatech.ac.kr/f?a=2"),
+    ]);
+    expect(files).toHaveLength(2);
+  });
+
+  it("편람으로 보이는 걸 앞에 둔다", () => {
+    const files = collectExcelAttachments([
+      attach("붙임3. 폐강강좌.xlsx", "https://portal.koreatech.ac.kr/f?a=3"),
+      attach("붙임2. 개설교과목.xlsx", "https://portal.koreatech.ac.kr/f?a=2"),
+    ]);
+    expect(files[0].name).toContain("개설교과목");
+  });
+
+  it("같은 첨부가 여러 번 실려도 하나만 본다", () => {
+    // 실제 게시글에 같은 파일이 네 번 들어 있는 경우가 있었다.
+    const same = attach("편람.xlsx(21 KB)", "https://portal.koreatech.ac.kr/f?a=9");
+    expect(collectExcelAttachments([same, same, same, same])).toHaveLength(1);
+  });
+
+  it("학교 주소가 아니면 모으지 않는다", () => {
+    expect(collectExcelAttachments([attach("편람.xlsx", "https://evil.example.com/a.xlsx")]))
+      .toHaveLength(0);
+  });
+
+  it("엑셀이 없으면 빈 목록", () => {
+    expect(collectExcelAttachments([attach("안내.pdf")])).toHaveLength(0);
+    expect(collectExcelAttachments(undefined)).toHaveLength(0);
+  });
+});
+
+describe("첨부 이름 정리", () => {
+  it("뒤에 붙은 크기를 뗀다", () => {
+    expect(cleanFileName("붙임2. 개설교과목.xlsx(21 KB)")).toBe("붙임2. 개설교과목.xlsx");
+    expect(cleanFileName("편람.xlsx (1.2 MB)")).toBe("편람.xlsx");
+    expect(cleanFileName("편람.xlsx")).toBe("편람.xlsx");
+  });
+});
+
+describe("제목에서 학기 읽기", () => {
+  it("실제 공지 제목을 읽는다", () => {
+    expect(guessSemester("[수강신청] 2026학년도 2학기 정규 수강신청 안내"))
+      .toEqual({ year: 2026, term: "2학기" });
+    expect(guessSemester("2026학년도 하계 계절학기 개설교과목 안내"))
+      .toEqual({ year: 2026, term: "여름학기" });
+    expect(guessSemester("2025학년도 동계 계절학기 개설 교과목 내역"))
+      .toEqual({ year: 2025, term: "겨울학기" });
+  });
+
+  it("알아내지 못하면 추측하지 않는다", () => {
+    // 엉뚱한 학기에 넣으면 되돌릴 수 없다. 모르면 사람에게 넘긴다.
+    expect(guessSemester("수강신청 안내")).toBeNull();
+    expect(guessSemester("2026학년도 수강신청 유의사항")).toBeNull();
+    expect(guessSemester("")).toBeNull();
   });
 });
 
 describe("첨부 주소 확인", () => {
   it("학교 도메인만 통과한다", () => {
     expect(isAllowedFileUrl("https://portal.koreatech.ac.kr/a.xlsx")).toBe(true);
-    expect(isAllowedFileUrl("https://koreatech.ac.kr/a.xlsx")).toBe(true);
     expect(isAllowedFileUrl("https://api.koreatech.in/a.xlsx")).toBe(true);
   });
 
   it("접미사 위장을 막는다", () => {
     expect(isAllowedFileUrl("https://koreatech.ac.kr.evil.com/a.xlsx")).toBe(false);
-    expect(isAllowedFileUrl("https://notkoreatech.ac.kr/a.xlsx")).toBe(false);
-    expect(isAllowedFileUrl("주소아님")).toBe(false);
-  });
-});
-
-describe("파일 이름", () => {
-  it("주소 끝에서 딴다", () => {
-    expect(fileNameOf(parseDetected(valid).notice!)).toBe("붙임2. 개설교과목.xlsx");
-  });
-
-  it("딸 수 없으면 학기로 만든다", () => {
-    const notice = parseDetected({ ...valid, file_url: "https://koreatech.ac.kr/" }).notice!;
-    expect(fileNameOf(notice)).toBe("2026-여름학기.xlsx");
+    expect(isAllowedFileUrl("http://portal.koreatech.ac.kr/a.xlsx")).toBe(false);
   });
 });

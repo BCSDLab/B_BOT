@@ -2,7 +2,6 @@ import { buildAdminRequest, ensureSemester, submitLectures, toAdminTerm } from "
 import {
   downloadNoticeFile,
   dropDetected,
-  fileNameOf,
   loadDetected,
 } from "~/services/lecture/detected";
 import { cancelJob, claimJob, createJob, finishJob } from "~/services/lecture/jobStore";
@@ -29,13 +28,17 @@ import type { BlockActionSetting } from "./type";
 // 등록하지 않은 action_id는 라우터에서 무시된다. 모달 안의 select와 URL 링크 버튼도
 // block_actions로 들어오는데, 그것들은 여기서 처리할 대상이 아니기 때문이다.
 export const blockActions: BlockActionSetting[] = [
-  {
-    // 배치가 감지한 공지에서 변환을 시작한다. 명령어로 하던 것과 같은 흐름을 탄다.
-    actionId: "lecture:detected_start",
-    async handler({ client, body, action }) {
+  // 배치가 감지한 공지에서 변환을 시작한다. 명령어로 하던 것과 같은 흐름을 탄다.
+  // 엑셀 첨부가 여럿이면 버튼도 여럿이라 action_id를 나눠 둔다.
+  ...[0, 1, 2, 3].map((slot) => ({
+    actionId: slot === 0 ? "lecture:detected_start" : `lecture:detected_start_${slot}`,
+    async handler({ client, body, action }: Parameters<BlockActionSetting["handler"]>[0]) {
       if (action.type !== "button" || !body.channel) return;
 
-      const { token } = JSON.parse(action.value ?? "{}") as { token?: string };
+      const { token, fileIndex = 0 } = JSON.parse(action.value ?? "{}") as {
+        token?: string;
+        fileIndex?: number;
+      };
       const channel = body.channel.id;
       const ts = body.message?.ts;
       const actor = body.user.id;
@@ -51,6 +54,26 @@ export const blockActions: BlockActionSetting[] = [
         });
         return;
       }
+      const file = notice.files[fileIndex];
+      if (!file) {
+        return;
+      }
+
+      // 학기를 모르면 진행하지 않는다. 엉뚱한 학기에 넣으면 되돌릴 수 없다.
+      if (!notice.year || !notice.term) {
+        await updateSlack({
+          client, channel, ts,
+          text: "학기를 지정해주세요",
+          blocks: [{ type: "section", text: { type: "mrkdwn",
+            text: [
+              ":grey_question: *제목에서 학기를 읽지 못했습니다.*",
+              "엑셀을 내려받아 `!강의반영 2026 여름학기`처럼 직접 올려주세요.",
+              `<${file.url}|${file.name}>`,
+            ].join("\n") } }],
+        });
+        return;
+      }
+
       // 먼저 지운다. 두 명이 눌러 두 번 변환하면 검토 링크가 둘이 된다.
       await dropDetected(token);
 
@@ -58,7 +81,7 @@ export const blockActions: BlockActionSetting[] = [
         env: notice.target,
         year: notice.year,
         termName: notice.term,
-        fileName: fileNameOf(notice),
+        fileName: file.name,
       };
 
       await updateSlack({
@@ -69,7 +92,7 @@ export const blockActions: BlockActionSetting[] = [
       });
 
       try {
-        const buffer = await downloadNoticeFile(notice.fileUrl);
+        const buffer = await downloadNoticeFile(file.url);
         const outcome = await convertToReview(buffer, target);
 
         // 이 메시지 스레드에 온 수정 요청이 어느 변환 건인지 찾을 수 있게 해둔다.
@@ -103,7 +126,7 @@ export const blockActions: BlockActionSetting[] = [
         });
       }
     },
-  },
+  })),
   {
     actionId: "lecture:detected_ignore",
     async handler({ client, body, action }) {

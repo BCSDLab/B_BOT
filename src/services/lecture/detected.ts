@@ -4,19 +4,30 @@ import type { KoinEnv } from "./target";
 /**
  * 배치가 강의 공지를 감지했을 때 넘겨주는 값.
  *
- * 배치는 슬랙을 모른다. 감지만 알리고, 알림 문구·버튼·검토·반영은 전부 삐봇이 한다.
- * 버튼 클릭이 배치로 가면 배치도 서명 검증과 상태 관리를 다시 만들어야 한다.
+ * 배치는 **게시글 번호만** 준다. 첨부파일 주소와 학기는 삐봇이 코인 API로 알아낸다.
+ * 배치가 첨부를 추출하고 슬랙 블록을 조립하면 그 지식이 두 곳에 흩어진다.
  */
-export interface DetectedNotice {
+export interface DetectedRequest {
   target: KoinEnv;
-  year: number;
-  term: string;
-  fileUrl: string;
-  noticeUrl?: string;
-  noticeTitle?: string;
+  articleId: number;
+  /** 제목으로 학기를 알아내지 못할 때 사람이 지정할 수 있게 열어둔다. */
+  year?: number;
+  term?: string;
 }
 
-const TERMS = ["1학기", "2학기", "여름학기", "겨울학기"];
+export interface AttachmentFile {
+  name: string;
+  url: string;
+}
+
+export interface DetectedNotice extends DetectedRequest {
+  articleTitle: string;
+  articleUrl: string;
+  /** 엑셀 첨부 후보. 둘 이상이면 사람이 고른다. */
+  files: AttachmentFile[];
+}
+
+export const TERMS = ["1학기", "2학기", "여름학기", "겨울학기"];
 
 /** 학교가 올린 파일만 받는다. 남이 넣은 주소로 봇이 아무거나 받아오게 두지 않는다. */
 const ALLOWED_FILE_HOSTS = ["koreatech.ac.kr", "koreatech.in"];
@@ -35,7 +46,7 @@ export function isAllowedFileUrl(url: string): boolean {
 
 export interface ParseResult {
   ok: boolean;
-  notice?: DetectedNotice;
+  request?: DetectedRequest;
   reason?: string;
 }
 
@@ -43,34 +54,117 @@ export interface ParseResult {
 export function parseDetected(body: unknown): ParseResult {
   const raw = (body ?? {}) as Record<string, unknown>;
   const target = raw.target;
-  const year = Number(raw.year);
-  const term = String(raw.term ?? "");
-  const fileUrl = String(raw.file_url ?? "");
+  const articleId = Number(raw.article_id);
 
   if (target !== "stage" && target !== "prod") {
     return { ok: false, reason: "target은 stage 또는 prod여야 합니다." };
   }
-  if (!Number.isInteger(year) || year < 2000 || year > 2100) {
-    return { ok: false, reason: "year가 올바르지 않습니다." };
-  }
-  if (!TERMS.includes(term)) {
-    return { ok: false, reason: `term은 ${TERMS.join(" · ")} 중 하나여야 합니다.` };
-  }
-  if (!isAllowedFileUrl(fileUrl)) {
-    return { ok: false, reason: "file_url이 학교 주소(https)가 아닙니다." };
+  if (!Number.isInteger(articleId) || articleId <= 0) {
+    return { ok: false, reason: "article_id는 1 이상의 정수여야 합니다." };
   }
 
-  return {
-    ok: true,
-    notice: {
-      target,
-      year,
-      term,
-      fileUrl,
-      noticeUrl: raw.notice_url ? String(raw.notice_url) : undefined,
-      noticeTitle: raw.notice_title ? String(raw.notice_title) : undefined,
-    },
-  };
+  // 학기는 보통 제목에서 알아낸다. 보내주면 그걸 우선한다.
+  const year = raw.year === undefined ? undefined : Number(raw.year);
+  const term = raw.term === undefined ? undefined : String(raw.term);
+  if (year !== undefined && (!Number.isInteger(year) || year < 2000 || year > 2100)) {
+    return { ok: false, reason: "year가 올바르지 않습니다." };
+  }
+  if (term !== undefined && !TERMS.includes(term)) {
+    return { ok: false, reason: `term은 ${TERMS.join(" · ")} 중 하나여야 합니다.` };
+  }
+
+  return { ok: true, request: { target, articleId, year, term } };
+}
+
+interface ArticleAttachment {
+  name?: string;
+  url?: string;
+}
+
+interface Article {
+  title?: string;
+  url?: string;
+  attachments?: ArticleAttachment[];
+}
+
+/** 편람일 가능성이 높은 이름. 이 순서가 곧 버튼 순서가 된다. */
+const LIKELY_NAMES = ["개설교과목", "개설 교과목", "편람", "교과목"];
+
+/**
+ * 첨부에서 엑셀 후보를 **전부** 모은다.
+ *
+ * 하나만 고르지 않는 건, 한 공지에 엑셀이 여럿 붙기 때문이다
+ * (편람 외에 폐강강좌·시간표 등). 조용히 첫 번째를 집으면 엉뚱한 파일을
+ * 변환하고도 아무도 모른다. 둘 이상이면 사람이 고른다.
+ *
+ * 같은 파일이 여러 번 실려 오는 게시글이 있어 주소로 한 번 걸러낸다.
+ * 이름 끝에 `(21 KB)`처럼 크기가 붙어 있어 확장자는 그 앞에서 본다.
+ */
+export function collectExcelAttachments(
+  attachments: ArticleAttachment[] | undefined,
+): AttachmentFile[] {
+  const seen = new Set<string>();
+  const files: AttachmentFile[] = [];
+
+  for (const attachment of attachments ?? []) {
+    const url = attachment.url ?? "";
+    const name = cleanFileName(attachment.name ?? "");
+    if (!url || seen.has(url)) {
+      continue;
+    }
+    seen.add(url);
+
+    if (name.toLowerCase().endsWith(".xlsx") && isAllowedFileUrl(url)) {
+      files.push({ name, url });
+    }
+  }
+
+  // 편람으로 보이는 걸 앞에 둔다. 고르는 사람이 대개 첫 번째를 누르게 된다.
+  return files.sort((a, b) => likelihood(b.name) - likelihood(a.name));
+}
+
+function likelihood(name: string): number {
+  const index = LIKELY_NAMES.findIndex((word) => name.includes(word));
+  return index === -1 ? 0 : LIKELY_NAMES.length - index;
+}
+
+/** `붙임2. 개설교과목.xlsx(21 KB)` → `붙임2. 개설교과목.xlsx` */
+export function cleanFileName(raw: string): string {
+  return raw.replace(/\s*\(\s*[\d.]+\s*[KMG]?B\s*\)\s*$/i, "").trim();
+}
+
+/**
+ * 공지 제목에서 학기를 읽는다.
+ *
+ * `2026학년도 하계 계절학기 개설교과목 안내` → 2026 여름학기
+ * 알아내지 못하면 사람이 지정하게 한다. 추측해서 엉뚱한 학기에 넣으면 되돌릴 수 없다.
+ */
+export function guessSemester(title: string): { year: number; term: string } | null {
+  const year = Number(/(\d{4})\s*학년도/.exec(title)?.[1]);
+  if (!Number.isInteger(year)) {
+    return null;
+  }
+
+  const term = /하계|여름/.test(title)
+    ? "여름학기"
+    : /동계|겨울/.test(title)
+      ? "겨울학기"
+      : /1\s*학기/.test(title)
+        ? "1학기"
+        : /2\s*학기/.test(title)
+          ? "2학기"
+          : null;
+
+  return term ? { year, term } : null;
+}
+
+/** 게시글을 조회해 제목과 첨부를 얻는다. 배치가 넘긴 번호 하나로 나머지를 채운다. */
+export async function fetchArticle(baseUrl: string, articleId: number): Promise<Article> {
+  const response = await fetch(`${baseUrl.replace(/\/$/, "")}/articles/${articleId}`);
+  if (!response.ok) {
+    throw new Error(`게시글 ${articleId}을 찾지 못했습니다 (HTTP ${response.status}).`);
+  }
+  return (await response.json()) as Article;
 }
 
 const MAX_BYTES = 20 * 1024 * 1024;
@@ -122,14 +216,4 @@ export async function loadDetected(token: string): Promise<DetectedNotice | null
 
 export async function dropDetected(token: string): Promise<void> {
   await useStorage("kvStorage").removeItem(key(token));
-}
-
-/** 파일명은 주소 끝에서 딴다. 검토 화면과 기록에 무엇을 읽었는지 남기려는 것이다. */
-export function fileNameOf(notice: DetectedNotice): string {
-  try {
-    const last = decodeURIComponent(new URL(notice.fileUrl).pathname.split("/").pop() ?? "");
-    return last || `${notice.year}-${notice.term}.xlsx`;
-  } catch {
-    return `${notice.year}-${notice.term}.xlsx`;
-  }
 }
