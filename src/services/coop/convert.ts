@@ -142,6 +142,11 @@ function isSecondCampus(shop: RawCoopShop): boolean {
   return /(?:^|\s)(?:2캠|제2캠)/.test(`${shop.groupLabel} ${shop.shopLabel}`);
 }
 
+function isNonShopNotice(shop: RawCoopShop): boolean {
+  const label = clean(`${shop.groupLabel} ${shop.shopLabel}`);
+  return label.includes("긴급민원") || label.includes("기계실");
+}
+
 function canonicalName(shop: RawCoopShop): string | null {
   const combined = clean(`${shop.groupLabel}${shop.shopLabel}`);
   const own = clean(shop.shopLabel);
@@ -222,7 +227,8 @@ function convertTimetable(
       detail: `운영 기간을 해석하지 못했습니다: ${raw.fromDate} - ${raw.toDate}` });
   }
 
-  const excludedShops = raw.shops.filter(isSecondCampus);
+  const sourceShops = raw.shops.filter((shop) => !isNonShopNotice(shop));
+  const excludedShops = sourceShops.filter(isSecondCampus);
   for (const shop of excludedShops) {
     const label = `${shop.groupLabel} ${shop.shopLabel}`.trim();
     issues.push({ code: "excluded_second_campus", severity: "info", shop: label,
@@ -230,7 +236,7 @@ function convertTimetable(
   }
 
   const used = new Set<number>();
-  const shops = raw.shops
+  const shops = sourceShops
     .filter((shop) => !isSecondCampus(shop))
     .flatMap((source) => {
       const label = `${source.groupLabel} ${source.shopLabel}`.trim();

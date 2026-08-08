@@ -119,6 +119,26 @@ describe("방학 학기 분리", () => {
     }));
   });
 
+  it("긴급 민원 안내 행은 두 학기의 매장 및 확인 필요 항목에서 제외한다", () => {
+    const notices = [
+      { groupLabel: "대학 시설 관련 긴급 민원", shopLabel: "", phone: "560-1266~7", remark: "", operationHours: [] },
+      { groupLabel: "", shopLabel: "기계실", phone: "560-1266~7", remark: "", operationHours: [] },
+    ];
+    const result = convertVacationTimetable({
+      ...vacationRaw,
+      shops: [...vacationRaw.shops, ...notices],
+    }, baseline, "2026-07-18");
+
+    for (const period of [result.seasonal, result.vacation]) {
+      expect(period.request.coop_shops).toHaveLength(2);
+      expect(period.issues).not.toContainEqual(expect.objectContaining({
+        code: "unmatched_shop",
+        shop: expect.stringContaining("긴급 민원"),
+      }));
+      expect(period.issues.filter((issue) => issue.severity === "blocking")).toHaveLength(0);
+    }
+  });
+
   it("방학 시작일이 전체 운영 기간 밖이면 거부한다", () => {
     expect(() => convertVacationTimetable(vacationRaw, baseline, "2026-09-01"))
       .toThrow("방학 시작일은 전체 운영 기간 안에서");

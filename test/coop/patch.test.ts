@@ -168,4 +168,24 @@ describe("생협 파싱 데이터 수정", () => {
     expect(json).toContain("coop:patch_apply");
     expect(json).toContain("coop:patch_cancel");
   });
+
+  it("수정 확인 메시지에서는 FRIDAY를 금요일로 보여준다", () => {
+    const blocks = buildCoopPatchBlocks({
+      patches: [{
+        field: "operation_hours",
+        shopName: "안경원",
+        dayOfWeek: "FRIDAY",
+        type: "",
+        before: "11:00 - 17:00",
+        after: "휴점",
+        value: "휴점",
+        openTime: "휴점",
+        closeTime: "휴점",
+      }],
+      problems: [],
+    }, "a".repeat(32), "U1");
+    const json = JSON.stringify(blocks);
+    expect(json).toContain("안경원 · 금요일");
+    expect(json).not.toContain("안경원 · FRIDAY");
+  });
 });

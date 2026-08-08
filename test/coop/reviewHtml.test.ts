@@ -39,7 +39,8 @@ describe("생협 검토 HTML", () => {
     expect(html).toContain("상세 검증");
     expect(html).toContain("학생회관 2층");
     expect(html).toContain('<td class="state">미운영</td>');
-    expect(html).toContain("<th>FRIDAY</th>");
+    expect(html).toContain("<th>금요일</th>");
+    expect(html).not.toContain("<th>FRIDAY</th>");
     expect(html).toContain('<td class="state">휴점</td>');
     expect(html).not.toContain("반영 매장");
     expect(html).not.toContain("반영에서 제외한 2캠 사업장");
