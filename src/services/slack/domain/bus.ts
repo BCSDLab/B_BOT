@@ -12,7 +12,7 @@ import {
   saveBusPatchPlan,
 } from "~/services/bus/reviewStore";
 import { resolveBusTarget } from "~/services/bus/target";
-import { downloadSlackSpreadsheet, findSpreadsheetFile } from "~/utils/slackFile";
+import { downloadSlackSpreadsheet, findSpreadsheetFiles } from "~/utils/slackFile";
 import { readThreadContext, threadRootOf } from "~/utils/slackThread";
 import type { MessageSetting } from "../type";
 
@@ -79,7 +79,32 @@ export const messages: MessageSetting[] = [
         return;
       }
 
-      const file = findSpreadsheetFile(files);
+      // 여러 개를 올리면 어느 걸 변환해야 하는지 봇도 사용자도 알 방법이 없다.
+      // 예전엔 첫 번째만 조용히 골라서, 두 번째 파일이 그냥 무시된 채로 넘어갔다.
+      const spreadsheets = findSpreadsheetFiles(files);
+      if (spreadsheets.length > 1) {
+        await client.chat.postMessage({
+          channel,
+          thread_ts: threadRoot,
+          text: "파일이 여러 개입니다.",
+          blocks: [
+            {
+              type: "section",
+              text: {
+                type: "mrkdwn",
+                text: [
+                  `:warning: *시간표 파일이 ${spreadsheets.length}개 올라왔습니다.*`,
+                  spreadsheets.map((f) => `• ${f.name}`).join("\n"),
+                  "하나만 올려주세요. 여러 파일 중 어느 걸 반영해야 할지 정할 수 없습니다.",
+                ].join("\n"),
+              },
+            },
+          ],
+        });
+        return;
+      }
+
+      const file = spreadsheets[0] ?? null;
       if (!parseBusCommand(text) || !file) {
         await client.chat.postMessage({
           channel,

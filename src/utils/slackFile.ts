@@ -37,13 +37,21 @@ export function findExcelFile(files: SlackFile[] | undefined): SlackFile | null 
 /**
  * 버스 시간표처럼 xls/xlsx를 모두 받는 경우. findExcelFile은 xlsx 전용이다.
  * csv는 결정론적 파서가 시트 구조를 요구해 받지 않는다.
+ *
+ * 첨부가 여러 개일 수 있어(예: 첨부 순서가 뒤섞이거나 실수로 두 번 올림) 목록
+ * 전체를 돌려준다. `.find()`로 하나만 고르면 여러 개를 올렸을 때 어느 걸
+ * 골랐는지 사용자가 알 방법이 없다 — 호출자가 개수를 보고 안내해야 한다.
  */
-export function findSpreadsheetFile(files: SlackFile[] | undefined): SlackFile | null {
+export function findSpreadsheetFiles(files: SlackFile[] | undefined): SlackFile[] {
   return (
-    files?.find((file) =>
+    files?.filter((file) =>
       [".xls", ".xlsx"].some((extension) => file.name?.toLowerCase().endsWith(extension)),
-    ) ?? null
+    ) ?? []
   );
+}
+
+export function findSpreadsheetFile(files: SlackFile[] | undefined): SlackFile | null {
+  return findSpreadsheetFiles(files)[0] ?? null;
 }
 
 const IMAGE_MIME_BY_TYPE: Record<string, StructuredImageMimeType> = {
