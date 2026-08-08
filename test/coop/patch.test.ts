@@ -106,6 +106,29 @@ describe("생협 파싱 데이터 수정", () => {
     expect(updated.issues).not.toContainEqual(expect.objectContaining({ code: "invalid_date" }));
   });
 
+  it("조식·중식·석식 수정 표현을 표준 식사 타입에 연결한다", () => {
+    const result = conversion();
+    result.shops[0].admin.operation_hours[0].type = "중식";
+    result.request = { coop_shops: result.shops.map((shop) => shop.admin) };
+    const problems: string[] = [];
+    const patch = resolveCoopPatch({
+      shop: "복지관식당",
+      day: "평일",
+      type: "중식",
+      field: "operation_hours",
+      value: "11:50 - 13:40",
+    }, result, problems);
+
+    expect(problems).toEqual([]);
+    expect(patch?.type).toBe("점심");
+    const updated = applyCoopPatches(result, [patch!]);
+    expect(updated.request.coop_shops[0].operation_hours[0]).toEqual(expect.objectContaining({
+      type: "점심",
+      open_time: "11:50",
+      close_time: "13:40",
+    }));
+  });
+
   it("수정 적용 전에 변경 전후와 확인 버튼을 보여준다", () => {
     const blocks = buildCoopPatchBlocks({
       patches: [{
