@@ -25,6 +25,8 @@ function displayHour(hour: AdminOperationHour): string {
     : `${hour.open_time} - ${hour.close_time}`;
 }
 
+const displayDay = (day: string): string => day === "FRIDAY" ? "금요일" : day;
+
 function iconFor(name: string): string {
   const attrs = 'viewBox="0 0 24 24" aria-hidden="true"';
   if (name.includes("식당")) {
@@ -66,7 +68,7 @@ function restaurantSchedule(hours: AdminOperationHour[]): string {
     "주말",
   ];
   return `<div class="schedule-table"><table>
-    <thead><tr><th>시간</th>${days.map((day) => `<th>${day}</th>`).join("")}</tr></thead>
+    <thead><tr><th>시간</th>${days.map((day) => `<th>${escapeHtml(displayDay(day))}</th>`).join("")}</tr></thead>
     <tbody>${types.map((type) => `<tr><th>${escapeHtml(type)}</th>${days.map((day) => {
       const hour = hours.find((item) => item.type === type && item.day_of_week === day)
         ?? hours.find((item) =>
@@ -81,7 +83,7 @@ function restaurantSchedule(hours: AdminOperationHour[]): string {
 
 function simpleSchedule(hours: AdminOperationHour[]): string {
   return `<div class="schedule-lines">${hours.map((hour) =>
-    `<div><span>${escapeHtml(hour.day_of_week)}${hour.type ? ` · ${escapeHtml(hour.type)}` : ""}</span><strong>${escapeHtml(displayHour(hour))}</strong></div>`
+    `<div><span>${escapeHtml(displayDay(hour.day_of_week))}${hour.type ? ` · ${escapeHtml(hour.type)}` : ""}</span><strong>${escapeHtml(displayHour(hour))}</strong></div>`
   ).join("")}</div>`;
 }
 
@@ -93,7 +95,7 @@ function rawHours(shop: ConvertedCoopShop): string {
 
 function normalizedHours(shop: ConvertedCoopShop): string {
   return shop.admin.operation_hours.map((hour) =>
-    `<li><span>${escapeHtml(hour.day_of_week)}${hour.type ? ` · ${escapeHtml(hour.type)}` : ""}</span>${escapeHtml(displayHour(hour))}</li>`
+    `<li><span>${escapeHtml(displayDay(hour.day_of_week))}${hour.type ? ` · ${escapeHtml(hour.type)}` : ""}</span>${escapeHtml(displayHour(hour))}</li>`
   ).join("");
 }
 

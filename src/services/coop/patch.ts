@@ -301,8 +301,9 @@ export function buildCoopPatchBlocks(
   requesterId: string,
 ): KnownBlock[] {
   const lines = plan.patches.map((patch) => {
+    const displayDayOfWeek = patch.dayOfWeek === "FRIDAY" ? "금요일" : patch.dayOfWeek;
     const where = patch.shopName
-      ? `${patch.shopName}${patch.dayOfWeek ? ` · ${patch.dayOfWeek}${patch.type ? ` · ${patch.type}` : ""}` : ""}`
+      ? `${patch.shopName}${displayDayOfWeek ? ` · ${displayDayOfWeek}${patch.type ? ` · ${patch.type}` : ""}` : ""}`
       : patch.field === "from_date" ? "운영 시작일" : "운영 종료일";
     return `*${where}*\n  이전: ${patch.before || "(비어 있음)"}\n  이후: ${patch.after || "(비움)"}`;
   });
