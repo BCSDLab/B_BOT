@@ -1,3 +1,14 @@
+/**
+ * 스레드를 대표하는 ts.
+ *
+ * 답글의 `ts`는 그 답글 자신의 것이라 스레드 식별자로 쓸 수 없다.
+ * 스레드 안에서 다시 변환했을 때 연결이 엉뚱한 키에 저장돼
+ * 수정이 이전 변환에 적용되던 원인이 이것이었다.
+ */
+export function threadRootOf(ts: string, parentTs?: string): string {
+  return parentTs ?? ts;
+}
+
 import type { WebClient } from "@slack/web-api";
 
 /** 맥락으로 쓸 만큼만. 길어지면 모델이 옛 요청을 다시 꺼낼 위험이 커진다. */

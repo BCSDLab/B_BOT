@@ -2,7 +2,7 @@ import { planPatches } from "~/services/lecture/patch";
 import { buildPatchBlocks, buildResultBlocks, convertToReview } from "~/services/lecture/pipeline";
 import { findTokenByThread, linkThread, loadReview, savePatchPlan } from "~/services/lecture/reviewStore";
 import { downloadSlackFile, findExcelFile } from "~/utils/slackFile";
-import { readThreadContext } from "~/utils/slackThread";
+import { readThreadContext, threadRootOf } from "~/utils/slackThread";
 import type { MessageSetting } from "../type";
 
 const COMMAND = /^!강의반영/;
@@ -25,14 +25,44 @@ export const messages: MessageSetting[] = [
   {
     regex: COMMAND,
     acceptsFiles: true,
-    async handler({ client, channel, ts, text, user, files }) {
+    async handler({ client, channel, ts, text, user, files, parentTs }) {
+      // 스레드 안에서 다시 실행할 수도 있다. 그때 ts는 그 답글 자신의 것이라
+      // 스레드를 대표하는 값(루트)으로 맞춰야 !수정이 찾아갈 수 있다.
+      const threadRoot = threadRootOf(ts, parentTs);
+
+      // 한 스레드에 변환이 둘이면 !수정이 어느 것에 적용되는지 헷갈린다.
+      // 덮어쓰는 대신 막는다. 만료돼 조회되지 않는 건 막을 이유가 없다.
+      if (parentTs) {
+        const existing = await findTokenByThread(channel, threadRoot);
+        if (existing && (await loadReview(existing))) {
+          await client.chat.postMessage({
+            channel,
+            thread_ts: threadRoot,
+            text: "이 스레드에는 이미 변환 결과가 있습니다.",
+            blocks: [
+              {
+                type: "section",
+                text: {
+                  type: "mrkdwn",
+                  text: [
+                    ":no_entry: *이 스레드에는 이미 변환 결과가 있습니다.*",
+                    "새 메시지로 시작해주세요. 한 스레드에 둘이 있으면 `!수정`이 어느 것에 적용되는지 알 수 없습니다.",
+                  ].join("\n"),
+                },
+              },
+            ],
+          });
+          return;
+        }
+      }
+
       const parsed = parseCommand(text);
       const excel = findExcelFile(files);
 
       if (!parsed || !excel) {
         await client.chat.postMessage({
           channel,
-          thread_ts: ts,
+          thread_ts: threadRoot,
           text: "사용법을 확인해주세요.",
           blocks: [
             {
@@ -60,7 +90,7 @@ export const messages: MessageSetting[] = [
       // 먼저 붙잡아두지 않으면 사람들이 명령어를 또 친다.
       const placeholder = await client.chat.postMessage({
         channel,
-        thread_ts: ts,
+        thread_ts: threadRoot,
         text: "변환 중",
         blocks: [
           {
@@ -79,7 +109,7 @@ export const messages: MessageSetting[] = [
         const outcome = await convertToReview(buffer, target);
 
         // 이 스레드에 온 수정 요청이 어느 변환 건인지 찾을 수 있게 해둔다.
-        await linkThread(channel, ts, outcome.token);
+        await linkThread(channel, threadRoot, outcome.token);
 
         await client.chat.update({
           channel,

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { hasLlmCredentials } from "~/services/lecture/llm";
+import { parsePeriodFormat, parseRangeFormat } from "~/services/lecture/classTime";
 import { describeClassTime } from "~/services/lecture/describeTime";
 import { applyPatches, planPatches, resolveAmbiguities } from "~/services/lecture/patch";
 import type { Lecture } from "~/services/lecture/types";
@@ -165,27 +166,55 @@ describe.skipIf(!hasLlmCredentials())("교시·시각 구분", () => {
 describe.skipIf(!hasLlmCredentials())("교시·시각 선택", () => {
   const lectures = [lecture({ raw_class_time: "수03A~04B" })];
 
-  it("신호가 없으면 두 해석을 계산해두고 고르게 한다", async () => {
+  it("애매한 표기를 임의로 한쪽으로 정하지 않는다", async () => {
     const plan = await planPatches("MEB321 01 강의시간을 09~10으로 바꿔줘", lectures, "period");
 
-    // 추측해서 patches에 넣지 않는다.
-    expect(plan.patches).toHaveLength(0);
-    expect(plan.ambiguities).toHaveLength(1);
+    // 교시·시각 신호가 없는 값을 그대로 적용해버리면 절반은 틀린다.
+    const guessed = plan.patches.filter(
+      (p) => p.field === "class_time" && !/[:]|교시|[AB]/.test(p.rawValue),
+    );
+    expect(guessed).toHaveLength(0);
 
-    const [item] = plan.ambiguities;
-    expect(describeClassTime(item.asPeriod.infos)).toContain("17:00~19:00");
-    expect(describeClassTime(item.asClock.infos)).toContain("09:00~10:00");
+    // 되물을 땐 두 해석을 실제 시각으로 다 계산해둬야 고를 수 있다.
+    for (const item of plan.ambiguities) {
+      expect(describeClassTime(item.asPeriod.infos)).toContain("17:00~19:00");
+      expect(describeClassTime(item.asClock.infos)).toContain("09:00~10:00");
+    }
   });
 
-  it("고른 쪽으로 확정하는 데 LLM이 끼지 않는다", async () => {
-    const plan = await planPatches("MEB321 01 강의시간을 09~10으로 바꿔줘", lectures, "period");
+});
 
-    const asClock = resolveAmbiguities(plan.ambiguities, "clock");
-    const asPeriod = resolveAmbiguities(plan.ambiguities, "period");
+describe("고른 쪽으로 확정", () => {
+  // 선택을 확정하는 단계엔 LLM이 끼지 않는다. 그래서 이 테스트도 부르지 않는다.
+  const target = lecture({ raw_class_time: "수03A~04B" });
+  const ambiguity = {
+    lecture: target,
+    rawValue: "09~10",
+    asPeriod: { normalized: "수09A~10B", infos: parsePeriodFormat("수09A~10B") },
+    asClock: { normalized: "09:00~10:00", infos: parseRangeFormat("09:00~10:00", [2]) },
+  };
 
-    expect(asClock[0].after).toContain("09:00~10:00");
-    expect(asPeriod[0].after).toContain("17:00~19:00");
-    // 적용에 쓸 파싱 결과도 함께 들고 있어야 한다.
-    expect(asClock[0].parsed).toEqual(plan.ambiguities[0].asClock.infos);
+  it("교시를 고르면 교시로 확정한다", () => {
+    const [patch] = resolveAmbiguities([ambiguity], "period");
+
+    expect(patch.after).toContain("17:00~19:00");
+    expect(patch.parsed).toEqual(ambiguity.asPeriod.infos);
+    // 검토 화면의 원본 열에 들어갈 값도 고른 쪽을 따라야 한다.
+    expect(patch.rawValue).toBe("수09A~10B");
+  });
+
+  it("시각을 고르면 시각으로 확정한다", () => {
+    const [patch] = resolveAmbiguities([ambiguity], "clock");
+
+    expect(patch.after).toContain("09:00~10:00");
+    expect(patch.parsed).toEqual(ambiguity.asClock.infos);
+    expect(patch.rawValue).toBe("09:00~10:00");
+  });
+
+  it("여러 건이면 전부 같은 쪽으로 확정한다", () => {
+    const patches = resolveAmbiguities([ambiguity, ambiguity], "clock");
+
+    expect(patches).toHaveLength(2);
+    expect(patches.every((p) => p.after.includes("09:00~10:00"))).toBe(true);
   });
 });

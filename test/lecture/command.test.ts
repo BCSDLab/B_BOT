@@ -95,3 +95,15 @@ describe("명령어 충돌", () => {
     expect(matching[0].acceptsFiles).toBeFalsy();
   });
 });
+
+describe("스레드 식별", () => {
+  it("답글은 자기 ts가 아니라 부모를 스레드 식별자로 쓴다", async () => {
+    const { threadRootOf } = await import("~/utils/slackThread");
+
+    // 최상단에서 실행하면 자기 자신이 스레드 루트가 된다.
+    expect(threadRootOf("1000.0001", undefined)).toBe("1000.0001");
+    // 답글의 ts를 쓰면 저장한 키를 아무도 조회하지 못해
+    // !수정이 조용히 이전 변환에 적용된다.
+    expect(threadRootOf("1000.0009", "1000.0001")).toBe("1000.0001");
+  });
+});
