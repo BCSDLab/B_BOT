@@ -48,7 +48,7 @@ const PATCH_SCHEMA = {
         required: ["shop", "day", "type", "field", "value"],
         properties: {
           shop: { type: "string", description: "매장명. 운영 기간 수정이면 빈 문자열." },
-          day: { type: "string", enum: ["평일", "토요일", ""], description: "운영시간 수정 대상 요일." },
+          day: { type: "string", enum: ["평일", "FRIDAY", "금요일", "주말", "토요일", ""], description: "운영시간 수정 대상 요일. 금요일은 FRIDAY, 토요일과 토·일요일은 주말." },
           type: { type: "string", description: "아침/점심/저녁 같은 시간 구분. 없으면 빈 문자열." },
           field: {
             type: "string",
@@ -68,7 +68,9 @@ const PATCH_SCHEMA = {
 const SYSTEM_PROMPT = `너는 이미지에서 추출한 생협 운영시간 데이터의 수정 요청을 구조화하는 도구다.
 
 - 사용자가 지금 메시지에서 명시한 값만 옮긴다. 값을 추측하거나 보충하지 마라.
-- 매장 운영시간은 매장명, 평일/토요일, 아침/점심/저녁 구분을 가능한 그대로 적는다.
+- 매장 운영시간은 매장명, 평일/FRIDAY/주말, 아침/점심/저녁 구분을 적는다.
+- 금요일은 FRIDAY로 적는다.
+- 토요일, 일요일, 토·일요일은 모두 주말로 적는다.
 - 일반 매장은 시간 구분이 없으므로 type을 빈 문자열로 둔다.
 - 영업시간 범위 전체나 휴점/미운영/24시간 상태는 operation_hours다.
 - 운영 시작일은 from_date, 운영 종료일은 to_date다. 날짜는 YYYY-MM-DD로 적는다.
@@ -77,6 +79,13 @@ const SYSTEM_PROMPT = `너는 이미지에서 추출한 생협 운영시간 데�
 - 직전 대화는 대명사 해석에만 참고하고, 지금 메시지가 요청한 변경만 반환한다.`;
 
 const clean = (value: string) => value.replace(/[\s·.()\-]/g, "").toLowerCase();
+const normalizePatchDay = (value: string): string => {
+  const day = clean(value);
+  if (day === "금요일" || day === "금" || day === "friday") return "FRIDAY";
+  return ["주말", "토요일", "토", "일요일", "일", "토일", "토일요일"].includes(day)
+    ? "주말"
+    : value;
+};
 const displayHour = (hour: AdminOperationHour) =>
   hour.open_time === hour.close_time ? hour.open_time : `${hour.open_time} - ${hour.close_time}`;
 
@@ -123,6 +132,7 @@ export function resolveCoopPatch(
   result: RegularConversionResult,
   problems: string[],
 ): CoopPatch | null {
+  const dayOfWeek = normalizePatchDay(raw.day);
   if (raw.field === "from_date" || raw.field === "to_date") {
     const value = normalizeDate(raw.value);
     if (!value) {
@@ -175,7 +185,7 @@ export function resolveCoopPatch(
     };
   }
 
-  if (!raw.day) {
+  if (!dayOfWeek) {
     problems.push(`${name}: 운영시간을 바꿀 요일을 적어주세요.`);
     return null;
   }
@@ -188,20 +198,20 @@ export function resolveCoopPatch(
     .map((hour) => hour.type ? normalizeMealType(hour.type) : hour.type)
     .filter((type): type is string => Boolean(type)))];
   const resolvedType = normalizeMealType(raw.type) || (knownTypes.length === 1 ? knownTypes[0] : "");
-  const sameDay = shop.admin.operation_hours.filter((hour) => hour.day_of_week === raw.day);
+  const sameDay = shop.admin.operation_hours.filter((hour) => hour.day_of_week === dayOfWeek);
   const existing = resolvedType
     ? sameDay.find((hour) => normalizeMealType(hour.type ?? "") === resolvedType)
     : sameDay.length === 1
       ? sameDay[0]
       : sameDay.find((hour) => !hour.type);
   if (!resolvedType && (sameDay.length > 1 || knownTypes.length > 1) && !existing) {
-    problems.push(`${name} ${raw.day}: 아침/점심/저녁 중 어떤 시간인지 적어주세요.`);
+    problems.push(`${name} ${dayOfWeek}: 아침/점심/저녁 중 어떤 시간인지 적어주세요.`);
     return null;
   }
   return {
     field: raw.field,
     shopName: name,
-    dayOfWeek: raw.day,
+    dayOfWeek,
     type: resolvedType,
     before: existing ? displayHour(existing) : "(없음)",
     after: hours.openTime === hours.closeTime ? hours.openTime : `${hours.openTime} - ${hours.closeTime}`,

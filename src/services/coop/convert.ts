@@ -108,7 +108,10 @@ export function normalizePhone(value: string): string | null {
 function normalizeDay(value: string): string | null {
   const day = clean(value);
   if (day === "평일" || day === "주중") return "평일";
-  if (day === "토요일" || day === "토") return "토요일";
+  if (day === "금요일" || day === "금") return "FRIDAY";
+  if (["주말", "토요일", "토", "일요일", "일", "토일", "토일요일"].includes(day)) {
+    return "주말";
+  }
   return null;
 }
 
@@ -116,7 +119,7 @@ function normalizeStatus(value: string): string | null {
   const compact = value.replace(/\s+/g, " ").trim();
   if (!compact) return null;
   if (/^24시간(?:\s*운영)?$/.test(compact)) return "24시간";
-  if (/^휴\s*점$/.test(compact)) return "휴점";
+  if (/^(?:금요일\s*)?휴\s*점$/.test(compact)) return "휴점";
   if (/미\s*운영$/.test(compact)) return compact.replace(/미\s*운영$/, "미운영");
   if (/예약\s*운영$/.test(compact)) return "예약 운영";
   return null;
@@ -167,7 +170,9 @@ function convertHours(source: RawCoopShop, issues: ConversionIssue[]): AdminOper
   const seen = new Set<string>();
 
   for (const hour of source.operationHours) {
-    const day = normalizeDay(hour.dayLabel);
+    const fridayClosed = [hour.openTime, hour.closeTime]
+      .some((value) => /^금요일\s*휴\s*점$/.test(value.trim()));
+    const day = fridayClosed ? "FRIDAY" : normalizeDay(hour.dayLabel);
     const open = normalizeHourValue(hour.openTime);
     const close = normalizeHourValue(hour.closeTime);
     const label = `${source.groupLabel} ${source.shopLabel}`.trim();

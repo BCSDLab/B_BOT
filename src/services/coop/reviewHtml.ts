@@ -60,7 +60,11 @@ function issueList(issues: ConversionIssue[]): string {
 
 function restaurantSchedule(hours: AdminOperationHour[]): string {
   const types = [...new Set(hours.map((hour) => hour.type).filter((type): type is string => Boolean(type)))];
-  const days = ["평일", "토요일"];
+  const days = [
+    "평일",
+    ...(hours.some((hour) => hour.day_of_week === "FRIDAY") ? ["FRIDAY"] : []),
+    "주말",
+  ];
   return `<div class="schedule-table"><table>
     <thead><tr><th>시간</th>${days.map((day) => `<th>${day}</th>`).join("")}</tr></thead>
     <tbody>${types.map((type) => `<tr><th>${escapeHtml(type)}</th>${days.map((day) => {
