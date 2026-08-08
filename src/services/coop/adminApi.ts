@@ -42,7 +42,7 @@ const headers = (accessToken: string) => ({
 
 const apiUrl = (baseUrl: string, path: string) => `${baseUrl.replace(/\/$/, "")}${path}`;
 
-/** 기존 검수 데이터까지 포함해 Admin API에는 표준 식사 타입만 전송한다. */
+/** 기존 검수 데이터까지 포함해 Admin API에는 표준 식사 타입과 한글 요일만 전송한다. */
 export function normalizeCoopTimetableRequest(
   request: AdminUpdateSemesterRequest,
 ): AdminUpdateSemesterRequest {
@@ -52,6 +52,7 @@ export function normalizeCoopTimetableRequest(
       coop_shop_info: { ...shop.coop_shop_info },
       operation_hours: shop.operation_hours.map((hour) => ({
         ...hour,
+        day_of_week: hour.day_of_week === "FRIDAY" ? "금요일" : hour.day_of_week,
         ...(hour.type ? { type: normalizeMealType(hour.type) } : {}),
       })),
     })),
