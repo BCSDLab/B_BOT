@@ -406,6 +406,7 @@ export async function runDueVersionUpdates(client?: WebClient) {
           client,
           current.slack.channel,
           `버스 시간표와 ${current.version_schedules.length}개 버전 갱신이 모두 완료되었습니다.`,
+          current.slack.ts,
         );
       }
       await update(current.id, (job) => transition(job, "COMPLETED"));

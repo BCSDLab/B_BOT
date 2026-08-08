@@ -67,7 +67,12 @@ export async function handleBusAction(
   }
   if (action.action_id === "bus:cancel") {
     await cancelJob(job.id);
-    await sendStatus(client, body.channel.id, "버스 시간표 업데이트를 취소했습니다.");
+    await sendStatus(
+      client,
+      body.channel.id,
+      "버스 시간표 업데이트를 취소했습니다.",
+      body.message?.ts,
+    );
     return;
   }
   if (action.action_id === "bus:start" || action.action_id === "bus:retry") {
@@ -132,6 +137,7 @@ export async function handleBusAction(
       client,
       body.channel.id,
       "버스 시간표 Admin API 반영 완료. 적용 전날 버전 갱신을 예약했습니다.",
+      body.message?.ts,
     );
     return;
   }
