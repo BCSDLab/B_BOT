@@ -46,6 +46,7 @@ describe("생협 변환 완료 메시지", () => {
     }, { year: 2026, termName: "1학기", fileName: "시간표.png" }, "U1");
 
     expect(JSON.stringify(blocks)).toContain("반영 대상 *11개*");
+    expect(JSON.stringify(blocks)).not.toContain("2캠 제외");
     expect(JSON.stringify(blocks)).toContain("https://bot.example.com/review/token");
     expect(JSON.stringify(blocks)).not.toContain("coop:apply");
   });
