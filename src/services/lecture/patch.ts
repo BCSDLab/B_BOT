@@ -87,6 +87,20 @@ export interface PatchPlan {
   problems: string[];
 }
 
+/**
+ * 어떻게 다시 말해야 하는지 알려준다.
+ * 원래 시간이 없는 강의는 요일을 물려받을 수 없어 안내가 달라야 한다.
+ */
+function hint(lecture: Lecture, timeFormat: TimeFormat): string {
+  if (timeFormat === "range") {
+    return "`09:00~12:00` 형태로 적어주세요.";
+  }
+  const hasDay = /[월화수목금토일]/.test(lecture.raw_class_time);
+  return hasDay
+    ? `현재 값은 \`${lecture.raw_class_time}\` 형태입니다. 요일과 교시를 함께 적어주세요.`
+    : "이 강의는 원래 강의시간이 없어 요일을 물려받을 수 없습니다. `수09A~10B`처럼 요일을 함께 적어주세요.";
+}
+
 function findLecture(
   lectures: Lecture[],
   identifier: string,
@@ -170,18 +184,7 @@ export async function planPatches(
           rawValue: normalized,
         });
       } catch (error) {
-        // 무엇을 어떻게 써야 하는지 현재 값으로 보여준다.
-        problems.push(
-          [
-            `${where}: 강의시간 "${item.value}"를 해석하지 못했습니다.`,
-            error instanceof ClassTimeParseError ? error.message : "",
-            timeFormat === "period"
-              ? `현재 값은 \`${lecture.raw_class_time}\` 형태입니다. 요일과 교시를 함께 적어주세요.`
-              : "`09:00~12:00` 형태로 적어주세요.",
-          ]
-            .filter(Boolean)
-            .join(" "),
-        );
+        problems.push([`${where}: 강의시간 "${item.value}"를 해석하지 못했습니다.`, hint(lecture, timeFormat)].join(" "));
       }
       continue;
     }

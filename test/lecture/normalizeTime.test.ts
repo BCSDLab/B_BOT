@@ -53,3 +53,15 @@ describe("사람이 말한 시각 → 엑셀 표기", () => {
     expect(normalizeRangeInput("9~12/14~16")).toBe("09:00~12:00/14:00~16:00");
   });
 });
+
+describe("사람이 쓰는 요일 표기", () => {
+  it("`수요일`도 요일로 읽는다", () => {
+    expect(normalizePeriodInput("수요일 09~10", "수03A~04B")).toBe("수09A~10B");
+  });
+
+  it("원래 시간이 없는 강의는 요일을 지정해야 한다", () => {
+    // `0`은 시간 없는 강의(K-MOOC·캡스톤 등)라 물려받을 요일이 없다.
+    expect(normalizePeriodInput("09~10", "0")).toBe("09~10");
+    expect(normalizePeriodInput("수요일 09~10", "0")).toBe("수09A~10B");
+  });
+});

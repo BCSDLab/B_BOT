@@ -147,7 +147,8 @@ const LOOSE_PERIOD = /^(\d{1,2})([AB])?(?:~(\d{1,2})([AB])?)?$/i;
  * 결과는 적용 전에 변경 전/후로 보여주므로 사람이 확인할 수 있다.
  */
 export function normalizePeriodInput(value: string, current: string): string {
-  const cleaned = value.replace(/\s+/g, "").replace(/교시/g, "");
+  // `수요일`처럼 말하는 걸 `수`로 맞춘다. `교시`도 마찬가지.
+  const cleaned = value.replace(/\s+/g, "").replace(/요일/g, "").replace(/교시/g, "");
   const inheritedDay = current.match(new RegExp(`[${DAY_CHARS}]`))?.[0];
 
   return cleaned
