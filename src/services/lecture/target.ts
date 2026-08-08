@@ -30,18 +30,26 @@ const CHANNEL_ENV: Record<string, KoinEnv> = {
 const LABEL: Record<KoinEnv, string> = { stage: "스테이지", prod: "프로덕션" };
 
 /**
- * 환경별 계정이 없으면 공용 계정으로 떨어진다.
- * 스테이지와 프로덕션이 같은 어드민 계정을 쓰는 경우가 있어서다.
+ * 어드민 계정은 스테이지·프로덕션이 같아서 하나만 둔다. **주소만 나눈다.**
+ *
+ * 환경별 주소에 폴백을 두지 않는 게 핵심이다. 공용 주소 하나로 떨어지게 하면
+ * 프로덕션 채널에서 누른 반영이 조용히 스테이지로 가고, 틀렸다는 걸 아무도 모른다.
+ *
+ * 빈 문자열은 없는 것으로 본다. 배포에서 값 없는 Secret이 `KEY=`로 들어가는데,
+ * 그대로 두면 "설정은 있는데 비어 있는" 상태로 진행된다.
  */
 function credentials(env: KoinEnv) {
-  const prefix = env === "prod" ? "KOIN_PROD" : "KOIN_STAGE";
   const env_ = import.meta.env as unknown as Record<string, string | undefined>;
-  const pick = (key: string) => env_[`${prefix}_${key}`] ?? env_[`KOIN_${key}`];
+  // 끝 슬래시는 여기서 떼어낸다. 붙이는 쪽마다 신경 쓰게 두면 언젠가 한 곳이 빠진다.
+  const read = (key: string) => {
+    const value = env_[key]?.trim().replace(/\/+$/, "");
+    return value === "" ? undefined : value;
+  };
 
   return {
-    baseUrl: pick("API_BASE_URL"),
-    email: pick("ADMIN_EMAIL"),
-    password: pick("ADMIN_PASSWORD"),
+    baseUrl: read(env === "prod" ? "KOIN_PROD_API_BASE_URL" : "KOIN_STAGE_API_BASE_URL"),
+    email: read("KOIN_ADMIN_EMAIL"),
+    password: read("KOIN_ADMIN_PASSWORD"),
   };
 }
 

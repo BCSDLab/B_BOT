@@ -2,16 +2,16 @@ interface KoinAdminLoginResponse {
   token: string;
 }
 
-/** 환경(스테이지·프로덕션)마다 다른 계정으로 부를 수 있게 인자를 받는다. 없으면 기존대로 env를 쓴다. */
-export async function loginKoinAdmin(config?: {
+/** 어느 코인에 붙을지는 부르는 쪽이 정한다. 채널로 이미 정해져 있어 기본값을 둘 이유가 없다. */
+export async function loginKoinAdmin({
+  baseURL,
+  email,
+  password,
+}: {
   baseURL: string;
   email: string;
   password: string;
 }): Promise<string> {
-  const baseURL = config?.baseURL ?? import.meta.env.KOIN_API_BASE_URL;
-  const email = config?.email ?? import.meta.env.KOIN_ADMIN_EMAIL;
-  const password = config?.password ?? import.meta.env.KOIN_ADMIN_PASSWORD;
-
   const response = await $fetch<KoinAdminLoginResponse>("admin/user/login", {
     baseURL,
     method: "POST",
