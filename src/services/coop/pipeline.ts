@@ -124,7 +124,7 @@ export function buildRegularCoopResultBlocks(
 ): KnownBlock[] {
   const lines = [
     `*${target.year} ${target.termName} 생협 운영시간* 변환 완료`,
-    `반영 대상 *${outcome.shopCount}개* · 2캠 제외 ${outcome.excludedCount}개`,
+    `반영 대상 *${outcome.shopCount}개*`,
   ];
   if (outcome.blockingCount > 0) {
     lines.push(`:warning: 확인이 필요한 항목 *${outcome.blockingCount}건*`);
