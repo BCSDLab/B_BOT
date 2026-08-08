@@ -210,17 +210,30 @@ function validateTime(value: string): string | undefined {
   return undefined;
 }
 
+function findStop(nodes: BusRoute["node_info"], name: string): { index: number; name: string } | undefined {
+  const exact = nodes.findIndex((n) => clean(n.name) === clean(name));
+  if (exact !== -1) return { index: exact, name: nodes[exact].name };
+  const normalized = clean(name).toLowerCase();
+  const partial = nodes.findIndex((n) => {
+    const nLower = clean(n.name).toLowerCase();
+    return nLower.includes(normalized) || normalized.includes(nLower);
+  });
+  if (partial !== -1) return { index: partial, name: nodes[partial].name };
+  return undefined;
+}
+
 export function resolvePatch(
   raw: RawPatch,
   conversions: BusConversion[],
   problems: string[],
 ): BusPatch | null {
-  const semester = semesterOfTitle(raw.semester);
-  const conversion = semester
-    ? conversionBySemester(conversions, semester)
-    : conversions.length === 1
-      ? conversions[0]
-      : undefined;
+  let semester = semesterOfTitle(raw.semester);
+  let conversion = semester ? conversionBySemester(conversions, semester) : undefined;
+  // LLM이 존재하지 않는 학기를 hallucination 했을 때, 변환 목록이 하나뿐이면 fallback.
+  if (!conversion && conversions.length === 1) {
+    conversion = conversions[0];
+    semester = undefined;
+  }
   if (!conversion) {
     problems.push(
       semester
@@ -326,8 +339,8 @@ export function resolvePatch(
   }
 
   if (raw.field === "arrival_time") {
-    const stopIndex = route.node_info.findIndex((node) => clean(node.name) === clean(raw.stop));
-    if (stopIndex === -1) {
+    const stop = raw.stop ? findStop(route.node_info, raw.stop) : undefined;
+    if (!stop) {
       problems.push(`${where}: 정류장 "${clean(raw.stop)}"를 찾지 못했습니다.`);
       return null;
     }
@@ -336,7 +349,7 @@ export function resolvePatch(
       problems.push(`${where} ${trip!.name} ${clean(raw.stop)}: "${raw.value}"은 시각(HH:MM)이나 마커가 아닙니다.`);
       return null;
     }
-    const before = trip!.arrival_time[stopIndex];
+    const before = trip!.arrival_time[stop.index];
     return {
       semester: resolvedSemester,
       target: candidates[0].payload.target,
@@ -345,7 +358,7 @@ export function resolvePatch(
       routeName: route.route_name,
       kind: "arrival_time",
       tripName: trip!.name,
-      stopName: clean(raw.stop),
+      stopName: stop.name,
       before: before ?? "(미운행)",
       after: value,
       rawValue: value,
@@ -398,9 +411,9 @@ export function resolvePatch(
       problems.push(`${where}: 마지막 남은 정류장은 삭제할 수 없습니다.`);
       return null;
     }
-    const stopName = clean(raw.stop);
-    if (!route.node_info.some((node) => clean(node.name) === stopName)) {
-      problems.push(`${where}: 정류장 "${stopName}"를 찾지 못했습니다.`);
+    const stop = raw.stop ? findStop(route.node_info, raw.stop) : undefined;
+    if (!stop) {
+      problems.push(`${where}: 정류장 "${clean(raw.stop)}"를 찾지 못했습니다.`);
       return null;
     }
     return {
@@ -410,10 +423,10 @@ export function resolvePatch(
       routeType: route.route_type,
       routeName: route.route_name,
       kind: "remove_stop",
-      stopName,
-      before: `${where} ${stopName} 삭제`,
+      stopName: stop.name,
+      before: `${where} ${stop.name} 삭제`,
       after: "삭제",
-      rawValue: stopName,
+      rawValue: stop.name,
     };
   }
 
@@ -453,20 +466,19 @@ export function resolvePatch(
       problems.push(`${where}: 추가할 정류장 이름을 적어주세요.`);
       return null;
     }
-    if (route.node_info.some((node) => clean(node.name) === name)) {
+    if (findStop(route.node_info, name)) {
       problems.push(`${where}: 정류장 "${name}"이 이미 있습니다.`);
       return null;
     }
     const reference = clean(raw.referenceStop);
-    const referenceIndex = reference
-      ? route.node_info.findIndex((node) => clean(node.name) === reference)
-      : -1;
+    const ref = reference ? findStop(route.node_info, reference) : undefined;
+    const referenceIndex = ref ? ref.index : -1;
     if (!reference || referenceIndex === -1) {
       problems.push(`${where}: 정류장 "${name}"을 어디에 추가할지 지정해주세요. (기준 정류장과 앞/뒤)`);
       return null;
     }
-    const beforeStop = raw.position === "before" ? reference : undefined;
-    const afterStop = raw.position === "after" ? reference : undefined;
+    const beforeStop = raw.position === "before" ? ref.name : undefined;
+    const afterStop = raw.position === "after" ? ref.name : undefined;
     if (!beforeStop && !afterStop) {
       problems.push(`${where}: "${reference}" 기준으로 앞(before)인지 뒤(after)인지 지정해주세요.`);
       return null;
