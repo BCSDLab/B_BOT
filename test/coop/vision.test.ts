@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { toDataUrl, validateStructuredImages } from "~/helper/adapter/structured";
-import { isRegularSemesterLabel } from "~/services/coop/vision";
+import {
+  isRegularSemesterLabel,
+  resolveRegularSemesterLabel,
+} from "~/services/coop/vision";
 
 describe("구조화 출력 이미지", () => {
   it("base64 이미지를 data URL로 만든다", () => {
@@ -15,11 +18,22 @@ describe("구조화 출력 이미지", () => {
 });
 
 describe("정규학기 판별", () => {
-  it.each(["2026-1학기", "26-2학기", "26.1학기"])("%s", (label) => {
+  it.each([
+    "2026-1학기",
+    "26-2학기",
+    "26.1학기",
+    "2026년 1학기",
+    "26-1학기 시설물 운영 시간",
+  ])("%s", (label) => {
     expect(isRegularSemesterLabel(label)).toBe(true);
   });
 
   it.each(["2026 하계방학", "26-여름학기", "", "2026-3학기"])("%s 거부", (label) => {
     expect(isRegularSemesterLabel(label)).toBe(false);
+  });
+
+  it("학기 필드가 비어도 제목에서 정규학기를 찾는다", () => {
+    expect(resolveRegularSemesterLabel("", "26-1학기 시설물 운영 시간"))
+      .toBe("26-1학기");
   });
 });

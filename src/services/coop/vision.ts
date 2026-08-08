@@ -1,4 +1,5 @@
 import regularPrompt from "./prompts/regular-timetable";
+import { normalizeSemester } from "./convert";
 import { generateCoopStructured } from "./llm";
 import type { RawRegularCoopTimetable } from "./types";
 import type { StructuredImageMimeType } from "~/helper/adapter/structured";
@@ -45,7 +46,14 @@ const RAW_TIMETABLE_SCHEMA = {
 } as const;
 
 export const isRegularSemesterLabel = (label: string): boolean =>
-  /^\s*(?:20)?\d{2}\s*[-.]?\s*[12]학기\s*$/.test(label);
+  normalizeSemester(label) !== null;
+
+export function resolveRegularSemesterLabel(
+  semesterLabel: string,
+  title: string,
+): string | null {
+  return normalizeSemester(semesterLabel) ?? normalizeSemester(title);
+}
 
 export async function extractRegularTimetable({
   imageBase64,
@@ -64,8 +72,13 @@ export async function extractRegularTimetable({
     maxTokens: 8192,
   });
 
-  if (!isRegularSemesterLabel(extracted.semesterLabel)) {
-    throw new Error("정규학기(1학기 또는 2학기) 시간표가 아닙니다.");
+  const semesterLabel = resolveRegularSemesterLabel(extracted.semesterLabel, extracted.title);
+  if (!semesterLabel) {
+    throw new Error([
+      "정규학기(1학기 또는 2학기) 시간표가 아닙니다.",
+      `읽은 학기: ${extracted.semesterLabel || "(없음)"}`,
+      `읽은 제목: ${extracted.title || "(없음)"}`,
+    ].join("\n"));
   }
-  return extracted;
+  return { ...extracted, semesterLabel };
 }
