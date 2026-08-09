@@ -15,7 +15,7 @@ import type {
   RegularConversionResult,
   VacationSeason,
 } from "./types";
-import { extractCoopTimetable, extractRegularTimetable, extractVacationTimetable } from "./vision";
+import { extractCoopTimetable } from "./vision";
 
 export interface RegularCoopArtifacts {
   conversion: RegularConversionResult;
@@ -87,24 +87,6 @@ export async function convertRegularCoopImage({
     fileName,
   });
   return buildRegularCoopArtifacts(raw, baseline);
-}
-
-export async function extractVacationCoopImage({
-  image,
-  mimeType,
-  fileName,
-}: {
-  image: ArrayBuffer | Uint8Array;
-  mimeType: StructuredImageMimeType;
-  fileName: string;
-}): Promise<RawRegularCoopTimetable> {
-  const bytes = image instanceof Uint8Array ? image : new Uint8Array(image);
-  if (bytes.byteLength === 0) throw new Error("생협 시간표 이미지가 비어 있습니다.");
-  return await extractVacationTimetable({
-    imageBase64: Buffer.from(bytes).toString("base64"),
-    mimeType,
-    fileName,
-  });
 }
 
 export async function extractCoopImage({
@@ -199,20 +181,6 @@ export function buildVacationCoopResultBlocks(
     ].join("\n") } },
     { type: "context", elements: [{ type: "mrkdwn", text: `${target.fileName} · 검토 링크는 7일 후 만료됩니다 · 요청: <@${requesterId}>` }] },
   ];
-}
-
-export async function convertRegularCoopToReview(
-  image: ArrayBuffer,
-  mimeType: StructuredImageMimeType,
-  target: RegularCoopTarget,
-): Promise<RegularCoopOutcome> {
-  if (image.byteLength === 0) throw new Error("생협 시간표 이미지가 비어 있습니다.");
-  const raw = await extractRegularTimetable({
-    imageBase64: Buffer.from(new Uint8Array(image)).toString("base64"),
-    mimeType,
-    fileName: target.fileName,
-  });
-  return await convertRegularRawCoopToReview(raw, target);
 }
 
 export async function convertRegularRawCoopToReview(

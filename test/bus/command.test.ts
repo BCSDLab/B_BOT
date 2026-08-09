@@ -31,14 +31,13 @@ describe("!버스반영 첨부 파일", () => {
     expect(accepting[0].regex.toString()).toContain("버스반영");
   });
 
-  it("파일 첨부 메시지를 받겠다고 선언한 명령어는 강의·생협·버스반영뿐이다", async () => {
+  it("파일 첨부 메시지를 받겠다고 선언한 명령어는 강의·버스반영뿐이다", async () => {
     const { messageFunctionList } = await import("~/services/slack/message");
     const accepting = messageFunctionList.filter((message) => message.acceptsFiles);
 
     // 파일 첨부 메시지가 선언하지 않은 명령어(!질문 등)에 흘러들어가면 없던 동작이 생긴다.
-    expect(accepting).toHaveLength(3);
+    expect(accepting).toHaveLength(2);
     expect(accepting.map((m) => m.regex.toString()).join()).toContain("강의반영");
-    expect(accepting.map((m) => m.regex.toString()).join()).toContain("생협반영");
     expect(accepting.map((m) => m.regex.toString()).join()).toContain("버스반영");
   });
 });
