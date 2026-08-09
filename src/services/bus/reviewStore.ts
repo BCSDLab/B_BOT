@@ -13,7 +13,10 @@ export interface BusReviewMeta {
   env: KoinEnv;
   sourceFileName: string;
   routeCount: number;
-  issueCount: number;
+  /** 검토 페이지의 "확인 필요 노선"/"운행요일 미지정 노선" 타일과 항상 같은 값이어야 한다
+   *  — 계산은 routeIssues.ts의 countBusRouteIssues 하나로만 한다. */
+  issueRouteCount: number;
+  noDaysRouteCount: number;
   createdAt: string;
 }
 

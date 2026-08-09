@@ -140,7 +140,8 @@ describe("bus:detected", () => {
       token: "t1",
       reviewUrl: "https://bot.example/bus-review/t1",
       routeCount: 12,
-      issueCount: 0,
+      issueRouteCount: 0,
+      noDaysRouteCount: 0,
       semesterTypes: ["REGULAR"],
     });
     const { handleBusDetectedAction } = await import("~/services/slack/busDetectedAction");
@@ -243,7 +244,8 @@ describe("bus:detected_start", () => {
       token: "t1",
       reviewUrl: "https://bot.example/bus-review/t1",
       routeCount: 5,
-      issueCount: 0,
+      issueRouteCount: 0,
+      noDaysRouteCount: 0,
       semesterTypes: ["SEASONAL"],
     });
     const { handleBusDetectedAction } = await import("~/services/slack/busDetectedAction");

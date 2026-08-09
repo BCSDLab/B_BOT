@@ -6,6 +6,7 @@ import { labelOf, isProduction, type KoinEnv } from "~/services/koin/target";
 import { renderBusReviewHtml } from "./reviewHtml";
 import type { BusReviewMeta, StoredBusReview } from "./reviewStore";
 import { buildBusReviewUrl, saveBusReview } from "./reviewStore";
+import { countBusRouteIssues } from "./routeIssues";
 import { validateConversion } from "./validation";
 import { totalRouteCount, type BusConversion } from "./types";
 
@@ -43,7 +44,8 @@ export interface BusConversionOutcome {
   token: string;
   reviewUrl: string;
   routeCount: number;
-  issueCount: number;
+  issueRouteCount: number;
+  noDaysRouteCount: number;
   semesterTypes: string[];
 }
 
@@ -65,11 +67,13 @@ export function buildStoredBusReview(
   target: BusConversionTarget,
 ): StoredBusReview {
   const html = renderBusReviewHtml(target.fileName, conversions);
+  const { issueRouteCount, noDaysRouteCount } = countBusRouteIssues(conversions);
   const meta: BusReviewMeta = {
     env: target.env,
     sourceFileName: target.fileName,
     routeCount: totalRouteCount(conversions),
-    issueCount: conversions.reduce((count, conversion) => count + conversion.warnings.length, 0),
+    issueRouteCount,
+    noDaysRouteCount,
     createdAt: new Date().toISOString(),
   };
   return { html, conversions, meta };
@@ -93,7 +97,8 @@ export async function convertBusToReview(
     token,
     reviewUrl: buildBusReviewUrl(token),
     routeCount: stored.meta.routeCount,
-    issueCount: stored.meta.issueCount,
+    issueRouteCount: stored.meta.issueRouteCount,
+    noDaysRouteCount: stored.meta.noDaysRouteCount,
     semesterTypes: semesterTypesOf(conversions),
   };
 }
@@ -113,8 +118,13 @@ export function buildReviewApprovalBlocks(
     prod ? `:rotating_light: 대상: *${labelOf(target.env)}*` : `대상: ${labelOf(target.env)}`,
     `반영 대상 *${outcome.routeCount}개*`,
   ];
-  if (outcome.issueCount > 0) {
-    lines.push(`:warning: 확인이 필요한 항목 *${outcome.issueCount}건*`);
+  // 검토 페이지의 "확인 필요 노선"/"운행요일 미지정 노선" 타일과 항상 같은 값이다
+  // (routeIssues.ts의 countBusRouteIssues 하나로만 센다) — 여기서 다시 계산하지 않는다.
+  if (outcome.issueRouteCount > 0) {
+    lines.push(`:warning: 확인 필요 노선 *${outcome.issueRouteCount}개*`);
+  }
+  if (outcome.noDaysRouteCount > 0) {
+    lines.push(`:large_blue_circle: 운행요일 미지정 노선 *${outcome.noDaysRouteCount}개*`);
   }
 
   return [

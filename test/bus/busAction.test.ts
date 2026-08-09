@@ -34,7 +34,8 @@ const storedReview = {
     env: "stage" as const,
     sourceFileName: "버스시간표.xlsx",
     routeCount: 1,
-    issueCount: 0,
+    issueRouteCount: 0,
+    noDaysRouteCount: 0,
     createdAt: "2026-08-08T00:00:00.000Z",
   },
 };

@@ -1,3 +1,4 @@
+import { routeHasNoDays, warningsForRoute } from "./routeIssues";
 import { totalRouteCount, type BusConversion, type BusRoute } from "./types";
 
 const esc = (value: unknown) =>
@@ -75,18 +76,8 @@ export function renderBusReviewHtml(id: string, conversions: BusConversion[]) {
     let noDaysRoutes = 0;
     const routes = conversion.payloads.flatMap((payload) =>
       Object.values(payload.body).flat().map((route) => {
-        const matched = warnings.filter((warning) => {
-          const text = String(warning);
-          // "천안 하교는 등교 노선 역순... 으로 자동 계산해 추가했습니다." 같은
-          // 경고는 노선명이 아닌 지역·방향 단위로 영향을 표시한다. 특정 노선을
-          // 건너뛴 경고(지역+노선명 등장)는 지역·노선명 결합으로만 부분 일치해
-          // "세종" 같은 짧은 이름이 오매칭되지 않게 한다.
-          return (
-            text.startsWith(`${route.region} ${route.route_type}`) ||
-            text.includes(`${route.region} ${route.route_name}`)
-          );
-        });
-        const noDays = route.route_info.some((trip) => !trip.running_days?.length);
+        const matched = warningsForRoute(warnings, route);
+        const noDays = routeHasNoDays(route);
         if (matched.length) issueRoutes++;
         if (noDays) noDaysRoutes++;
         return routeHtml(payload.target, payload.semester_type, route, matched, noDays);
