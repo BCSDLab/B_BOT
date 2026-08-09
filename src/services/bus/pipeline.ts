@@ -132,12 +132,25 @@ export function buildReviewApprovalBlocks(
           type: "button",
           text: {
             type: "plain_text",
-            text: `${prod ? "프로덕션에 " : ""}${outcome.issueCount > 0 ? "그래도 반영" : "반영"}`,
+            text: prod ? "프로덕션에 반영" : "반영하기",
             emoji: true,
           },
-          style: outcome.issueCount > 0 || prod ? undefined : "primary",
+          style: prod ? undefined : "primary",
           action_id: "bus:apply",
           value: JSON.stringify({ token: outcome.token, requesterId }),
+          ...(prod
+            ? {
+                confirm: {
+                  title: { type: "plain_text", text: "프로덕션에 반영할까요?" },
+                  text: {
+                    type: "mrkdwn",
+                    text: `버스 노선 *${outcome.routeCount}개*를 실제 서비스에 반영합니다.`,
+                  },
+                  confirm: { type: "plain_text", text: "반영" },
+                  deny: { type: "plain_text", text: "취소" },
+                },
+              }
+            : {}),
         },
         {
           type: "button",
