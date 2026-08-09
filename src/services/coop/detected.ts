@@ -1,7 +1,7 @@
 import type { StructuredImageMimeType } from "~/helper/adapter/structured";
 import { createCoopReviewToken, isValidCoopToken } from "./reviewStore";
 import { normalizeSemester, normalizeVacationSemester } from "./convert";
-import type { CoopKoinEnv } from "./target";
+import type { KoinEnv } from "~/services/koin/target";
 
 export interface CoopNoticeImage {
   name: string;
@@ -18,7 +18,7 @@ interface ArticleAttachment {
 }
 
 export interface DetectedCoopNotice {
-  env: CoopKoinEnv;
+  env: KoinEnv;
   articleId: number;
   articleTitle: string;
   articleUrl: string;

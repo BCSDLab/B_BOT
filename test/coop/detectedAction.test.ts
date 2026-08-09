@@ -1,5 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+// 락은 실제 Postgres에 붙는다. 여기서는 항상 통과시킨다 —
+// 잠금 자체는 test/koin/detectLock.test.ts가 실제 DB로 확인한다.
+vi.mock("~/services/koin/detectLock", () => ({
+  acquireDetectLock: vi.fn(async () => ({ ok: true })),
+  releaseDetectLock: vi.fn(async () => undefined),
+}));
+
+
 vi.mock("~/services/coop/detected", () => ({
   collectCoopImages: vi.fn(() => [{
     name: "2026-1학기.png",
@@ -52,8 +60,8 @@ vi.mock("~/services/coop/jobStore", () => ({
   createCoopJob: vi.fn(async () => undefined),
 }));
 
-vi.mock("~/services/coop/target", () => ({
-  resolveCoopTarget: vi.fn(() => ({
+vi.mock("~/services/koin/target", () => ({
+  resolveTarget: vi.fn(() => ({
     ok: true,
     target: {
       env: "stage",
@@ -63,7 +71,7 @@ vi.mock("~/services/coop/target", () => ({
       password: "password",
     },
   })),
-  coopTargetLabel: vi.fn(() => "스테이지"),
+  labelOf: vi.fn(() => "스테이지"),
 }));
 
 import {

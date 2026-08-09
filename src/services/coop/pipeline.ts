@@ -1,10 +1,10 @@
 import type { KnownBlock } from "@slack/web-api";
 import type { StructuredImageMimeType } from "~/helper/adapter/structured";
 import {
-  coopTargetLabel,
-  isCoopProduction,
-  type CoopKoinEnv,
-} from "./target";
+  labelOf,
+  isProduction,
+  type KoinEnv,
+} from "~/services/koin/target";
 import { fetchCoopShopBaseline } from "./baseline";
 import { convertRegularTimetable, convertVacationTimetable } from "./convert";
 import { buildReviewUrl, saveCoopReview } from "./reviewStore";
@@ -24,7 +24,7 @@ export interface RegularCoopArtifacts {
 }
 
 export interface RegularCoopTarget {
-  env: CoopKoinEnv;
+  env: KoinEnv;
   year: number;
   termName: "1학기" | "2학기";
   fileName: string;
@@ -40,7 +40,7 @@ export interface RegularCoopOutcome {
 }
 
 export interface VacationCoopTarget {
-  env: CoopKoinEnv;
+  env: KoinEnv;
   year: number;
   season: VacationSeason;
   fileName: string;
@@ -64,29 +64,6 @@ export function buildRegularCoopArtifacts(
     requestJson: `${JSON.stringify(conversion.request, null, 2)}\n`,
     reviewHtml: renderRegularCoopReview(conversion),
   };
-}
-
-export async function convertRegularCoopImage({
-  image,
-  mimeType,
-  fileName,
-  baseline,
-}: {
-  image: ArrayBuffer | Uint8Array;
-  mimeType: StructuredImageMimeType;
-  fileName: string;
-  baseline: CoopShopBaseline;
-}): Promise<RegularCoopArtifacts> {
-  const bytes = image instanceof Uint8Array ? image : new Uint8Array(image);
-  if (bytes.byteLength === 0) {
-    throw new Error("생협 시간표 이미지가 비어 있습니다.");
-  }
-  const raw = await extractRegularTimetable({
-    imageBase64: Buffer.from(bytes).toString("base64"),
-    mimeType,
-    fileName,
-  });
-  return buildRegularCoopArtifacts(raw, baseline);
 }
 
 export async function extractCoopImage({
@@ -161,7 +138,7 @@ export function buildVacationCoopResultBlocks(
 ): KnownBlock[] {
   const lines = [
     `*${target.year} ${target.season} 생협 운영시간* 변환 완료`,
-    `대상: ${coopTargetLabel(target.env)}`,
+    `대상: ${labelOf(target.env)}`,
     `학기 *2개* · 학기별 매장 *${outcome.shopCount}개*`,
   ];
   if (outcome.blockingCount > 0) lines.push(`:warning: 확인이 필요한 항목 *${outcome.blockingCount}건*`);
@@ -232,9 +209,9 @@ export function buildRegularCoopResultBlocks(
 ): KnownBlock[] {
   const lines = [
     `*${target.year} ${target.termName} 생협 운영시간* 변환 완료`,
-    isCoopProduction(target.env)
-      ? `:rotating_light: 대상: *${coopTargetLabel(target.env)}*`
-      : `대상: ${coopTargetLabel(target.env)}`,
+    isProduction(target.env)
+      ? `:rotating_light: 대상: *${labelOf(target.env)}*`
+      : `대상: ${labelOf(target.env)}`,
     `반영 대상 *${outcome.shopCount}개*`,
   ];
   if (outcome.blockingCount > 0) {
@@ -281,8 +258,8 @@ export function buildRegularCoopResultBlocks(
   ];
 }
 
-export function buildCoopApplyButtons(token: string, env: CoopKoinEnv, shopCount: number) {
-  const prod = isCoopProduction(env);
+export function buildCoopApplyButtons(token: string, env: KoinEnv, shopCount: number) {
+  const prod = isProduction(env);
   return [
     {
       type: "button" as const,

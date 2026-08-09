@@ -2,7 +2,7 @@ import type { KnownBlock } from "@slack/web-api";
 import { convertExcelDeterministically } from "./deterministicConversion";
 import { analyseExcel, analyseXlsx } from "./excelAnalyzer";
 import { TITLE_OF, type BusPatchPlan } from "./patch";
-import { busLabelOf, isBusProduction, type BusKoinEnv } from "./target";
+import { labelOf, isProduction, type KoinEnv } from "~/services/koin/target";
 import { renderBusReviewHtml } from "./reviewHtml";
 import type { BusReviewMeta, StoredBusReview } from "./reviewStore";
 import { buildBusReviewUrl, saveBusReview } from "./reviewStore";
@@ -11,7 +11,7 @@ import { totalRouteCount, type BusConversion } from "./types";
 
 export interface BusConversionTarget {
   /** 채널로 정해진 대상. 변환부터 반영까지 바뀌지 않는다. */
-  env: BusKoinEnv;
+  env: KoinEnv;
   fileName: string;
 }
 
@@ -107,10 +107,10 @@ export function buildReviewApprovalBlocks(
   target: BusConversionTarget,
   requesterId: string,
 ): KnownBlock[] {
-  const prod = isBusProduction(target.env);
+  const prod = isProduction(target.env);
   const lines = [
     "*버스 시간표* 변환 완료",
-    prod ? `:rotating_light: 대상: *${busLabelOf(target.env)}*` : `대상: ${busLabelOf(target.env)}`,
+    prod ? `:rotating_light: 대상: *${labelOf(target.env)}*` : `대상: ${labelOf(target.env)}`,
     `반영 대상 *${outcome.routeCount}개*`,
   ];
   if (outcome.issueCount > 0) {

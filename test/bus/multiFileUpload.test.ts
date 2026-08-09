@@ -10,8 +10,8 @@ vi.mock("~/services/bus/reviewStore", () => ({
   saveBusPatchPlan: vi.fn(async () => undefined),
 }));
 
-vi.mock("~/services/bus/target", () => ({
-  resolveBusTarget: () => ({
+vi.mock("~/services/koin/target", () => ({
+  resolveTarget: () => ({
     ok: true,
     target: { env: "stage", label: "스테이지", baseUrl: "https://api.stage.koreatech.in" },
   }),

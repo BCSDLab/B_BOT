@@ -7,8 +7,9 @@ import {
   finishCoopJob,
 } from "~/services/coop/jobStore";
 import { loadCoopReview } from "~/services/coop/reviewStore";
-import { getCoopAdminAuth } from "~/services/coop/koinAuth";
-import { coopTargetLabel, resolveCoopTargetByEnv } from "~/services/coop/target";
+import { getKoinAdminAuth } from "~/services/koin/adminAuth";
+import { labelOf, resolveTargetByEnv } from "~/services/koin/target";
+import type { BlockActionSetting } from "./type";
 
 const section = (text: string) => [
   { type: "section" as const, text: { type: "mrkdwn" as const, text } },
@@ -87,14 +88,14 @@ export async function handleCoopApplyAction(
 
     await update(client, channel, ts, "생협 반영 중", section(
       `:hourglass_flowing_sand: *생협 운영시간 반영 중…* ${stored.meta.shopCount}개\n` +
-      `${coopTargetLabel(stored.meta.env)} · 작업자: <@${actor}>`,
+      `${labelOf(stored.meta.env)} · 작업자: <@${actor}>`,
     ));
 
-    const resolved = resolveCoopTargetByEnv(stored.meta.env);
+    const resolved = resolveTargetByEnv(stored.meta.env);
     if (!resolved.target) {
       throw new Error(resolved.reason ?? "대상 환경을 찾지 못했습니다.");
     }
-    const auth = await getCoopAdminAuth(resolved.target);
+    const auth = await getKoinAdminAuth(resolved.target);
     if (stored.periods) {
       await applyCoopTimetables(stored.periods.map((period) => ({
         semester: {
@@ -120,7 +121,7 @@ export async function handleCoopApplyAction(
     await update(client, channel, ts, "생협 반영 완료", [
       ...section(
         `:white_check_mark: *${stored.meta.year} ${stored.meta.termName} 생협 반영 완료*\n` +
-        `${coopTargetLabel(stored.meta.env)} · 매장 *${stored.meta.shopCount}개* · 학기 ID ${appliedSemesterIds.join(", ")}`,
+        `${labelOf(stored.meta.env)} · 매장 *${stored.meta.shopCount}개* · 학기 ID ${appliedSemesterIds.join(", ")}`,
       ),
       {
         type: "context",
@@ -155,3 +156,11 @@ export async function handleCoopApplyAction(
     ]);
   }
 }
+
+/** 생협 반영·취소. 등록표는 `blockAction.ts`가 모으기만 한다. */
+export const coopApplyActions: BlockActionSetting[] = COOP_APPLY_ACTION_IDS.map((actionId) => ({
+  actionId,
+  async handler({ client, body, action }) {
+    await handleCoopApplyAction(client, body, action);
+  },
+}));

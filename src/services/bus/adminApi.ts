@@ -1,5 +1,5 @@
 import type { BusConversion, BusPayload, BusRoute, BusTarget, BusVersionUpdate, SemesterType } from "./types";
-import type { BusAdminAuth } from "./koinAuth";
+import type { KoinAdminAuth } from "~/services/koin/adminAuth";
 
 /** 응답이 없으면 job이 APPLYING/버전 갱신 크론이 영원히 멈춘다. */
 const REQUEST_TIMEOUT_MS = 30_000;
@@ -98,7 +98,7 @@ export class BusAdminApiError extends Error {
  */
 export async function submitBusTimetables(
   conversions: BusConversion[],
-  { baseUrl, accessToken }: BusAdminAuth,
+  { baseUrl, accessToken }: KoinAdminAuth,
   onApplied?: (applied: { target: BusTarget; semesterType: SemesterType }) => void,
 ): Promise<void> {
   const base = baseUrl.replace(/\/$/, "");
@@ -151,7 +151,7 @@ export async function submitBusTimetables(
  */
 export async function updateBusVersionViaAdminApi(
   versionUpdate: BusVersionUpdate,
-  { baseUrl, accessToken }: BusAdminAuth,
+  { baseUrl, accessToken }: KoinAdminAuth,
 ): Promise<void> {
   const versionUrl = new URL(`/admin/version/${versionUpdate.type}`, baseUrl).toString();
   const headers = {

@@ -1,5 +1,5 @@
 import { createJob } from "~/services/lecture/jobStore";
-import { resolveTarget } from "~/services/lecture/target";
+import { resolveTarget } from "~/services/koin/target";
 import { planPatches } from "~/services/lecture/patch";
 import { buildPatchBlocks, buildResultBlocks, convertToReview } from "~/services/lecture/pipeline";
 import { findTokenByThread, linkThread, loadReview, savePatchPlan } from "~/services/lecture/reviewStore";
@@ -61,7 +61,7 @@ export const messages: MessageSetting[] = [
       }
 
       // 어느 코인에 반영할지는 채널이 정한다. 모르는 채널이면 진행하지 않는다.
-      const resolved = resolveTarget(channel);
+      const resolved = resolveTarget(channel, "강의");
       if (!resolved.target) {
         await client.chat.postMessage({
           channel,

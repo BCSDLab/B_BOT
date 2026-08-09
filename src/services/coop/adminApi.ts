@@ -1,10 +1,7 @@
+export type { KoinAdminAuth as CoopAdminAuth } from "~/services/koin/adminAuth";
+import type { KoinAdminAuth as CoopAdminAuth } from "~/services/koin/adminAuth";
 import type { AdminUpdateSemesterRequest } from "./types";
 import { normalizeMealType } from "./convert";
-
-export interface CoopAdminAuth {
-  baseUrl: string;
-  accessToken: string;
-}
 
 export interface CoopSemesterCreateRequest {
   semester: string;

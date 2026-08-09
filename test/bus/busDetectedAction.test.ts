@@ -1,5 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+// 락은 실제 Postgres에 붙는다. 여기서는 항상 통과시킨다 —
+// 잠금 자체는 test/koin/detectLock.test.ts가 실제 DB로 확인한다.
+vi.mock("~/services/koin/detectLock", () => ({
+  acquireDetectLock: vi.fn(async () => ({ ok: true })),
+  releaseDetectLock: vi.fn(async () => undefined),
+}));
+
+
 const fetchBusArticle = vi.fn();
 const collectBusSpreadsheets = vi.fn();
 const downloadBusNoticeFile = vi.fn();
@@ -21,8 +29,8 @@ vi.mock("~/services/bus/reviewStore", () => ({
   linkBusThread: (...args: unknown[]) => (linkBusThread as (...a: unknown[]) => unknown)(...args),
 }));
 
-vi.mock("~/services/bus/target", () => ({
-  resolveBusTarget: (channel: string) =>
+vi.mock("~/services/koin/target", () => ({
+  resolveTarget: (channel: string) =>
     channel === "C-unknown"
       ? { ok: false, reason: "이 채널은 버스 반영 대상이 아닙니다." }
       : { ok: true, target: { env: "stage", label: "스테이지", baseUrl: "https://api.stage.koreatech.in" } },

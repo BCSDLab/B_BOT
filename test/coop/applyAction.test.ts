@@ -40,16 +40,16 @@ vi.mock("~/services/coop/reviewStore", () => ({
   })),
 }));
 
-vi.mock("~/services/coop/koinAuth", () => ({
-  getCoopAdminAuth: vi.fn(async () => ({
+vi.mock("~/services/koin/adminAuth", () => ({
+  getKoinAdminAuth: vi.fn(async () => ({
     baseUrl: "https://api.stage.example.com",
     accessToken: "token",
   })),
 }));
 
-vi.mock("~/services/coop/target", () => ({
-  coopTargetLabel: vi.fn(() => "스테이지"),
-  resolveCoopTargetByEnv: vi.fn(() => ({
+vi.mock("~/services/koin/target", () => ({
+  labelOf: vi.fn(() => "스테이지"),
+  resolveTargetByEnv: vi.fn(() => ({
     ok: true,
     target: {
       env: "stage",

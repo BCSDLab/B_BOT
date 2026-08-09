@@ -1,3 +1,4 @@
+import { escapeHtml } from "~/services/koin/reviewPage";
 import type {
   AdminOperationHour,
   ConversionIssue,
@@ -5,13 +6,6 @@ import type {
   RegularConversionResult,
   VacationSplitConversionResult,
 } from "./types";
-
-const escapeHtml = (value: unknown): string => String(value ?? "")
-  .replaceAll("&", "&amp;")
-  .replaceAll("<", "&lt;")
-  .replaceAll(">", "&gt;")
-  .replaceAll('"', "&quot;")
-  .replaceAll("'", "&#39;");
 
 function formatKoreanDate(value: string, includeYear: boolean): string {
   const [year, month, day] = value.split("-").map(Number);

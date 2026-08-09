@@ -143,11 +143,11 @@ describe("예약된 버전 갱신 실행", () => {
       findBusJobsWithPendingVersionSchedules,
       setBusVersionSchedules,
     }));
-    vi.doMock("~/services/bus/koinAuth", () => ({
-      getBusAdminAuth: vi.fn(async () => ({ baseUrl: "https://api.stage.koreatech.in", accessToken: "t" })),
+    vi.doMock("~/services/koin/adminAuth", () => ({
+      getKoinAdminAuth: vi.fn(async () => ({ baseUrl: "https://api.stage.koreatech.in", accessToken: "t" })),
     }));
-    vi.doMock("~/services/bus/target", () => ({
-      resolveBusTargetByEnv: () => ({ ok: true, target: { env: "stage" } }),
+    vi.doMock("~/services/koin/target", () => ({
+      resolveTargetByEnv: () => ({ ok: true, target: { env: "stage" } }),
     }));
     vi.doMock("~/services/bus/adminApi", () => ({
       updateBusVersionViaAdminApi: vi.fn(async () => undefined),
@@ -165,8 +165,8 @@ describe("예약된 버전 갱신 실행", () => {
     expect(setBusVersionSchedules).toHaveBeenCalledWith("job-1", []);
 
     vi.doUnmock("~/services/bus/jobStore");
-    vi.doUnmock("~/services/bus/koinAuth");
-    vi.doUnmock("~/services/bus/target");
+    vi.doUnmock("~/services/koin/adminAuth");
+    vi.doUnmock("~/services/koin/target");
     vi.doUnmock("~/services/bus/adminApi");
     vi.resetModules();
   });
@@ -180,11 +180,11 @@ describe("예약된 버전 갱신 실행", () => {
       findBusJobsWithPendingVersionSchedules,
       setBusVersionSchedules,
     }));
-    vi.doMock("~/services/bus/koinAuth", () => ({
-      getBusAdminAuth: vi.fn(async () => ({ baseUrl: "https://api.stage.koreatech.in", accessToken: "t" })),
+    vi.doMock("~/services/koin/adminAuth", () => ({
+      getKoinAdminAuth: vi.fn(async () => ({ baseUrl: "https://api.stage.koreatech.in", accessToken: "t" })),
     }));
-    vi.doMock("~/services/bus/target", () => ({
-      resolveBusTargetByEnv: () => ({ ok: true, target: { env: "stage" } }),
+    vi.doMock("~/services/koin/target", () => ({
+      resolveTargetByEnv: () => ({ ok: true, target: { env: "stage" } }),
     }));
     const updateBusVersionViaAdminApi = vi.fn(async () => undefined);
     vi.doMock("~/services/bus/adminApi", () => ({ updateBusVersionViaAdminApi }));
@@ -200,8 +200,8 @@ describe("예약된 버전 갱신 실행", () => {
     expect(setBusVersionSchedules).not.toHaveBeenCalled();
 
     vi.doUnmock("~/services/bus/jobStore");
-    vi.doUnmock("~/services/bus/koinAuth");
-    vi.doUnmock("~/services/bus/target");
+    vi.doUnmock("~/services/koin/adminAuth");
+    vi.doUnmock("~/services/koin/target");
     vi.doUnmock("~/services/bus/adminApi");
     vi.resetModules();
   });

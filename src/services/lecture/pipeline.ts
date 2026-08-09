@@ -2,7 +2,7 @@ import type { KnownBlock } from "@slack/web-api";
 import { blockingIssues, buildAdminRequest, toAdminTerm } from "./adminApi";
 import { convertRows } from "./convert";
 import type { PatchPlan } from "./patch";
-import { isProduction, labelOf, type KoinEnv } from "./target";
+import { isProduction, labelOf, type KoinEnv } from "~/services/koin/target";
 import { describeClassTime } from "./describeTime";
 import { renderReviewPage } from "./reviewHtml";
 import type { StoredReview } from "./reviewStore";
