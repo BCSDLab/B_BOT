@@ -10,6 +10,7 @@ import { buildReviewApprovalBlocks, convertBusToReview } from "~/services/bus/pi
 import { linkBusThread } from "~/services/bus/reviewStore";
 import { acquireDetectLock, releaseDetectLock } from "~/services/koin/detectLock";
 import { resolveTarget } from "~/services/koin/target";
+import type { BlockActionSetting } from "./type";
 
 const ARTICLE_URL = (articleId: number) => `https://koreatech.in/articles/${articleId}`;
 
@@ -179,3 +180,11 @@ export async function handleBusDetectedAction(
     );
   }
 }
+
+/** 버스 공지 감지. 등록표는 `blockAction.ts`가 모으기만 한다. */
+export const busDetectedActions: BlockActionSetting[] = BUS_DETECTED_ACTION_IDS.map((actionId) => ({
+  actionId,
+  async handler({ client, body, action }) {
+    await handleBusDetectedAction(client, body, action);
+  },
+}));

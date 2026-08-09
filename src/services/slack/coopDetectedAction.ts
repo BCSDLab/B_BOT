@@ -26,6 +26,7 @@ import {
 import { savePendingCoopVacation } from "~/services/coop/vacationStore";
 import { resolveExtractedCoopSemester } from "~/services/coop/vision";
 import { acquireDetectLock, releaseDetectLock } from "~/services/koin/detectLock";
+import type { BlockActionSetting } from "./type";
 
 const MAX_CHOICES = 4;
 const ARTICLE_URL = (articleId: number) => `https://koreatech.in/articles/${articleId}`;
@@ -349,3 +350,11 @@ export async function handleCoopDetectedAction(
     hint: semesterHint ?? undefined,
   });
 }
+
+/** 생협 공지 감지. 등록표는 `blockAction.ts`가 모으기만 한다. */
+export const coopDetectedActions: BlockActionSetting[] = COOP_DETECTED_ACTION_IDS.map((actionId) => ({
+  actionId,
+  async handler({ client, body, action }) {
+    await handleCoopDetectedAction(client, body, action);
+  },
+}));

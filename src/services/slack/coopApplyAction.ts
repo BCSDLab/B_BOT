@@ -9,6 +9,7 @@ import {
 import { loadCoopReview } from "~/services/coop/reviewStore";
 import { getKoinAdminAuth } from "~/services/koin/adminAuth";
 import { labelOf, resolveTargetByEnv } from "~/services/koin/target";
+import type { BlockActionSetting } from "./type";
 
 const section = (text: string) => [
   { type: "section" as const, text: { type: "mrkdwn" as const, text } },
@@ -155,3 +156,11 @@ export async function handleCoopApplyAction(
     ]);
   }
 }
+
+/** 생협 반영·취소. 등록표는 `blockAction.ts`가 모으기만 한다. */
+export const coopApplyActions: BlockActionSetting[] = COOP_APPLY_ACTION_IDS.map((actionId) => ({
+  actionId,
+  async handler({ client, body, action }) {
+    await handleCoopApplyAction(client, body, action);
+  },
+}));

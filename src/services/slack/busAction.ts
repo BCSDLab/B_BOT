@@ -20,6 +20,7 @@ import {
 import { labelOf, resolveTargetByEnv } from "~/services/koin/target";
 import { validateConversion } from "~/services/bus/validation";
 import { computeBusVersionSchedules, describeBusVersionSchedules } from "~/services/bus/versionSchedule";
+import type { BlockActionSetting } from "./type";
 
 const section = (text: string): KnownBlock[] => [
   { type: "section", text: { type: "mrkdwn", text } },
@@ -241,3 +242,19 @@ export async function handleBusPatchAction(
     );
   }
 }
+
+/** 버스 반영·취소. 등록표는 `blockAction.ts`가 모으기만 한다. */
+export const busApplyActions: BlockActionSetting[] = BUS_APPLY_ACTION_IDS.map((actionId) => ({
+  actionId,
+  async handler({ client, body, action }) {
+    await handleBusApplyAction(client, body, action);
+  },
+}));
+
+/** 버스 수정 적용·취소. 등록표는 `blockAction.ts`가 모으기만 한다. */
+export const busPatchActions: BlockActionSetting[] = BUS_PATCH_ACTION_IDS.map((actionId) => ({
+  actionId,
+  async handler({ client, body, action }) {
+    await handleBusPatchAction(client, body, action);
+  },
+}));
