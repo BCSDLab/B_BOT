@@ -1,5 +1,5 @@
-import type pg from "pg";
-import { createPool, query } from "~/helper/adapter/postgres";
+import { query } from "~/helper/adapter/postgres";
+import { createJobLock, closeJobPool, getPool } from "~/services/koin/jobLock";
 import type { BusVersionUpdate } from "./types";
 
 /**
@@ -9,10 +9,10 @@ import type { BusVersionUpdate } from "./types";
  * 프로세스 메모리(또는 파일)에 두고 있었는데, 배포할 때마다 풀려서 사실상 없는 것과
  * 같았다. DB에 두면 재시작해도 남고, 누가 언제 무엇을 반영했는지도 함께 남는다.
  */
-export type BusJobStatus = "PENDING" | "APPLYING" | "APPLIED" | "FAILED" | "CANCELLED";
+export type { JobStatus as BusJobStatus, ClaimResult as BusClaimResult } from "~/services/koin/jobLock";
+import type { JobStatus as BusJobStatus } from "~/services/koin/jobLock";
 
 /** 반영을 다시 시도할 수 있는 상태. 실패는 원인을 고치고 다시 누를 수 있어야 한다. */
-const CLAIMABLE: BusJobStatus[] = ["PENDING", "FAILED"];
 
 /**
  * 사이트에 노출되는 "버전" 문구는 시간표 PUT과 별개로, 적용 전날 00:05(KST)에
@@ -42,16 +42,8 @@ export interface BusJob {
   updated_at: string;
 }
 
-let pool: pg.Pool | undefined;
-function getPool(): pg.Pool {
-  return (pool ??= createPool());
-}
-
 /** 테스트 종료용. 평소 실행 중엔 부를 필요가 없다 — 프로세스가 끝날 때 같이 닫힌다. */
-export async function closeBusJobPool(): Promise<void> {
-  await pool?.end();
-  pool = undefined;
-}
+export const closeBusJobPool = closeJobPool;
 
 // 이 레포에는 마이그레이션 도구가 없다. 첫 사용 때 한 번 만들고 넘어간다.
 let schemaReady: Promise<void> | undefined;
@@ -121,91 +113,13 @@ export async function createBusJob(job: {
   );
 }
 
-export interface BusClaimResult {
-  ok: boolean;
-  /** 가져가지 못한 이유. 누른 사람에게만 보여준다. */
-  reason?: string;
-}
+const lock = createJobLock<BusJob>({ table: "bus_update_job", ensureSchema: ensureBusJobSchema });
 
-/**
- * 반영 권한을 한 명만 갖게 한다.
- *
- * 조회 후 갱신하면 그 사이에 다른 사람이 끼어들 수 있다. 조건부 UPDATE 한 번으로
- * 상태를 바꾸고, 바뀐 행이 없으면 이미 누군가 가져간 것이다.
- */
-export async function claimBusJob(token: string, actor: string): Promise<BusClaimResult> {
-  await ensureBusJobSchema();
-  const claimed = await query(
-    getPool(),
-    `UPDATE bus_update_job
-        SET status = 'APPLYING', actor = $2, error = NULL, updated_at = now()
-      WHERE token = $1 AND status = ANY($3)
-      RETURNING token`,
-    [token, actor, CLAIMABLE],
-  );
+export const claimBusJob = lock.claim;
+export const finishBusJob = lock.finish;
+export const cancelBusJob = lock.cancel;
+export const findBusJob = lock.find;
 
-  if (claimed.rows.length > 0) {
-    return { ok: true };
-  }
-
-  const current = await findBusJob(token);
-  if (!current) {
-    return { ok: false, reason: "작업 기록을 찾지 못했습니다. 다시 변환해주세요." };
-  }
-
-  return {
-    ok: false,
-    reason:
-      {
-        APPLYING: `<@${current.actor}>님이 반영을 진행 중입니다.`,
-        APPLIED: `이미 <@${current.actor}>님이 반영했습니다.`,
-        CANCELLED: "취소된 작업입니다. 다시 변환해주세요.",
-      }[current.status as string] ?? `지금은 반영할 수 없습니다 (${current.status}).`,
-  };
-}
-
-export async function finishBusJob(
-  token: string,
-  status: Extract<BusJobStatus, "APPLIED" | "FAILED">,
-  error?: string,
-): Promise<void> {
-  await ensureBusJobSchema();
-  await query(
-    getPool(),
-    // APPLYING일 때만 종결한다. 이미 끝난 작업을 뒤늦게 온 실패 처리기가
-    // 덮어쓰면 안 된다.
-    `UPDATE bus_update_job
-        SET status = $2, error = $3, updated_at = now()
-      WHERE token = $1 AND status = 'APPLYING'`,
-    [token, status, error ?? null],
-  );
-}
-
-/** 취소는 아직 아무도 반영하지 않았을 때만. 진행 중인 걸 가로채지 않는다. */
-export async function cancelBusJob(token: string, actor: string): Promise<boolean> {
-  await ensureBusJobSchema();
-  const result = await query(
-    getPool(),
-    `UPDATE bus_update_job
-        SET status = 'CANCELLED', actor = $2, updated_at = now()
-      WHERE token = $1 AND status = ANY($3)
-      RETURNING token`,
-    [token, actor, CLAIMABLE],
-  );
-  return result.rows.length > 0;
-}
-
-export async function findBusJob(token: string): Promise<BusJob | null> {
-  await ensureBusJobSchema();
-  const result = await query(
-    getPool(),
-    `SELECT * FROM bus_update_job WHERE token = $1`,
-    [token],
-  );
-  return result.rows[0] ?? null;
-}
-
-/** 반영 성공 직후 버전 문구 예약을 건다. */
 export async function setBusVersionSchedules(
   token: string,
   schedules: BusVersionSchedule[],

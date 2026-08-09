@@ -1,9 +1,9 @@
-import type pg from "pg";
-import { createPool, query } from "~/helper/adapter/postgres";
+import { query } from "~/helper/adapter/postgres";
+import { createJobLock, getPool } from "~/services/koin/jobLock";
 
-export type CoopJobStatus = "PENDING" | "APPLYING" | "APPLIED" | "FAILED" | "CANCELLED";
+export type { JobStatus as CoopJobStatus, ClaimResult as CoopClaimResult } from "~/services/koin/jobLock";
+import type { JobStatus as CoopJobStatus } from "~/services/koin/jobLock";
 
-const CLAIMABLE: CoopJobStatus[] = ["PENDING", "FAILED"];
 
 export interface CoopJob {
   token: string;
@@ -21,11 +21,6 @@ export interface CoopJob {
   error: string | null;
   created_at: string;
   updated_at: string;
-}
-
-let pool: pg.Pool | undefined;
-function getPool(): pg.Pool {
-  return (pool ??= createPool());
 }
 
 let schemaReady: Promise<void> | undefined;
@@ -95,42 +90,23 @@ export async function createCoopJob(job: {
   );
 }
 
-export interface CoopClaimResult {
-  ok: boolean;
-  reason?: string;
-}
+const lock = createJobLock<CoopJob>({ table: "coop_update_job", ensureSchema: ensureCoopJobSchema });
 
-export async function claimCoopJob(token: string, actor: string): Promise<CoopClaimResult> {
-  await ensureCoopJobSchema();
-  const claimed = await query(
-    getPool(),
-    `UPDATE coop_update_job
-        SET status = 'APPLYING', actor = $2, error = NULL, updated_at = now()
-      WHERE token = $1 AND status = ANY($3)
-      RETURNING token`,
-    [token, actor, CLAIMABLE],
-  );
-  if (claimed.rows.length > 0) return { ok: true };
+export const claimCoopJob = lock.claim;
+export const cancelCoopJob = lock.cancel;
+export const findCoopJob = lock.find;
 
-  const current = await findCoopJob(token);
-  if (!current) {
-    return { ok: false, reason: "작업 기록을 찾지 못했습니다. 다시 변환해주세요." };
-  }
-  return {
-    ok: false,
-    reason: {
-      APPLYING: `<@${current.actor}>님이 반영을 진행 중입니다.`,
-      APPLIED: `이미 <@${current.actor}>님이 반영했습니다.`,
-      CANCELLED: "취소된 작업입니다. 다시 변환해주세요.",
-    }[current.status] ?? `지금은 반영할 수 없습니다 (${current.status}).`,
-  };
-}
-
+/**
+ * 생협은 종결하면서 학기 id도 함께 남겨야 해서 공통 finish를 쓰지 않는다.
+ * APPLYING일 때만 종결하는 조건은 공통과 같게 맞춘다 — 이미 끝난 작업을
+ * 뒤늦게 온 실패 처리기가 덮어쓰면 안 된다.
+ */
 export async function finishCoopJob(
   token: string,
   status: Extract<CoopJobStatus, "APPLIED" | "FAILED">,
   options: { error?: string; semesterId?: number; semesterIds?: number[] } = {},
 ): Promise<void> {
+  await ensureCoopJobSchema();
   await query(
     getPool(),
     `UPDATE coop_update_job
@@ -139,7 +115,7 @@ export async function finishCoopJob(
             semester_id = COALESCE($4, semester_id),
             semester_ids = COALESCE($5::jsonb, semester_ids),
             updated_at = now()
-      WHERE token = $1`,
+      WHERE token = $1 AND status = 'APPLYING'`,
     [
       token,
       status,
@@ -150,25 +126,3 @@ export async function finishCoopJob(
   );
 }
 
-export async function cancelCoopJob(token: string, actor: string): Promise<boolean> {
-  await ensureCoopJobSchema();
-  const result = await query(
-    getPool(),
-    `UPDATE coop_update_job
-        SET status = 'CANCELLED', actor = $2, updated_at = now()
-      WHERE token = $1 AND status = ANY($3)
-      RETURNING token`,
-    [token, actor, CLAIMABLE],
-  );
-  return result.rows.length > 0;
-}
-
-export async function findCoopJob(token: string): Promise<CoopJob | null> {
-  await ensureCoopJobSchema();
-  const result = await query(
-    getPool(),
-    `SELECT * FROM coop_update_job WHERE token = $1`,
-    [token],
-  );
-  return result.rows[0] ?? null;
-}
