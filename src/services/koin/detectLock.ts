@@ -84,10 +84,11 @@ export async function acquireDetectLock(
 }
 
 /**
- * 변환을 시작하지 못하고 끝난 경우에만 푼다(첨부 없음·조회 실패 등).
+ * 처리가 끝나면(성공·실패·취소 무관) 항상 푼다.
  *
- * 변환이 시작된 뒤에는 풀지 않는다. 그때부터는 검토 링크가 이미 있어서, 다시 누르면
- * 같은 게시글로 두 번째 변환이 생긴다. 프로세스가 죽은 경우는 위의 30분이 처리한다.
+ * 원본 "확인" 버튼은 락을 잡는 즉시 다른 문구로 갈아끼우므로, 그 이후로는 결과와
+ * 무관하게 다시 눌릴 방법이 없다. 동시 클릭 방지는 `acquireDetectLock`의 원자적
+ * INSERT가 담당하니, 처리 끝난 락을 계속 들고 있을 이유가 없다.
  */
 export async function releaseDetectLock(
   scope: string,
@@ -99,4 +100,17 @@ export async function releaseDetectLock(
     `DELETE FROM detect_lock WHERE scope = $1 AND channel_id = $2 AND article_id = $3`,
     [scope, channel, articleId],
   );
+}
+
+/**
+ * 배포(=서버 재시작) 시점에 남아있는 락을 전부 지운다.
+ *
+ * 이 파일의 락 해제 규칙이 최근 바뀌었다 — 배포 전에 걸린 락은 예전 규칙(성공하면
+ * 안 풀림)대로 남아 있을 수 있는데, 그 진행 상태를 쥐고 있던 프로세스는 이미 죽었다.
+ * 30분 만료를 기다리게 두지 않고 새 프로세스가 뜰 때 한 번에 정리한다.
+ */
+export async function clearAllDetectLocks(): Promise<number> {
+  await ensureSchema();
+  const result = await query(getPool(), `DELETE FROM detect_lock RETURNING scope`);
+  return result.rows.length;
 }

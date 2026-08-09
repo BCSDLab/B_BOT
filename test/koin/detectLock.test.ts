@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { acquireDetectLock, releaseDetectLock } from "~/services/koin/detectLock";
+import { acquireDetectLock, clearAllDetectLocks, releaseDetectLock } from "~/services/koin/detectLock";
 
 /**
  * 실제 Postgres에 붙는 테스트. 조건부 INSERT로 하나만 통과시킨다는 게 이 모듈의
@@ -98,5 +98,19 @@ describe.skipIf(!hasTestDb)("감지 알림 중복 클릭 방어", () => {
 
     const taken = await acquireDetectLock("lecture", CHANNEL, article, "U2");
     expect(taken.ok).toBe(true);
+  });
+
+  it("배포 시 전부 지운다 — 남은 락을 든 채 새로 누른 사람도 통과한다", async () => {
+    // 이 테스트는 테이블 전체를 비우므로 마지막에 둔다. 위 테스트들이 남긴
+    // 잔여 락(만료 처리 확인용 등)이 섞여 있어도 개수만 맞으면 된다.
+    const article = nextArticle();
+    await acquireDetectLock("lecture", CHANNEL, article, "U1");
+
+    const cleared = await clearAllDetectLocks();
+    expect(cleared).toBeGreaterThan(0);
+
+    // 배포 전 락을 든 채 재시작됐어도, 새로 뜬 프로세스에서는 막히지 않는다.
+    const after = await acquireDetectLock("lecture", CHANNEL, article, "U2");
+    expect(after.ok).toBe(true);
   });
 });
