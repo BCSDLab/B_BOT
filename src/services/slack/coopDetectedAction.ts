@@ -264,7 +264,7 @@ export async function handleCoopDetectedAction(
     await say("생협 이미지 첨부 없음", [
       ":grey_question: *지원하는 이미지 첨부를 찾지 못했습니다.*",
       `<${articleUrl}|${article.title ?? `게시글 ${articleId}`}>`,
-      "이미지를 직접 올리고 `!생협반영 2026 1학기`로 실행해주세요.",
+      "공지에 PNG, JPEG, WebP 또는 GIF 이미지를 첨부한 뒤 다시 시도해주세요.",
     ].join("\n"));
     return;
   }

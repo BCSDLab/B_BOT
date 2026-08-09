@@ -45,15 +45,14 @@ describe("첨부 파일 고르기", () => {
 });
 
 describe("파일 첨부 메시지 처리 범위", () => {
-  it("강의와 생협 반영 명령어만 파일을 받겠다고 선언한다", async () => {
+  it("강의와 버스 반영 명령어만 파일을 받겠다고 선언한다", async () => {
     const { messageFunctionList } = await import("~/services/slack/message");
     const accepting = messageFunctionList.filter((m) => m.acceptsFiles);
 
     // 파일 첨부 메시지가 기존 명령어(!질문 등)에 흘러들어가면 없던 동작이 생긴다.
-    expect(accepting).toHaveLength(3);
+    expect(accepting).toHaveLength(2);
     expect(accepting.map((item) => item.regex.toString())).toEqual(expect.arrayContaining([
       expect.stringContaining("강의반영"),
-      expect.stringContaining("생협반영"),
       expect.stringContaining("버스반영"),
     ]));
   });
