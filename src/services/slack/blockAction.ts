@@ -55,6 +55,7 @@ import {
   loadCoopReview,
   updateCoopReview,
 } from "~/services/coop/reviewStore";
+import { acquireDetectLock, releaseDetectLock } from "~/services/koin/detectLock";
 import type { BlockActionSetting } from "./type";
 
 const busApplyAction = (actionId: string): BlockActionSetting => ({
@@ -214,6 +215,21 @@ export const blockActions: BlockActionSetting[] = [
       }
       const env = resolved.target.env;
 
+      // 버튼을 지우는 것만으로는 두 번 눌리는 걸 막지 못한다. 원본을 갈아끼우기 전에
+      // 잠근다 — 변환이 두 번 돌면 검토 링크와 [반영] 버튼이 둘씩 생기고,
+      // 그 둘은 토큰이 달라 반영 락에도 걸리지 않는다.
+      const lock = await acquireDetectLock("lecture", channel, articleId, actor);
+      if (!lock.ok) {
+        await client.chat.postEphemeral({
+          channel,
+          user: actor,
+          text: lock.actor
+            ? `<@${lock.actor}>님이 이미 이 공지를 진행 중입니다.`
+            : "이미 진행 중인 공지입니다.",
+        });
+        return;
+      }
+
       // 배치 메시지는 여기서 역할이 끝난다. 이후 갱신은 봇이 올린 메시지에서 한다.
       await replaceOriginal(responseUrl, "진행합니다", notice(
         `:white_check_mark: *강의 업데이트를 진행합니다.* · ${labelOf(env)}\n<@${actor}>`,
@@ -225,6 +241,12 @@ export const blockActions: BlockActionSetting[] = [
         blocks: notice(`:hourglass_flowing_sand: 게시글을 확인하고 있습니다…`),
       });
       const ts = posted.ts;
+      if (!ts) {
+        // ts가 없으면 이후 갱신도, 스레드 연결도 할 수 없다. 빈 문자열로 이어가면
+        // 다음 변환이 같은 스레드 키를 덮어써서 `!수정`이 엉뚱한 건에 붙는다.
+        await releaseDetectLock("lecture", channel, articleId);
+        throw new Error("메시지를 올리지 못해 진행할 수 없습니다.");
+      }
 
       const say = (text: string, mrkdwn: string) =>
         updateSlack({ client, channel, ts, text, blocks: notice(mrkdwn) });
@@ -233,6 +255,7 @@ export const blockActions: BlockActionSetting[] = [
       try {
         article = await fetchArticle(articleId);
       } catch (error) {
+        await releaseDetectLock("lecture", channel, articleId);
         await say("게시글 조회 실패",
           `:x: *게시글을 읽지 못했습니다.*\n${error instanceof Error ? error.message : ""}`);
         return;
@@ -240,6 +263,7 @@ export const blockActions: BlockActionSetting[] = [
 
       const files = collectExcelAttachments(article.attachments);
       if (files.length === 0) {
+        await releaseDetectLock("lecture", channel, articleId);
         await say("첨부 없음", [
           ":grey_question: *엑셀 첨부를 찾지 못했습니다.*",
           `<${article.url ?? ""}|${article.title ?? `게시글 ${articleId}`}>`,
@@ -251,6 +275,7 @@ export const blockActions: BlockActionSetting[] = [
       // 학기를 모르면 진행하지 않는다. 엉뚱한 학기에 넣으면 되돌릴 수 없다.
       const semester = guessSemester(article.title ?? "");
       if (!semester) {
+        await releaseDetectLock("lecture", channel, articleId);
         await say("학기를 지정해주세요", [
           ":grey_question: *제목에서 학기를 읽지 못했습니다.*",
           "엑셀을 내려받아 `!강의반영 2026 여름학기`처럼 직접 올려주세요.",

@@ -25,6 +25,7 @@ import {
 } from "~/services/koin/target";
 import { savePendingCoopVacation } from "~/services/coop/vacationStore";
 import { resolveExtractedCoopSemester } from "~/services/coop/vision";
+import { acquireDetectLock, releaseDetectLock } from "~/services/koin/detectLock";
 
 const MAX_CHOICES = 4;
 const ARTICLE_URL = (articleId: number) => `https://koreatech.in/articles/${articleId}`;
@@ -232,6 +233,21 @@ export async function handleCoopDetectedAction(
   }
   const env = resolved.target.env;
 
+  // 버튼을 지우는 것만으로는 두 번 눌리는 걸 막지 못한다. 원본을 갈아끼우기 전에
+  // 잠근다 — 변환이 두 번 돌면 검토 링크와 반영 버튼이 둘씩 생기고,
+  // 그 둘은 토큰이 달라 반영 락에도 걸리지 않는다.
+  const lock = await acquireDetectLock("coop", channel, articleId, actor);
+  if (!lock.ok) {
+    await client.chat.postEphemeral({
+      channel,
+      user: actor,
+      text: lock.actor
+        ? `<@${lock.actor}>님이 이미 이 공지를 진행 중입니다.`
+        : "이미 진행 중인 공지입니다.",
+    });
+    return;
+  }
+
   await replaceOriginal(
     body.response_url,
     "생협 업데이트를 진행합니다.",
@@ -243,6 +259,11 @@ export async function handleCoopDetectedAction(
     blocks: section(":hourglass_flowing_sand: 생협 게시글을 확인하고 있습니다…"),
   });
   const ts = posted.ts;
+  if (!ts) {
+    // ts가 없으면 이후 갱신도, 스레드 연결도 할 수 없다.
+    await releaseDetectLock("coop", channel, articleId);
+    throw new Error("메시지를 올리지 못해 진행할 수 없습니다.");
+  }
   const say = (text: string, mrkdwn: string) => client.chat.update({
     channel,
     ts,
@@ -254,6 +275,7 @@ export async function handleCoopDetectedAction(
   try {
     article = await fetchCoopArticle(articleId);
   } catch (error) {
+    await releaseDetectLock("coop", channel, articleId);
     await say("생협 게시글 조회 실패", `:x: *게시글을 읽지 못했습니다.*\n${error instanceof Error ? error.message : ""}`);
     return;
   }
@@ -261,6 +283,7 @@ export async function handleCoopDetectedAction(
   const articleUrl = article.url || ARTICLE_URL(articleId);
   const images = collectCoopImages(article.attachments);
   if (images.length === 0) {
+    await releaseDetectLock("coop", channel, articleId);
     await say("생협 이미지 첨부 없음", [
       ":grey_question: *지원하는 이미지 첨부를 찾지 못했습니다.*",
       `<${articleUrl}|${article.title ?? `게시글 ${articleId}`}>`,
