@@ -133,52 +133,6 @@ export const messageFunctionList: MessageSetting[] = [
     },
   },
   {
-    // block_actions 핸들러 동작 확인용. 버튼을 붙일 때 참고할 최소 예시이기도 하다.
-    regex: /^!버튼테스트/,
-    async handler({
-      client,
-      channel,
-      ts,
-      user,
-    }) {
-      await sendSlackBlock({
-        client,
-        channel,
-        threadTs: ts,
-        blocks: [
-          {
-            type: "section",
-            text: {
-              type: "mrkdwn",
-              text: "*버튼 테스트*\n아래 버튼을 누르면 이 메시지가 갱신됩니다.",
-            },
-          },
-          {
-            type: "actions",
-            elements: [
-              {
-                type: "button",
-                text: { type: "plain_text", text: "진행", emoji: true },
-                style: "primary",
-                action_id: "demo_button:approve",
-                // 핸들러에 넘길 값은 action_id가 아니라 value에 싣는다.
-                // action_id는 정확히 일치해야 핸들러를 찾을 수 있기 때문이다.
-                value: JSON.stringify({ requesterId: user }),
-              },
-              {
-                type: "button",
-                text: { type: "plain_text", text: "취소", emoji: true },
-                style: "danger",
-                action_id: "demo_button:reject",
-                value: JSON.stringify({ requesterId: user }),
-              },
-            ],
-          },
-        ],
-      });
-    },
-  },
-  {
     regex: /^!점메추/,
     async handler({
       client,

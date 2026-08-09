@@ -3,7 +3,6 @@ import { busDetectedActions } from "./busDetectedAction";
 import { coopApplyActions } from "./coopApplyAction";
 import { coopDetectedActions } from "./coopDetectedAction";
 import { coopPatchActions } from "./coopPatchAction";
-import { demoActions } from "./demoAction";
 import { lectureActions } from "./lectureAction";
 import { lectureDetectedActions } from "./lectureDetectedAction";
 import type { BlockActionSetting } from "./type";
@@ -30,5 +29,4 @@ export const blockActions: BlockActionSetting[] = [
   ...coopPatchActions,
   ...lectureDetectedActions,
   ...lectureActions,
-  ...demoActions,
 ];
