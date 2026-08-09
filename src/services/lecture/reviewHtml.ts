@@ -1,3 +1,4 @@
+import { escapeHtml } from "~/services/koin/reviewPage";
 import type { PreflightIssue } from "./adminApi";
 import { describeClassTime } from "./describeTime";
 import type { Lecture } from "./types";
@@ -17,10 +18,6 @@ export interface ReviewPageInput {
   parseFailures: { row: number; value: string; message: string }[];
 }
 
-const escapeHtml = (value: string) =>
-  value.replace(/[&<>"']/g, (c) =>
-    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!,
-  );
 
 const ISSUE_LABEL: Record<PreflightIssue["kind"], string> = {
   too_long: "길이 초과",

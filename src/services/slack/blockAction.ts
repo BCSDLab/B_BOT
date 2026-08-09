@@ -10,10 +10,10 @@ import {
 } from "~/services/lecture/detected";
 import type { AttachmentFile } from "~/services/lecture/detected";
 import { cancelJob, claimJob, createJob, finishJob } from "~/services/lecture/jobStore";
-import { getKoinAdminAuth } from "~/services/lecture/koinAuth";
+import { getKoinAdminAuth } from "~/services/koin/adminAuth";
 import { linkThread } from "~/services/lecture/reviewStore";
-import { labelOf, resolveTarget, resolveTargetByEnv } from "~/services/lecture/target";
-import type { KoinEnv } from "~/services/lecture/target";
+import { labelOf, resolveTarget, resolveTargetByEnv } from "~/services/koin/target";
+import type { KoinEnv } from "~/services/koin/target";
 import { applyPatches, resolveAmbiguities } from "~/services/lecture/patch";
 import {
   buildPatchBlocks,
@@ -207,7 +207,7 @@ export const blockActions: BlockActionSetting[] = [
       if (!articleId) return;
 
       // 어느 코인에 반영할지는 채널로 정한다. 배치는 웹훅을 고르는 것으로 이미 답했다.
-      const resolved = resolveTarget(channel);
+      const resolved = resolveTarget(channel, "강의");
       if (!resolved.ok || !resolved.target) {
         await replaceOriginal(responseUrl, "대상 아님", notice(`:x: ${resolved.reason}`));
         return;

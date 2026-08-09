@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 import type { Patch, TimeAmbiguity } from "./patch";
-import type { KoinEnv } from "./target";
+import type { KoinEnv } from "~/services/koin/target";
 import type { Lecture, TimeFormat } from "./types";
 
 /**

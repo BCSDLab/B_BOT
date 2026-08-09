@@ -19,10 +19,10 @@ import {
 import { linkCoopThread } from "~/services/coop/reviewStore";
 import { createCoopJob } from "~/services/coop/jobStore";
 import {
-  coopTargetLabel,
-  resolveCoopTarget,
-  type CoopKoinEnv,
-} from "~/services/coop/target";
+  labelOf,
+  resolveTarget,
+  type KoinEnv,
+} from "~/services/koin/target";
 import { savePendingCoopVacation } from "~/services/coop/vacationStore";
 import { resolveExtractedCoopSemester } from "~/services/coop/vision";
 
@@ -65,13 +65,13 @@ async function runCoopConversion({
   actor: string;
   image: CoopNoticeImage;
   hint?: { year: number; termName: DetectedCoopTermName };
-  env: CoopKoinEnv;
+  env: KoinEnv;
 }) {
   await client.chat.update({
     channel,
     ts,
     text: "생협 운영시간 변환 중",
-    blocks: section(`:hourglass_flowing_sand: *생협 운영시간* 이미지 분석 중…\n${coopTargetLabel(env)} · ${image.name}\n작업자: <@${actor}>`),
+    blocks: section(`:hourglass_flowing_sand: *생협 운영시간* 이미지 분석 중…\n${labelOf(env)} · ${image.name}\n작업자: <@${actor}>`),
   });
 
   try {
@@ -221,7 +221,7 @@ export async function handleCoopDetectedAction(
   };
   if (!articleId) return;
 
-  const resolved = resolveCoopTarget(channel);
+  const resolved = resolveTarget(channel, "생협");
   if (!resolved.target) {
     await replaceOriginal(
       body.response_url,
@@ -235,7 +235,7 @@ export async function handleCoopDetectedAction(
   await replaceOriginal(
     body.response_url,
     "생협 업데이트를 진행합니다.",
-    section(`:white_check_mark: *생협 업데이트를 진행합니다.* · ${coopTargetLabel(env)}\n<@${actor}>`),
+    section(`:white_check_mark: *생협 업데이트를 진행합니다.* · ${labelOf(env)}\n<@${actor}>`),
   );
   const posted = await client.chat.postMessage({
     channel,

@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import type { AdminUpdateSemesterRequest, RegularConversionResult } from "./types";
 import type { CoopPatch } from "./patch";
-import type { CoopKoinEnv } from "./target";
+import type { KoinEnv } from "~/services/koin/target";
 
 const TOKEN_BYTES = 16;
 const EXPIRE_DAYS = 7;
@@ -37,7 +37,7 @@ export interface StoredCoopReview {
     conversion: RegularConversionResult;
   }>;
   meta: {
-    env: CoopKoinEnv;
+    env: KoinEnv;
     year: number;
     termName: string;
     sourceFileName: string;

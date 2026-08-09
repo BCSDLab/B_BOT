@@ -52,8 +52,8 @@ vi.mock("~/services/coop/jobStore", () => ({
   createCoopJob: vi.fn(async () => undefined),
 }));
 
-vi.mock("~/services/coop/target", () => ({
-  resolveCoopTarget: vi.fn(() => ({
+vi.mock("~/services/koin/target", () => ({
+  resolveTarget: vi.fn(() => ({
     ok: true,
     target: {
       env: "stage",
@@ -63,7 +63,7 @@ vi.mock("~/services/coop/target", () => ({
       password: "password",
     },
   })),
-  coopTargetLabel: vi.fn(() => "스테이지"),
+  labelOf: vi.fn(() => "스테이지"),
 }));
 
 import {

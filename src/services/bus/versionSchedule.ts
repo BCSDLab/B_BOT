@@ -5,8 +5,8 @@ import {
   setBusVersionSchedules,
   type BusVersionSchedule,
 } from "./jobStore";
-import { getBusAdminAuth } from "./koinAuth";
-import { resolveBusTargetByEnv, type BusKoinEnv } from "./target";
+import { getKoinAdminAuth } from "~/services/koin/adminAuth";
+import { resolveTargetByEnv, type KoinEnv } from "~/services/koin/target";
 import type { BusConversion } from "./types";
 
 /**
@@ -89,11 +89,11 @@ export async function runDueBusVersionUpdates(client?: WebClient, signal?: Abort
       // 아직 때가 안 된 일정을 만나면 멈춘다. 순서를 건너뛰면 뒤 학기가 먼저 노출될 수 있다.
       if (new Date(schedule.scheduled_at) > new Date()) break;
 
-      const resolved = resolveBusTargetByEnv(job.target_env as BusKoinEnv);
+      const resolved = resolveTargetByEnv(job.target_env as KoinEnv);
       if (!resolved.target) break; // 설정이 없으면 다음 주기에 다시 시도한다.
 
       try {
-        const auth = await getBusAdminAuth(resolved.target);
+        const auth = await getKoinAdminAuth(resolved.target);
         await updateBusVersionViaAdminApi(schedule.version_update, auth);
         schedule.completed_at = new Date().toISOString();
         changed = true;

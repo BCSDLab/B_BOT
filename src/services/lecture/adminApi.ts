@@ -1,3 +1,5 @@
+export type { KoinAdminAuth } from "~/services/koin/adminAuth";
+import type { KoinAdminAuth } from "~/services/koin/adminAuth";
 import type { Lecture, LectureInfo } from "./types";
 
 /** POST /admin/lectures의 term enum. */
@@ -198,11 +200,6 @@ export function buildAdminRequest(
     issues,
     stats: { total: converted.length, withoutTime, maxClassTime },
   };
-}
-
-export interface KoinAdminAuth {
-  baseUrl: string;
-  accessToken: string;
 }
 
 /**

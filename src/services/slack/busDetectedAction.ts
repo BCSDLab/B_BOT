@@ -8,7 +8,7 @@ import {
 import { createBusJob } from "~/services/bus/jobStore";
 import { buildReviewApprovalBlocks, convertBusToReview } from "~/services/bus/pipeline";
 import { linkBusThread } from "~/services/bus/reviewStore";
-import { resolveBusTarget } from "~/services/bus/target";
+import { resolveTarget } from "~/services/koin/target";
 
 const ARTICLE_URL = (articleId: number) => `https://koreatech.in/articles/${articleId}`;
 
@@ -62,7 +62,7 @@ export async function handleBusDetectedAction(
   if (!articleId) return;
 
   // 어느 코인에 반영할지는 채널로 정한다. 배치는 웹훅을 고르는 것으로 이미 답했다.
-  const resolved = resolveBusTarget(channel);
+  const resolved = resolveTarget(channel, "버스");
   if (!resolved.target) {
     await replaceOriginal(
       body.response_url,

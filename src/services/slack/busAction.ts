@@ -8,7 +8,7 @@ import {
   finishBusJob,
   setBusVersionSchedules,
 } from "~/services/bus/jobStore";
-import { getBusAdminAuth } from "~/services/bus/koinAuth";
+import { getKoinAdminAuth } from "~/services/koin/adminAuth";
 import { applyBusPatchesToConversions } from "~/services/bus/patch";
 import { buildStoredBusReview } from "~/services/bus/pipeline";
 import {
@@ -17,7 +17,7 @@ import {
   loadBusReview,
   updateBusReview,
 } from "~/services/bus/reviewStore";
-import { busLabelOf, resolveBusTargetByEnv } from "~/services/bus/target";
+import { labelOf, resolveTargetByEnv } from "~/services/koin/target";
 import { validateConversion } from "~/services/bus/validation";
 import { computeBusVersionSchedules, describeBusVersionSchedules } from "~/services/bus/versionSchedule";
 
@@ -102,15 +102,15 @@ export async function handleBusApplyAction(
       "버스 시간표 반영 중",
       section(
         `:hourglass_flowing_sand: *버스 시간표 반영 중…* ${stored.meta.routeCount}개\n` +
-          `${busLabelOf(stored.meta.env)} · 작업자: <@${actor}>`,
+          `${labelOf(stored.meta.env)} · 작업자: <@${actor}>`,
       ),
     );
 
-    const resolved = resolveBusTargetByEnv(stored.meta.env);
+    const resolved = resolveTargetByEnv(stored.meta.env);
     if (!resolved.target) {
       throw new Error(resolved.reason ?? "대상 환경을 찾지 못했습니다.");
     }
-    const auth = await getBusAdminAuth(resolved.target);
+    const auth = await getKoinAdminAuth(resolved.target);
     // 예약 계산은 순수 함수라 여기서 먼저 검증한다. PUT이 끝난 뒤에 실패하면
     // 이미 반영된 시간표를 FAILED로 잘못 표시하게 된다.
     const versionSchedules = computeBusVersionSchedules(stored.conversions);
@@ -124,7 +124,7 @@ export async function handleBusApplyAction(
     await update(client, channel, ts, "버스 시간표 반영 완료", [
       ...section(
         `:white_check_mark: *버스 시간표 반영 완료*\n` +
-          `${busLabelOf(stored.meta.env)} · 노선 *${stored.meta.routeCount}개*\n` +
+          `${labelOf(stored.meta.env)} · 노선 *${stored.meta.routeCount}개*\n` +
           `버전 문구 갱신 예약:\n${describeBusVersionSchedules(versionSchedules)}`,
       ),
       {

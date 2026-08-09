@@ -1,11 +1,11 @@
 import type { RawRegularCoopTimetable, VacationSeason } from "./types";
-import type { CoopKoinEnv } from "./target";
+import type { KoinEnv } from "~/services/koin/target";
 
 const EXPIRE_MS = 24 * 60 * 60 * 1000;
 const key = (channel: string, threadTs: string) => `coop-vacation:${channel}:${threadTs}`;
 
 export interface PendingCoopVacation {
-  env: CoopKoinEnv;
+  env: KoinEnv;
   year: number;
   season: VacationSeason;
   fileName: string;

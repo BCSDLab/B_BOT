@@ -64,16 +64,16 @@ vi.mock("~/services/bus/reviewStore", () => ({
   dropBusPatchPlan: (...args: unknown[]) => (dropBusPatchPlan as (...a: unknown[]) => unknown)(...args),
 }));
 
-vi.mock("~/services/bus/koinAuth", () => ({
-  getBusAdminAuth: vi.fn(async () => ({
+vi.mock("~/services/koin/adminAuth", () => ({
+  getKoinAdminAuth: vi.fn(async () => ({
     baseUrl: "https://api.stage.koreatech.in",
     accessToken: "koin-jwt",
   })),
 }));
 
-vi.mock("~/services/bus/target", () => ({
-  busLabelOf: () => "스테이지",
-  resolveBusTargetByEnv: () => ({
+vi.mock("~/services/koin/target", () => ({
+  labelOf: () => "스테이지",
+  resolveTargetByEnv: () => ({
     ok: true,
     target: {
       env: "stage",

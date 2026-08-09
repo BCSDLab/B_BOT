@@ -11,7 +11,7 @@ import {
   loadBusReview,
   saveBusPatchPlan,
 } from "~/services/bus/reviewStore";
-import { resolveBusTarget } from "~/services/bus/target";
+import { resolveTarget } from "~/services/koin/target";
 import { downloadSlackSpreadsheet, findSpreadsheetFiles } from "~/utils/slackFile";
 import { readThreadContext, threadRootOf } from "~/utils/slackThread";
 import type { MessageSetting } from "../type";
@@ -66,7 +66,7 @@ export const messages: MessageSetting[] = [
       }
 
       // 어느 코인에 반영할지는 채널이 정한다. 모르는 채널이면 진행하지 않는다.
-      const resolved = resolveBusTarget(channel);
+      const resolved = resolveTarget(channel, "버스");
       if (!resolved.target) {
         await client.chat.postMessage({
           channel,

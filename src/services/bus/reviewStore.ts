@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 import type { BusPatch } from "./patch";
-import type { BusKoinEnv } from "./target";
+import type { KoinEnv } from "~/services/koin/target";
 import type { BusConversion } from "./types";
 
 /**
@@ -14,7 +14,7 @@ const EXPIRE_DAYS = 7;
 
 export interface BusReviewMeta {
   /** 어느 코인에 반영할 건지. 검토·반영 내내 바뀌지 않아야 한다. */
-  env: BusKoinEnv;
+  env: KoinEnv;
   sourceFileName: string;
   routeCount: number;
   issueCount: number;

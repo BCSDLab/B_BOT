@@ -1,5 +1,5 @@
 import { createReviewToken, isValidToken } from "./reviewStore";
-import type { KoinEnv } from "./target";
+import type { KoinEnv } from "~/services/koin/target";
 
 export interface AttachmentFile {
   name: string;

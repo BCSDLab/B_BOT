@@ -1,14 +1,14 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { getCoopAdminAuth } from "~/services/coop/koinAuth";
+import { getKoinAdminAuth } from "~/services/koin/adminAuth";
 
-describe("생협 관리자 인증", () => {
+describe("코인 관리자 인증", () => {
   afterEach(() => vi.unstubAllGlobals());
 
-  it("생협 대상의 주소와 계정으로 로그인한다", async () => {
-    const fetchMock = vi.fn(async () => ({ token: "coop-token" }));
+  it("대상의 주소와 계정으로 로그인한다", async () => {
+    const fetchMock = vi.fn(async () => ({ token: "admin-token" }));
     vi.stubGlobal("$fetch", fetchMock);
 
-    await expect(getCoopAdminAuth({
+    await expect(getKoinAdminAuth({
       env: "stage",
       label: "스테이지",
       baseUrl: "https://api.stage.example.com",
@@ -16,7 +16,7 @@ describe("생협 관리자 인증", () => {
       password: "password",
     })).resolves.toEqual({
       baseUrl: "https://api.stage.example.com",
-      accessToken: "coop-token",
+      accessToken: "admin-token",
     });
     expect(fetchMock).toHaveBeenCalledWith("admin/user/login", expect.objectContaining({
       baseURL: "https://api.stage.example.com",
@@ -26,7 +26,7 @@ describe("생협 관리자 인증", () => {
 
   it("토큰 없는 로그인 응답을 거절한다", async () => {
     vi.stubGlobal("$fetch", vi.fn(async () => ({})));
-    await expect(getCoopAdminAuth({
+    await expect(getKoinAdminAuth({
       env: "stage",
       label: "스테이지",
       baseUrl: "https://api.stage.example.com",
