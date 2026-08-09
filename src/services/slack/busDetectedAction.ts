@@ -57,6 +57,7 @@ async function runConversion({
   env,
   label,
   file,
+  articleId,
 }: {
   client: WebClient;
   channel: string;
@@ -65,6 +66,7 @@ async function runConversion({
   env: KoinEnv;
   label: string;
   file: BusNoticeFile;
+  articleId: number;
 }) {
   const conversionTarget = { env, fileName: file.name };
 
@@ -77,6 +79,9 @@ async function runConversion({
     ),
   });
 
+  // 이 게시글의 원본 버튼은 락을 잡은 직후 이미 갈아끼웠다(위 호출부의 replaceOriginal).
+  // 그러니 여기서부터는 성공하든 실패하든 다시 눌릴 방법이 없다 — 결과와 무관하게
+  // 항상 풀어준다. 안 풀면 취소하거나 실패해도 30분 동안 같은 게시글의 새 알림이 막힌다.
   try {
     const bytes = await downloadBusNoticeFile(file);
     const extension = `.${file.name.split(".").pop()?.toLowerCase()}`;
@@ -112,6 +117,8 @@ async function runConversion({
         }\n${file.name} · 요청: <@${actor}>`,
       ),
     });
+  } finally {
+    await releaseDetectLock("bus", channel, articleId);
   }
 }
 
@@ -141,10 +148,15 @@ export async function handleBusDetectedAction(
 
   if (action.action_id === "bus:detected_ignore") {
     // 파일을 여럿 중에 고르다가 "아니요"를 누른 경우엔 값에 token이 실려 온다.
-    // 배치가 웹훅으로 올린 최초 메시지의 "넘어가기"엔 token이 없다.
+    // 배치가 웹훅으로 올린 최초 메시지의 "넘어가기"엔 token이 없다 — 그땐 아직
+    // 락을 잡기 전이라 풀 것도 없다.
     const { token } = JSON.parse(action.value ?? "{}") as { token?: string };
     if (token) {
+      const notice = await loadBusDetected(token);
       await dropBusDetected(token);
+      if (notice) {
+        await releaseDetectLock("bus", channel, notice.articleId);
+      }
     }
     await replaceOriginal(
       body.response_url,
@@ -185,6 +197,7 @@ export async function handleBusDetectedAction(
       env: notice.target,
       label: labelOf(notice.target),
       file,
+      articleId: notice.articleId,
     });
     return;
   }
@@ -322,6 +335,7 @@ export async function handleBusDetectedAction(
     env: target.env,
     label: target.label,
     file: files[0],
+    articleId,
   });
 }
 

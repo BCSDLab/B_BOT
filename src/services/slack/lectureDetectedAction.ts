@@ -50,7 +50,7 @@ function shorten(name: string): string {
  * 첨부가 하나일 때와 골랐을 때가 여기서 만난다.
  */
 async function runConversion({
-  client, channel, ts, actor, env, file, year, term,
+  client, channel, ts, actor, env, file, year, term, articleId,
 }: {
   client: Parameters<BlockActionSetting["handler"]>[0]["client"];
   channel: string;
@@ -60,6 +60,7 @@ async function runConversion({
   file: AttachmentFile;
   year: number;
   term: string;
+  articleId: number;
 }) {
   const target = { env, year, termName: term, fileName: file.name };
 
@@ -70,6 +71,9 @@ async function runConversion({
       text: `:hourglass_flowing_sand: *${year} ${term}* 변환 중…\n${labelOf(env)} · ${file.name}\n작업자: <@${actor}>` } }],
   });
 
+  // 이 게시글의 원본 버튼은 락을 잡은 직후 이미 갈아끼웠다(호출부의 replaceOriginal).
+  // 그러니 여기서부터는 성공하든 실패하든 다시 눌릴 방법이 없다 — 결과와 무관하게
+  // 항상 풀어준다. 안 풀면 취소하거나 실패해도 30분 동안 같은 게시글의 새 알림이 막힌다.
   try {
     const buffer = await downloadNoticeFile(file.url);
     const outcome = await convertToReview(buffer, target);
@@ -103,6 +107,8 @@ async function runConversion({
           text: `${file.name} · 작업자: <@${actor}>` }] },
       ],
     });
+  } finally {
+    await releaseDetectLock("lecture", channel, articleId);
   }
 }
 
@@ -248,7 +254,7 @@ export const lectureDetectedActions: BlockActionSetting[] = [
 
       await runConversion({
         client, channel, ts, actor,
-        env, file: files[0], ...semester,
+        env, file: files[0], ...semester, articleId,
       });
     },
   },
@@ -285,6 +291,7 @@ export const lectureDetectedActions: BlockActionSetting[] = [
       await runConversion({
         client, channel, ts, actor,
         env: notice.target, file, year: notice.year, term: notice.term,
+        articleId: notice.articleId,
       });
     },
   })),
@@ -295,7 +302,11 @@ export const lectureDetectedActions: BlockActionSetting[] = [
 
       const { token } = JSON.parse(action.value ?? "{}") as { token?: string };
       if (token) {
+        const notice = await loadDetected(token);
         await dropDetected(token);
+        if (notice && body.channel) {
+          await releaseDetectLock("lecture", body.channel.id, notice.articleId);
+        }
       }
 
       // 배치가 웹훅으로 올린 메시지일 수 있어 response_url로 바꾼다.

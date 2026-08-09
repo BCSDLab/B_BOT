@@ -60,6 +60,7 @@ async function runCoopConversion({
   image,
   hint,
   env,
+  articleId,
 }: {
   client: WebClient;
   channel: string;
@@ -68,6 +69,7 @@ async function runCoopConversion({
   image: CoopNoticeImage;
   hint?: { year: number; termName: DetectedCoopTermName };
   env: KoinEnv;
+  articleId: number;
 }) {
   await client.chat.update({
     channel,
@@ -76,6 +78,9 @@ async function runCoopConversion({
     blocks: section(`:hourglass_flowing_sand: *생협 운영시간* 이미지 분석 중…\n${labelOf(env)} · ${image.name}\n작업자: <@${actor}>`),
   });
 
+  // 이 게시글의 원본 버튼은 락을 잡은 직후 이미 갈아끼웠다(호출부의 replaceOriginal).
+  // 그러니 여기서부터는 성공하든 실패하든 다시 눌릴 방법이 없다 — 결과와 무관하게
+  // 항상 풀어준다. 안 풀면 취소하거나 실패해도 30분 동안 같은 게시글의 새 알림이 막힌다.
   try {
     const buffer = await downloadCoopNoticeImage(image);
     const raw = await extractCoopImage({
@@ -154,6 +159,8 @@ async function runCoopConversion({
         { type: "context", elements: [{ type: "mrkdwn", text: `${image.name} · 작업자: <@${actor}>` }] },
       ],
     });
+  } finally {
+    await releaseDetectLock("coop", channel, articleId);
   }
 }
 
@@ -177,7 +184,13 @@ export async function handleCoopDetectedAction(
 
   if (action.action_id === "coop:detected_ignore") {
     const { token } = JSON.parse(action.value ?? "{}") as { token?: string };
-    if (token) await dropDetectedCoop(token);
+    if (token) {
+      const detected = await loadDetectedCoop(token);
+      await dropDetectedCoop(token);
+      if (detected) {
+        await releaseDetectLock("coop", channel, detected.articleId);
+      }
+    }
     await replaceOriginal(
       body.response_url,
       "생협 공지를 넘어갑니다.",
@@ -214,6 +227,7 @@ export async function handleCoopDetectedAction(
         ? { year: detected.year, termName: detected.termName }
         : undefined,
       env: detected.env,
+      articleId: detected.articleId,
     });
     return;
   }
@@ -348,6 +362,7 @@ export async function handleCoopDetectedAction(
     image: images[0],
     env,
     hint: semesterHint ?? undefined,
+    articleId,
   });
 }
 

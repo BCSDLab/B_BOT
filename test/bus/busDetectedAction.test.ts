@@ -2,9 +2,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // 락은 실제 Postgres에 붙는다. 여기서는 항상 통과시킨다 —
 // 잠금 자체는 test/koin/detectLock.test.ts가 실제 DB로 확인한다.
+const acquireDetectLock = vi.fn(async () => ({ ok: true }));
+const releaseDetectLock = vi.fn(async () => undefined);
 vi.mock("~/services/koin/detectLock", () => ({
-  acquireDetectLock: vi.fn(async () => ({ ok: true })),
-  releaseDetectLock: vi.fn(async () => undefined),
+  acquireDetectLock: (...args: unknown[]) => (acquireDetectLock as (...a: unknown[]) => unknown)(...args),
+  releaseDetectLock: (...args: unknown[]) => (releaseDetectLock as (...a: unknown[]) => unknown)(...args),
 }));
 
 
@@ -166,6 +168,9 @@ describe("bus:detected", () => {
     expect(mock.chat.update).toHaveBeenLastCalledWith(
       expect.objectContaining({ text: "버스 시간표 변환 완료 · 12개" }),
     );
+    // 원본 버튼은 락을 잡은 직후 이미 갈아끼워 다시 눌릴 수 없다 — 변환이 끝나면
+    // 성공 여부와 무관하게 풀어줘야, 나중에 취소하거나 재공지가 와도 막히지 않는다.
+    expect(releaseDetectLock).toHaveBeenCalledWith("bus", "C1", 1);
   });
 
   it("변환에 실패하면 실패 메시지로 남긴다", async () => {
@@ -185,6 +190,8 @@ describe("bus:detected", () => {
     expect(mock.chat.update).toHaveBeenLastCalledWith(
       expect.objectContaining({ text: "버스 시간표 변환 실패" }),
     );
+    // 토큰이 아직 없어 재시도해도 중복이 생기지 않는다 — 락을 30분 붙들어둘 이유가 없다.
+    expect(releaseDetectLock).toHaveBeenCalledWith("bus", "C1", 1);
   });
 
   it("시간표 첨부가 여럿이면 바로 변환하지 않고 고르게 한다", async () => {
@@ -277,10 +284,41 @@ describe("bus:detected_start", () => {
       expect.objectContaining({ text: "만료됨" }),
     );
   });
+
+  it("고른 파일 변환에 실패하면 락을 풀어 재시도할 수 있게 한다", async () => {
+    loadBusDetected.mockResolvedValue({
+      target: "stage",
+      articleId: 7,
+      articleTitle: "공지",
+      articleUrl: "https://koreatech.in/articles/7",
+      files: [{ name: "정규학기.xlsx", url: "https://koreatech.in/f/1" }],
+    });
+    downloadBusNoticeFile.mockRejectedValue(new Error("첨부 파일을 받지 못했습니다"));
+    const { handleBusDetectedAction } = await import("~/services/slack/busDetectedAction");
+    const mock = client();
+
+    await handleBusDetectedAction(
+      mock as never,
+      body({ message: { ts: "999.001" } }) as never,
+      button({ token: "detected-token", fileIndex: 0 }, "bus:detected_start") as never,
+    );
+
+    expect(releaseDetectLock).toHaveBeenCalledWith("bus", "C1", 7);
+    expect(mock.chat.update).toHaveBeenLastCalledWith(
+      expect.objectContaining({ text: "버스 시간표 변환 실패" }),
+    );
+  });
 });
 
 describe("bus:detected_ignore (파일 선택 중 취소)", () => {
-  it("token이 실려 있으면 저장해둔 후보를 지운다", async () => {
+  it("token이 실려 있으면 저장해둔 후보를 지우고 감지 락도 함께 푼다", async () => {
+    loadBusDetected.mockResolvedValue({
+      target: "stage",
+      articleId: 3,
+      articleTitle: "공지",
+      articleUrl: "https://koreatech.in/articles/3",
+      files: [{ name: "시간표.xlsx", url: "https://koreatech.in/f/1" }],
+    });
     const { handleBusDetectedAction } = await import("~/services/slack/busDetectedAction");
     const mock = client();
 
@@ -291,5 +329,7 @@ describe("bus:detected_ignore (파일 선택 중 취소)", () => {
     );
 
     expect(dropBusDetected).toHaveBeenCalledWith("detected-token");
+    // 취소했으니 재시도가 30분 동안 막히면 안 된다.
+    expect(releaseDetectLock).toHaveBeenCalledWith("bus", "C1", 3);
   });
 });
