@@ -4,9 +4,12 @@
  * 다시 조회해서 첨부 시간표를 찾아오는 부분만 맡는다 — 배치가 아는 건 action_id와
  * `article_id` 하나뿐이고, 나머지는 전부 여기서 한다(coop/lecture와 동일한 이유).
  *
- * 첨부가 여러 개일 수 있는 coop(이미지)·lecture와 달리 버스 공지 첨부는 항상
- * 시간표 파일 하나뿐이라, 여러 개 중 고르는 단계(*_start_N, KV 저장)가 없다.
+ * 시간표 파일이 여러 개 붙는 공지도 있어(정규학기·계절학기가 따로 올라오는 경우 등),
+ * lecture와 동일하게 둘 이상이면 사람이 버튼으로 고르게 한다.
  */
+
+import { createBusReviewToken, isValidBusReviewToken } from "./reviewStore";
+import type { KoinEnv } from "~/services/koin/target";
 
 interface BusArticleAttachment {
   name?: string;
@@ -23,6 +26,20 @@ export interface BusArticle {
 export interface BusNoticeFile {
   name: string;
   url: string;
+}
+
+/**
+ * 첨부가 여럿이라 사람이 고르는 동안 들고 있는 값.
+ *
+ * 배치는 **게시글 번호만** 준다. 첨부는 버튼을 누른 뒤 삐봇이 코인 API로 알아낸다.
+ */
+export interface BusDetectedNotice {
+  target: KoinEnv;
+  articleId: number;
+  articleTitle: string;
+  articleUrl: string;
+  /** 시간표 첨부 후보. 이 순서가 곧 버튼 순서다. */
+  files: BusNoticeFile[];
 }
 
 const MAX_BYTES = 20 * 1024 * 1024;
@@ -105,4 +122,24 @@ export async function downloadBusNoticeFile(file: BusNoticeFile): Promise<Buffer
     }
   }
   return Buffer.from(buffer);
+}
+
+const key = (token: string) => `bus-detected:${token}`;
+
+/** 버튼을 누를 때까지 들고 있는다. 주소가 길어 버튼 value에 담기 어렵다. */
+export async function saveBusDetected(notice: BusDetectedNotice): Promise<string> {
+  const token = createBusReviewToken();
+  await useStorage("kvStorage").setItem(key(token), notice);
+  return token;
+}
+
+export async function loadBusDetected(token: string): Promise<BusDetectedNotice | null> {
+  if (!isValidBusReviewToken(token)) {
+    return null;
+  }
+  return (await useStorage("kvStorage").getItem<BusDetectedNotice>(key(token))) ?? null;
+}
+
+export async function dropBusDetected(token: string): Promise<void> {
+  await useStorage("kvStorage").removeItem(key(token));
 }

@@ -3,13 +3,18 @@ import type { KnownBlock, WebClient } from "@slack/web-api";
 import {
   collectBusSpreadsheets,
   downloadBusNoticeFile,
+  dropBusDetected,
   fetchBusArticle,
+  loadBusDetected,
+  saveBusDetected,
 } from "~/services/bus/detected";
+import type { BusNoticeFile } from "~/services/bus/detected";
 import { createBusJob } from "~/services/bus/jobStore";
 import { buildReviewApprovalBlocks, convertBusToReview } from "~/services/bus/pipeline";
 import { linkBusThread } from "~/services/bus/reviewStore";
 import { acquireDetectLock, releaseDetectLock } from "~/services/koin/detectLock";
-import { resolveTarget } from "~/services/koin/target";
+import { labelOf, resolveTarget } from "~/services/koin/target";
+import type { KoinEnv } from "~/services/koin/target";
 import type { BlockActionSetting } from "./type";
 
 const ARTICLE_URL = (articleId: number) => `https://koreatech.in/articles/${articleId}`;
@@ -32,7 +37,92 @@ async function replaceOriginal(
   });
 }
 
-export const BUS_DETECTED_ACTION_IDS = ["bus:detected", "bus:detected_ignore"] as const;
+/** 버튼이 너무 많으면 읽히지 않는다. 넘치면 파일을 직접 올리는 편이 낫다(lecture와 동일). */
+const MAX_CHOICES = 4;
+
+/** 버튼 글자가 길면 잘려서 무엇인지 알 수 없다. */
+function shorten(name: string): string {
+  return name.length > 28 ? `${name.slice(0, 27)}…` : name;
+}
+
+/**
+ * 고른 파일을 내려받아 변환하고 검토 링크까지 올린다.
+ * 첨부가 하나일 때와 골랐을 때가 여기서 만난다.
+ */
+async function runConversion({
+  client,
+  channel,
+  ts,
+  actor,
+  env,
+  label,
+  file,
+}: {
+  client: WebClient;
+  channel: string;
+  ts: string;
+  actor: string;
+  env: KoinEnv;
+  label: string;
+  file: BusNoticeFile;
+}) {
+  const conversionTarget = { env, fileName: file.name };
+
+  await client.chat.update({
+    channel,
+    ts,
+    text: "버스 시간표 변환 중",
+    blocks: section(
+      `:hourglass_flowing_sand: *버스 시간표* 변환 중…\n${label} · ${file.name}`,
+    ),
+  });
+
+  try {
+    const bytes = await downloadBusNoticeFile(file);
+    const extension = `.${file.name.split(".").pop()?.toLowerCase()}`;
+    const outcome = await convertBusToReview(bytes, extension, conversionTarget);
+
+    // 반영 권한을 한 명만 갖게 하려면 상태가 DB에 있어야 한다. job 행이 없는데
+    // 스레드부터 묶으면, 여기서 실패했을 때 스레드가 막다른 곳이 된다.
+    await createBusJob({
+      token: outcome.token,
+      channelId: channel,
+      threadTs: ts,
+      sourceFile: file.name,
+      routeCount: outcome.routeCount,
+      semesterTypes: outcome.semesterTypes,
+      targetEnv: env,
+    });
+    await linkBusThread(channel, ts, outcome.token);
+
+    await client.chat.update({
+      channel,
+      ts,
+      text: `버스 시간표 변환 완료 · ${outcome.routeCount}개`,
+      blocks: buildReviewApprovalBlocks(outcome, conversionTarget, actor),
+    });
+  } catch (error) {
+    await client.chat.update({
+      channel,
+      ts,
+      text: "버스 시간표 변환 실패",
+      blocks: section(
+        `:x: *변환 실패*\n${
+          error instanceof Error ? error.message : "알 수 없는 오류입니다"
+        }\n${file.name} · 요청: <@${actor}>`,
+      ),
+    });
+  }
+}
+
+export const BUS_DETECTED_ACTION_IDS = [
+  "bus:detected",
+  "bus:detected_ignore",
+  "bus:detected_start",
+  "bus:detected_start_1",
+  "bus:detected_start_2",
+  "bus:detected_start_3",
+] as const;
 
 /**
  * 배치가 올린 감지 알림의 "확인"/"넘어가기".
@@ -50,11 +140,52 @@ export async function handleBusDetectedAction(
   const actor = body.user.id;
 
   if (action.action_id === "bus:detected_ignore") {
+    // 파일을 여럿 중에 고르다가 "아니요"를 누른 경우엔 값에 token이 실려 온다.
+    // 배치가 웹훅으로 올린 최초 메시지의 "넘어가기"엔 token이 없다.
+    const { token } = JSON.parse(action.value ?? "{}") as { token?: string };
+    if (token) {
+      await dropBusDetected(token);
+    }
     await replaceOriginal(
       body.response_url,
       "버스 공지를 넘어갑니다.",
       section(`:no_entry_sign: *이 버스 공지는 넘어갑니다.*\n<@${actor}>`),
     );
+    return;
+  }
+
+  // 파일이 여럿이라 고른 경우. 버튼마다 action_id가 달라야 해서 접미사로 나눈다.
+  if (action.action_id.startsWith("bus:detected_start")) {
+    const { token, fileIndex = 0 } = JSON.parse(action.value ?? "{}") as {
+      token?: string;
+      fileIndex?: number;
+    };
+    const ts = body.message?.ts;
+    if (!token || !ts) return;
+
+    const notice = await loadBusDetected(token);
+    const file = notice?.files[fileIndex];
+    if (!notice || !file) {
+      await client.chat.update({
+        channel,
+        ts,
+        text: "만료됨",
+        blocks: section(":x: 이미 처리했거나 만료된 알림입니다."),
+      });
+      return;
+    }
+
+    // 먼저 지운다. 두 명이 눌러 두 번 변환하면 검토 링크가 둘이 된다.
+    await dropBusDetected(token);
+    await runConversion({
+      client,
+      channel,
+      ts,
+      actor,
+      env: notice.target,
+      label: labelOf(notice.target),
+      file,
+    });
     return;
   }
 
@@ -137,48 +268,61 @@ export async function handleBusDetectedAction(
     return;
   }
 
-  const file = files[0];
-  const conversionTarget = { env: target.env, fileName: file.name };
-
-  await client.chat.update({
-    channel,
-    ts,
-    text: "버스 시간표 변환 중",
-    blocks: section(
-      `:hourglass_flowing_sand: *버스 시간표* 변환 중…\n${target.label} · ${file.name}`,
-    ),
-  });
-
-  try {
-    const bytes = await downloadBusNoticeFile(file);
-    const extension = `.${file.name.split(".").pop()?.toLowerCase()}`;
-    const outcome = await convertBusToReview(bytes, extension, conversionTarget);
-
-    // 반영 권한을 한 명만 갖게 하려면 상태가 DB에 있어야 한다. job 행이 없는데
-    // 스레드부터 묶으면, 여기서 실패했을 때 스레드가 막다른 곳이 된다.
-    await createBusJob({
-      token: outcome.token,
-      channelId: channel,
-      threadTs: ts,
-      sourceFile: file.name,
-      routeCount: outcome.routeCount,
-      semesterTypes: outcome.semesterTypes,
-      targetEnv: target.env,
+  // 시간표 파일이 여럿이면 사람이 고른다. 정규학기·계절학기가 따로 붙는 공지가 있다.
+  if (files.length > 1) {
+    const token = await saveBusDetected({
+      target: target.env,
+      articleId,
+      articleTitle: article.title ?? `게시글 ${articleId}`,
+      articleUrl,
+      files,
     });
-    await linkBusThread(channel, ts, outcome.token);
 
     await client.chat.update({
       channel,
       ts,
-      text: `버스 시간표 변환 완료 · ${outcome.routeCount}개`,
-      blocks: buildReviewApprovalBlocks(outcome, conversionTarget, actor),
+      text: "변환할 파일을 골라주세요",
+      blocks: [
+        ...section(
+          [
+            `:page_facing_up: *버스 시간표* · ${target.label}`,
+            `시간표 첨부가 *${files.length}개* 입니다. 변환할 파일을 골라주세요.`,
+            "",
+            ...files.slice(0, MAX_CHOICES).map((f, i) => `${i + 1}. ${f.name}`),
+          ].join("\n"),
+        ),
+        {
+          type: "actions",
+          elements: [
+            ...files.slice(0, MAX_CHOICES).map((f, index) => ({
+              type: "button" as const,
+              text: { type: "plain_text" as const, text: shorten(f.name), emoji: true },
+              style: index === 0 ? ("primary" as const) : undefined,
+              action_id: `bus:detected_start${index === 0 ? "" : `_${index}`}`,
+              value: JSON.stringify({ token, fileIndex: index }),
+            })),
+            {
+              type: "button" as const,
+              text: { type: "plain_text" as const, text: "아니요", emoji: true },
+              action_id: "bus:detected_ignore",
+              value: JSON.stringify({ token }),
+            },
+          ],
+        },
+      ],
     });
-  } catch (error) {
-    await say(
-      "버스 시간표 변환 실패",
-      `:x: *변환 실패*\n${error instanceof Error ? error.message : "알 수 없는 오류입니다"}\n${file.name} · 요청: <@${actor}>`,
-    );
+    return;
   }
+
+  await runConversion({
+    client,
+    channel,
+    ts,
+    actor,
+    env: target.env,
+    label: target.label,
+    file: files[0],
+  });
 }
 
 /** 버스 공지 감지. 등록표는 `blockAction.ts`가 모으기만 한다. */
