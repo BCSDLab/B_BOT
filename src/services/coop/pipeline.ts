@@ -66,29 +66,6 @@ export function buildRegularCoopArtifacts(
   };
 }
 
-export async function convertRegularCoopImage({
-  image,
-  mimeType,
-  fileName,
-  baseline,
-}: {
-  image: ArrayBuffer | Uint8Array;
-  mimeType: StructuredImageMimeType;
-  fileName: string;
-  baseline: CoopShopBaseline;
-}): Promise<RegularCoopArtifacts> {
-  const bytes = image instanceof Uint8Array ? image : new Uint8Array(image);
-  if (bytes.byteLength === 0) {
-    throw new Error("생협 시간표 이미지가 비어 있습니다.");
-  }
-  const raw = await extractRegularTimetable({
-    imageBase64: Buffer.from(bytes).toString("base64"),
-    mimeType,
-    fileName,
-  });
-  return buildRegularCoopArtifacts(raw, baseline);
-}
-
 export async function extractCoopImage({
   image,
   mimeType,
