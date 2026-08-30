@@ -145,7 +145,7 @@ export async function submitBusTimetables(
 }
 
 /**
- * 사이트에 노출되는 "버전" 문구만 갱신한다. 시간표 반영(PUT)과는 별개 API라
+ * 사이트에 노출되는 "버전" 문구만 갱신한다. 시간표 반영(PUT)과는 별개 API(POST)라
  * 현재 version 값을 먼저 읽어와야 한다 — 버전 API는 title/content만 바꿔도
  * version 필드를 함께 요구한다.
  */
@@ -171,7 +171,7 @@ export async function updateBusVersionViaAdminApi(
   }
 
   const updateResponse = await fetch(versionUrl, {
-    method: "PUT",
+    method: "POST",
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     headers,
     body: JSON.stringify({
@@ -181,6 +181,6 @@ export async function updateBusVersionViaAdminApi(
     }),
   });
   if (!updateResponse.ok) {
-    throw new Error(`Version Admin API PUT failed: ${updateResponse.status}`);
+    throw new Error(`Version Admin API POST failed: ${updateResponse.status}`);
   }
 }
