@@ -69,6 +69,11 @@ function collectReturnRules(workbook: AnalysedWorkbook): Map<string, number> {
  * arrival time (departure + time between the stop and the campus arrival on the
  * way in, so drop-off times grow monotonically). Request stops are labelled
  * "하차", matching the explicit 하교 tables the source already publishes.
+ *
+ * **정류장 순서는 등교와 그대로 같게 둔다(뒤집지 않는다).** KOIN에 실제로
+ * 반영할 때는 등교/하교가 한 문서의 route_info 배열 안에 같이 들어가야
+ * 하는데(뒤에서 병합한다), 그러려면 두 방향이 같은 node_info 순서를 공유
+ * 해야 각 위치의 도착시각이 같은 정류장을 가리킨다.
  */
 function mirrorRoute(route: BusRoute, departure: number): BusRoute | undefined {
   const trips: Array<{
@@ -87,7 +92,7 @@ function mirrorRoute(route: BusRoute, departure: number): BusRoute | undefined {
       // 그대로 베끼면 하교 노선도 "등교"로 잘못 분류된다).
       name: "하교",
       ...(trip.running_days ? { running_days: trip.running_days } : {}),
-      arrival_time: trip.arrival_time.slice().reverse().map((value) => {
+      arrival_time: trip.arrival_time.map((value) => {
         if (typeof value === "string") {
           const valueMinutes = parseTime(value);
           if (valueMinutes !== null)
@@ -101,7 +106,7 @@ function mirrorRoute(route: BusRoute, departure: number): BusRoute | undefined {
     region: route.region,
     route_type: "하교",
     route_name: route.route_name,
-    node_info: route.node_info.slice().reverse(),
+    node_info: route.node_info,
     route_info: trips,
   };
 }

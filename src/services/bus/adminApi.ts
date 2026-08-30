@@ -52,6 +52,58 @@ function shuttleRouteType(route: BusRoute): string {
 const adminRouteType = (route: BusRoute, target: BusTarget): string =>
   target === "commuting" ? "주중" : shuttleRouteType(route);
 
+/** Same stop names, either in the same order or exactly reversed; undefined if neither. */
+function nodeOrderRelation(
+  a: BusRoute["node_info"],
+  b: BusRoute["node_info"],
+): "same" | "reversed" | undefined {
+  if (a.length !== b.length || a.length === 0) return undefined;
+  if (a.every((node, index) => node.name === b[index].name)) return "same";
+  if (a.every((node, index) => node.name === b[a.length - 1 - index].name)) return "reversed";
+  return undefined;
+}
+
+/**
+ * KOIN Admin API의 commuting upsert 키는 (region, route_type, route_name,
+ * sub_name)인데, commuting route_type은 방향과 무관하게 항상 "주중"으로
+ * 고정해서 보낸다(`adminRouteType`). 그래서 같은 region+route_name의 등교와
+ * 하교를 별도 문서 두 개로 PUT하면 키가 완전히 같아져, 나중에 보낸 쪽이
+ * 먼저 것을 덮어쓴다(DB에 하교만 남는 이유). 정류장 순서가 같거나(등교 노선
+ * 역순 자동계산) 정확히 반대(원본에 별도 하교 표가 있는 경우)면 한 문서의
+ * route_info 배열로 합쳐서 이 충돌을 피한다. 정류장이 다르면(무관한 노선)
+ * 합치지 않는다.
+ */
+function mergeCommutingDirections(routes: BusRoute[]): BusRoute[] {
+  const merged: BusRoute[] = [];
+  const consumed = new Set<number>();
+  for (let index = 0; index < routes.length; index += 1) {
+    if (consumed.has(index)) continue;
+    let current = routes[index];
+    for (let other = index + 1; other < routes.length; other += 1) {
+      if (consumed.has(other)) continue;
+      const candidate = routes[other];
+      if (
+        candidate.region !== current.region ||
+        candidate.route_name !== current.route_name
+      )
+        continue;
+      const relation = nodeOrderRelation(current.node_info, candidate.node_info);
+      if (!relation) continue;
+      const candidateRouteInfo =
+        relation === "same"
+          ? candidate.route_info
+          : candidate.route_info.map((trip) => ({
+              ...trip,
+              arrival_time: [...trip.arrival_time].reverse(),
+            }));
+      current = { ...current, route_info: [...current.route_info, ...candidateRouteInfo] };
+      consumed.add(other);
+    }
+    merged.push(current);
+  }
+  return merged;
+}
+
 /**
  * Admin API가 정의한 필드만 남긴다. running_days 같은 검수 전용 필드는 보내지 않는다.
  * route_name과 정류장/회차 이름에서 괄호 안 내용을 분리해 sub_name/detail로 보낸다.
@@ -120,6 +172,9 @@ export async function submitBusTimetables(
     }
     const url = new URL(base + target.path);
     url.searchParams.set("semester_type", payload.semester_type);
+    const routes = Object.values(payload.body)[0];
+    const submittedRoutes =
+      payload.target === "commuting" ? mergeCommutingDirections(routes) : routes;
     const response = await fetch(url, {
       method: "PUT",
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
@@ -128,7 +183,7 @@ export async function submitBusTimetables(
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        [target.bodyKey]: Object.values(payload.body)[0].map((route) =>
+        [target.bodyKey]: submittedRoutes.map((route) =>
           toAdminRoute(route, payload.target),
         ),
       }),

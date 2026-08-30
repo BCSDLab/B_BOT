@@ -46,23 +46,26 @@ describe("synthesizeReturnRoutes: 등교 노선 역순 하교 자동 생성", ()
     // route_info[].name이 정확히 "등교"/"하교"인지로 구분한다. 등교 원본의
     // trip.name("1회")을 그대로 베끼면 하교도 "등교"로 잘못 분류된다.
     for (const trip of 하교.route_info) expect(trip.name).toBe("하교");
+    // 정류장 순서는 등교와 그대로 같다(뒤집지 않는다) — 실제 반영 시 등교/
+    // 하교가 한 문서의 route_info 배열로 병합되려면 같은 node_info 순서를
+    // 공유해야 한다.
     expect(하교.node_info.map((node) => node.name)).toEqual([
-      "대학(본교)",
-      "중앙@",
-      "동우@,신계초",
-      "부영@",
-      "청당동",
-      "한양수자인",
       "천안역",
+      "한양수자인",
+      "청당동",
+      "부영@",
+      "동우@,신계초",
+      "중앙@",
+      "대학(본교)",
     ]);
     expect(하교.route_info[0].arrival_time).toEqual([
-      "18:10",
-      "하차",
-      "하차",
-      "18:34",
-      "18:39",
-      "18:42",
       "18:50",
+      "18:42",
+      "18:39",
+      "18:34",
+      "하차",
+      "하차",
+      "18:10",
     ]);
     expect(하교.route_info[0].running_days).toEqual(["MON", "TUE", "WED", "THU", "FRI"]);
     expect(warnings).toEqual(["천안 하교는 등교 노선 역순(18:10 출발)으로 자동 계산해 추가했습니다."]);
@@ -99,8 +102,8 @@ describe("synthesizeReturnRoutes: 등교 노선 역순 하교 자동 생성", ()
     const [, 하교] = synthesizeReturnRoutes([route], wb, warnings);
 
     expect(하교).toBeDefined();
-    expect(하교!.node_info.map((node) => node.name)).toEqual(["대학(본교)", "정차장A", "온양온천역"]);
-    expect(하교!.route_info[0].arrival_time).toEqual(["18:10", null, "19:00"]);
+    expect(하교!.node_info.map((node) => node.name)).toEqual(["온양온천역", "정차장A", "대학(본교)"]);
+    expect(하교!.route_info[0].arrival_time).toEqual(["19:00", null, "18:10"]);
     expect(warnings).toEqual(["청주 하교는 등교 노선 역순(18:10 출발)으로 자동 계산해 추가했습니다."]);
   });
 

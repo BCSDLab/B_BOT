@@ -229,6 +229,132 @@ describe("버스 timetable 반영", () => {
     expect(applied).toEqual(["commuting/REGULAR"]);
   });
 
+  it("같은 지역·노선명의 통학 등교/하교는 한 문서로 합쳐서 보낸다", async () => {
+    // KOIN commuting upsert 키는 (region, route_type, route_name, sub_name)인데
+    // commuting route_type은 방향과 무관하게 "주중" 고정이다. 등교/하교를 별도
+    // 문서로 보내면 키가 같아져 나중 것이 먼저 것을 덮어쓴다(DB에 하교만 남는
+    // 버그의 원인) — 정류장 순서가 같으면 한 문서의 route_info로 합쳐야 한다.
+    const bothDirections: BusConversion = {
+      ...conversion,
+      payloads: [
+        {
+          target: "commuting",
+          semester_type: "REGULAR",
+          body: {
+            commuting_bus_timetables: [
+              {
+                region: "천안",
+                route_type: "등교",
+                route_name: "터미널",
+                node_info: [{ name: "터미널" }, { name: "대학" }],
+                route_info: [{ name: "등교", arrival_time: ["08:10", "08:50"] }],
+              },
+              {
+                region: "천안",
+                route_type: "하교",
+                route_name: "터미널",
+                node_info: [{ name: "터미널" }, { name: "대학" }],
+                route_info: [{ name: "하교", arrival_time: ["18:50", "18:10"] }],
+              },
+            ],
+          },
+        },
+      ],
+    };
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await submitBusTimetables([bothDirections], auth);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const body = JSON.parse(String((fetchMock.mock.calls[0] as [URL, RequestInit])[1].body));
+    expect(body.commuting_bus_timetables).toHaveLength(1);
+    expect(body.commuting_bus_timetables[0].route_info).toEqual([
+      { name: "등교", detail: null, arrival_time: ["08:10", "08:50"] },
+      { name: "하교", detail: null, arrival_time: ["18:50", "18:10"] },
+    ]);
+  });
+
+  it("정류장 순서가 정반대인 등교/하교도 순서를 맞춰 한 문서로 합친다", async () => {
+    const reversedOrder: BusConversion = {
+      ...conversion,
+      payloads: [
+        {
+          target: "commuting",
+          semester_type: "REGULAR",
+          body: {
+            commuting_bus_timetables: [
+              {
+                region: "세종",
+                route_type: "등교",
+                route_name: "세종",
+                node_info: [{ name: "정류장A" }, { name: "대학" }],
+                route_info: [{ name: "등교", arrival_time: ["08:00", "08:50"] }],
+              },
+              {
+                region: "세종",
+                route_type: "하교",
+                route_name: "세종",
+                // 원본에 별도로 실린 하교 표라 정류장 순서가 정반대다.
+                node_info: [{ name: "대학" }, { name: "정류장A" }],
+                route_info: [{ name: "하교", arrival_time: ["18:10", "18:30"] }],
+              },
+            ],
+          },
+        },
+      ],
+    };
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await submitBusTimetables([reversedOrder], auth);
+
+    const body = JSON.parse(String((fetchMock.mock.calls[0] as [URL, RequestInit])[1].body));
+    expect(body.commuting_bus_timetables).toHaveLength(1);
+    // 등교 노선(정류장A→대학) 순서에 맞춰 하교의 도착시각도 반대로 뒤집는다.
+    expect(body.commuting_bus_timetables[0].route_info).toEqual([
+      { name: "등교", detail: null, arrival_time: ["08:00", "08:50"] },
+      { name: "하교", detail: null, arrival_time: ["18:30", "18:10"] },
+    ]);
+  });
+
+  it("정류장이 다른 노선은 이름이 같아도 합치지 않는다", async () => {
+    const unrelated: BusConversion = {
+      ...conversion,
+      payloads: [
+        {
+          target: "commuting",
+          semester_type: "REGULAR",
+          body: {
+            commuting_bus_timetables: [
+              {
+                region: "천안",
+                route_type: "등교",
+                route_name: "터미널",
+                node_info: [{ name: "터미널" }, { name: "대학" }],
+                route_info: [{ name: "등교", arrival_time: ["08:10", "08:50"] }],
+              },
+              {
+                region: "천안",
+                route_type: "하교",
+                route_name: "터미널",
+                node_info: [{ name: "터미널" }, { name: "두정역" }, { name: "대학" }],
+                route_info: [{ name: "하교", arrival_time: ["18:10", "18:20", "18:50"] }],
+              },
+            ],
+          },
+        },
+      ],
+    };
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await submitBusTimetables([unrelated], auth);
+
+    const body = JSON.parse(String((fetchMock.mock.calls[0] as [URL, RequestInit])[1].body));
+    expect(body.commuting_bus_timetables).toHaveLength(2);
+  });
+
   it("올바르지 않은 body_key면 보내기 전에 거부한다", async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
