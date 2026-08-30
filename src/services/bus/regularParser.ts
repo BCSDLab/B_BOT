@@ -434,14 +434,18 @@ function standaloneTables(
         }))
         .filter((info) => info.arrival_time.some((value) => value !== null));
       if (routeInfo.length) {
+        const region =
+          sourceRegion(`${title} ${usedRows.map((row) => row.name).join(" ")}`) ??
+          "천안";
         routes.push({
           target,
           route: {
-            region:
-              sourceRegion(`${title} ${usedRows.map((row) => row.name).join(" ")}`) ??
-              "천안",
+            region,
             route_type: direction,
-            route_name: shuttleRouteName(sheet, header, title),
+            // 통학(commuting) 노선은 등교/하교 방향이 route_info[].name과
+            // route_type에 이미 담기니, route_name엔 지역명만 남긴다
+            // (프로덕션 실제 표기: "세종 등교/하교"가 아니라 "세종").
+            route_name: target === "commuting" ? region : shuttleRouteName(sheet, header, title),
             node_info: usedRows.map((row) => ({ name: row.name })),
             route_info: routeInfo,
           },
@@ -488,20 +492,31 @@ function seoulGrids(
         break;
       }
     }
-    // "교대 출발"/"동천 출발"은 배차가 어디서 출발하는 차량인지 적어둔
-    // 것일 뿐, 학생 입장에선 같은 서울 노선의 1·2·3호차다. 노선을 가르지
-    // 않고 표에 나온 컬럼 순서 그대로 한 노선에 담는다.
-    const nodeRows: Array<{ row: number; name: string }> = [];
-    for (let row = header.row + 1; row < tableEnd; row += 1) {
-      const name = clean(at.get(key(row, header.column)));
-      if (!name) continue;
-      const hasAny = tripColumns.some(
-        (column) => arrival(at.get(key(row, column))) !== undefined,
-      );
-      if (hasAny) nodeRows.push({ row, name });
+    // "교대 출발"/"동천 출발"처럼 회차 헤더 한 줄 위에 출발지가 따로 있으면
+    // 그 출발지별로 노선을 가른다 — 프로덕션 데이터의 실제 표기("서울 등교
+    // 추가 교대역"/"서울 등교 추가 동천역")가 이렇게 나뉘어 있다. 출발지
+    // 표기가 없으면 컬럼별로 서로 다른 그룹 키를 줘서 갈라둔다.
+    const originRow = header.row - 1;
+    const groups = new Map<string, { origin: string | null; columns: number[] }>();
+    for (const column of tripColumns) {
+      const origin = clean(at.get(key(originRow, column))) || null;
+      const groupKey = origin ?? `column:${column}`;
+      const group = groups.get(groupKey) ?? { origin, columns: [] };
+      group.columns.push(column);
+      groups.set(groupKey, group);
     }
-    if (nodeRows.length) {
-      const routeInfo = tripColumns
+    for (const { origin, columns } of groups.values()) {
+      const nodeRows: Array<{ row: number; name: string }> = [];
+      for (let row = header.row + 1; row < tableEnd; row += 1) {
+        const name = clean(at.get(key(row, header.column)));
+        if (!name) continue;
+        const hasAny = columns.some(
+          (column) => arrival(at.get(key(row, column))) !== undefined,
+        );
+        if (hasAny) nodeRows.push({ row, name });
+      }
+      if (!nodeRows.length) continue;
+      const routeInfo = columns
         .map((column) => {
           const label = clean(at.get(key(header.row, column)));
           return {
@@ -515,18 +530,20 @@ function seoulGrids(
           };
         })
         .filter((info) => info.arrival_time.some((value) => value !== null));
-      if (routeInfo.length) {
-        routes.push({
-          target: "commuting",
-          route: {
-            region: "서울",
-            route_type: "등교",
-            route_name: "서울",
-            node_info: nodeRows.map((row) => ({ name: row.name })),
-            route_info: routeInfo,
-          },
-        });
-      }
+      if (!routeInfo.length) continue;
+      const originStation = origin
+        ? origin.replace(/\s*출발\s*$/, "").replace(/(?<!역)$/, "역")
+        : undefined;
+      routes.push({
+        target: "commuting",
+        route: {
+          region: "서울",
+          route_type: "등교",
+          route_name: originStation ? `서울 등교 추가 ${originStation}` : "서울",
+          node_info: nodeRows.map((row) => ({ name: row.name })),
+          route_info: routeInfo,
+        },
+      });
     }
   }
   return routes;
@@ -645,24 +662,30 @@ function arrowTextRoutes(
     // 사라진다.
     const dayLabel = days?.length === 1 ? KOREAN_DAY[days[0]] : undefined;
     const direction = /대학|본교/.test(nodes[0]) ? "하교" : "등교";
-    routes.push({
-      target: "commuting",
-      route: {
-        region,
-        route_type: direction,
-        route_name: dayLabel ? `${region}(${dayLabel})` : region,
-        node_info: nodes.map((name) => ({ name })),
-        // KOIN 사이트는 route_type이 WEEKDAYS(통학)인 노선의 등교/하교를
-        // route_info[].name이 정확히 "등교"/"하교"인지로 구분한다.
-        route_info: Array.from({ length: tripCount }, (_, index) => ({
-          name: direction,
-          ...(days ? { running_days: days } : {}),
-          arrival_time: nodes.map(
-            (_, nodeIndex) => perNode[nodeIndex]?.[index] ?? null,
-          ),
-        })),
-      },
-    });
+    // 프로덕션 표기(예: "대전 등교 1"/"대전 등교 2")는 배차가 여러 개면
+    // 노선 자체를 회차마다 별도 문서로 나눈다 — 한 문서에 route_info를
+    // 여러 개 넣지 않는다. 배차가 하나뿐이면 번호 없이 지역명만 쓴다.
+    for (let index = 0; index < tripCount; index += 1) {
+      const suffix = tripCount > 1 ? ` ${direction} ${index + 1}` : "";
+      routes.push({
+        target: "commuting",
+        route: {
+          region,
+          route_type: direction,
+          route_name: `${region}${suffix}${dayLabel ? `(${dayLabel})` : ""}`,
+          node_info: nodes.map((name) => ({ name })),
+          // KOIN 사이트는 route_type이 WEEKDAYS(통학)인 노선의 등교/하교를
+          // route_info[].name이 정확히 "등교"/"하교"인지로 구분한다.
+          route_info: [
+            {
+              name: direction,
+              ...(days ? { running_days: days } : {}),
+              arrival_time: nodes.map((_, nodeIndex) => perNode[nodeIndex]?.[index] ?? null),
+            },
+          ],
+        },
+      });
+    }
   }
   return routes;
 }

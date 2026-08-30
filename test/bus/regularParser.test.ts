@@ -144,7 +144,7 @@ describe("parseStructuredWorkbook", () => {
     expect(route!.route.route_info.map((trip) => trip.name)).toEqual(["1회", "2회"]);
   });
 
-  it("서울 노선은 출발지가 달라도 가르지 않고 표에 나온 순서대로 한 노선에 담는다", () => {
+  it("서울 노선은 출발지별로 나누고 프로덕션 표기('서울 등교 추가 OO역')를 따른다", () => {
     const seoul: AnalysedWorkbook = {
       sheets: [
         {
@@ -183,11 +183,13 @@ describe("parseStructuredWorkbook", () => {
 
     const routes = parseStructuredWorkbook(seoul);
     const seoulRoutes = routes.filter((r) => r.route.region === "서울");
-    expect(seoulRoutes).toHaveLength(1);
+    expect(seoulRoutes.map((r) => r.route.route_name).sort()).toEqual([
+      "서울 등교 추가 교대역",
+      "서울 등교 추가 동천역",
+    ]);
 
-    const [seoulRoute] = seoulRoutes;
-    expect(seoulRoute.route.route_name).toBe("서울");
-    expect(seoulRoute.route.node_info).toEqual([
+    const gyodae = seoulRoutes.find((r) => r.route.route_name === "서울 등교 추가 교대역")!;
+    expect(gyodae.route.node_info).toEqual([
       { name: "교대역" },
       { name: "동천역" },
       { name: "대학" },
@@ -195,14 +197,16 @@ describe("parseStructuredWorkbook", () => {
     // KOIN 사이트는 route_type이 WEEKDAYS(통학)인 노선의 등교/하교를
     // route_info[].name이 정확히 "등교"/"하교"인지로 구분하므로, 회차가
     // 여러 개여도 전부 "등교"로 남는다(구분은 arrival_time·running_days로).
-    expect(seoulRoute.route.route_info.map((trip) => trip.name)).toEqual([
-      "등교",
-      "등교",
-      "등교",
-      "등교",
-    ]);
-    expect(seoulRoute.route.route_info[0].arrival_time).toEqual(["07:10", null, "08:40"]);
-    expect(seoulRoute.route.route_info[3].arrival_time).toEqual([null, "07:30", "08:40"]);
+    expect(gyodae.route.route_info.map((trip) => trip.name)).toEqual(["등교", "등교", "등교"]);
+    expect(gyodae.route.route_info[0].arrival_time).toEqual(["07:10", null, "08:40"]);
+
+    const dongcheon = seoulRoutes.find((r) => r.route.route_name === "서울 등교 추가 동천역")!;
+    expect(dongcheon.route.node_info).toEqual([{ name: "동천역" }, { name: "대학" }]);
+    expect(dongcheon.route.route_info).toHaveLength(1);
+    expect(dongcheon.route.route_info[0]).toMatchObject({
+      name: "등교",
+      arrival_time: ["07:30", "08:40"],
+    });
   });
 
   it("서울 하교는 '노선' 헤더 없이 한 칸에 뭉친 요일별 출발시각을 회차로 나눈다", () => {
