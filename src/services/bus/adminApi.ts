@@ -94,7 +94,11 @@ export class BusAdminApiError extends Error {
  *
  * PUT은 payload(대상 × 학기)마다 따로 나간다. 중간에 실패하면 앞선 PUT은 이미
  * 반영된 상태로 남는다 — `onApplied`로 어디까지 갔는지 호출자에게 알려준다.
- * 각 PUT은 전체 시간표를 통째로 덮어써서 재시도해도 안전하다.
+ *
+ * **주의: 이 PUT은 upsert다, 전체 교체가 아니다.** 새 payload에 없는 옛 노선은
+ * 지워지지 않고 그대로 남는다(삭제/조회 API가 없어 여기서 정리할 방법도 없다).
+ * 노선 이름·구성이 바뀌는 반영(오늘 같은 파서 수정 이후 재반영 등) 뒤에는 옛
+ * 이름의 고아 노선이 없는지 사람이 직접 확인해야 한다.
  */
 export async function submitBusTimetables(
   conversions: BusConversion[],

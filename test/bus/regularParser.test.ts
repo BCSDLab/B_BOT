@@ -209,4 +209,81 @@ describe("parseStructuredWorkbook", () => {
       arrival_time: ["07:30", "08:40"],
     });
   });
+
+  it("서울 하교는 '노선' 헤더 없이 한 칸에 뭉친 요일별 출발시각을 회차로 나눈다", () => {
+    const seoulReturn: AnalysedWorkbook = {
+      sheets: [
+        {
+          name: "REGULAR",
+          cells: [
+            cell(0, 1, "서울(월~금요일) 안내"),
+            cell(5, 1, "대학"),
+            cell(5, 4, "14:10(금), 18:10(월~금)"),
+            cell(6, 1, "죽전"),
+            cell(6, 4, "하차"),
+            cell(7, 1, "교대"),
+            cell(7, 4, "하차"),
+          ],
+          merges: [],
+        },
+      ],
+      tables: [],
+    };
+
+    const routes = parseStructuredWorkbook(seoulReturn);
+    const route = routes.find(
+      (r) => r.route.region === "서울" && r.route.route_type === "하교",
+    );
+    expect(route).toBeDefined();
+    expect(route!.route.route_name).toBe("서울");
+    expect(route!.route.node_info).toEqual([
+      { name: "대학" },
+      { name: "죽전" },
+      { name: "교대" },
+    ]);
+    expect(route!.route.route_info).toEqual([
+      {
+        name: "14:10(금)",
+        running_days: ["FRI"],
+        arrival_time: ["14:10", "하차", "하차"],
+      },
+      {
+        name: "18:10(월~금)",
+        running_days: ["MON", "TUE", "WED", "THU", "FRI"],
+        arrival_time: ["18:10", "하차", "하차"],
+      },
+    ]);
+  });
+
+  it("통학 표 제목에 요일이 없으면(예: 세종) 평일 운행을 기본값으로 둔다", () => {
+    const noDayTitle: AnalysedWorkbook = {
+      sheets: [
+        {
+          name: "REGULAR",
+          cells: [
+            cell(0, 1, "세종 등교/하교"),
+            cell(1, 1, "정류장"),
+            cell(1, 4, "예정시간"),
+            cell(2, 1, "정류장A"),
+            cell(2, 4, "07:20"),
+            cell(3, 1, "대학"),
+            cell(3, 4, "08:50"),
+          ],
+          merges: [],
+        },
+      ],
+      tables: [],
+    };
+
+    const routes = parseStructuredWorkbook(noDayTitle);
+    const route = routes.find((r) => r.target === "commuting");
+    expect(route).toBeDefined();
+    expect(route!.route.route_info[0].running_days).toEqual([
+      "MON",
+      "TUE",
+      "WED",
+      "THU",
+      "FRI",
+    ]);
+  });
 });

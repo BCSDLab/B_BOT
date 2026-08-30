@@ -401,10 +401,17 @@ function standaloneTables(
       ),
     );
     if (usedRows.length) {
+      // 통학(commuting) 표는 요일 표기가 원문에 없으면 평일 운행이 기본값이다
+      // (regionalMatrices의 통학 노선도 같은 기본값을 쓴다). 셔틀 표는 표 자체가
+      // 특정 요일 전용(토요일 등)일 때만 이 표를 타므로 강제하지 않는다.
+      const defaultDays =
+        target === "commuting" ? [...WEEKDAYS] : undefined;
       const routeInfo = tripColumns
         .map((trip) => ({
           name: trip.label,
-          ...(sourceDays(title) ? { running_days: sourceDays(title) } : {}),
+          ...((sourceDays(title) ?? defaultDays)
+            ? { running_days: sourceDays(title) ?? defaultDays }
+            : {}),
           arrival_time: usedRows.map(
             (row) => arrival(at.get(key(row.row, trip.column))) ?? null,
           ),
@@ -520,6 +527,71 @@ function seoulGrids(
   return routes;
 }
 
+const MULTI_DEPARTURE = /(\d{1,2}:\d{2})\(([^)]+)\)/g;
+
+/**
+ * 서울 하교처럼 "노선"/"정류장" 헤더 없이, 출발 정류장 한 칸에 요일별 출발
+ * 여러 회차가 "14:10(금), 16:10(금), 18:10(월~금)"처럼 쉼표로 뭉쳐 있고
+ * 그 아래 정류장들은 전부 "하차"만 적힌 표를 읽는다. 뒤 정류장들은 회차별
+ * 도착시각이 원문에 따로 없으니 모든 회차가 같은 "하차" 값을 공유한다.
+ */
+function seoulReturnRoutes(
+  sheet: AnalysedSheet,
+): Array<{ target: BusTarget; route: BusRoute }> {
+  const at = values(sheet);
+  const routes: Array<{ target: BusTarget; route: BusRoute }> = [];
+  for (const anchor of sheet.cells.filter(
+    (cell) =>
+      isMaster(cell) &&
+      typeof cell.value === "string" &&
+      [...cell.value.matchAll(MULTI_DEPARTURE)].length >= 2,
+  )) {
+    const nearbySeoul = sheet.cells.some(
+      (cell) =>
+        cell.row < anchor.row &&
+        cell.row >= anchor.row - 15 &&
+        /서울/.test(clean(cell.value)),
+    );
+    if (!nearbySeoul) continue;
+    const originCell = sheet.cells
+      .filter((cell) => cell.row === anchor.row && cell.column < anchor.column)
+      .sort((left, right) => right.column - left.column)[0];
+    if (!originCell) continue;
+    const nameColumn = originCell.column;
+    const nodes: Array<{ row: number; name: string }> = [
+      { row: anchor.row, name: clean(originCell.value) },
+    ];
+    for (let row = anchor.row + 1; row < anchor.row + 15; row += 1) {
+      const name = clean(at.get(key(row, nameColumn)));
+      if (!name || /^(운행기간|★|.*시간표|.*셔틀버스)/.test(name)) break;
+      nodes.push({ row, name });
+    }
+    if (nodes.length < 2) continue;
+    const dispatches = [...String(anchor.value).matchAll(MULTI_DEPARTURE)];
+    const routeInfo = dispatches.map((match) => ({
+      name: `${match[1]}(${match[2]})`,
+      ...(sourceDays(match[2]) ? { running_days: sourceDays(match[2]) } : {}),
+      arrival_time: [
+        match[1],
+        ...nodes
+          .slice(1)
+          .map((node) => arrival(at.get(key(node.row, anchor.column))) ?? null),
+      ],
+    }));
+    routes.push({
+      target: "commuting",
+      route: {
+        region: "서울",
+        route_type: "하교",
+        route_name: "서울",
+        node_info: nodes.map((node) => ({ name: node.name })),
+        route_info: routeInfo,
+      },
+    });
+  }
+  return routes;
+}
+
 function timeParts(text: string): string[] {
   return [...text.matchAll(/(?<!\d)([0-2]?\d)(?:시|:)([0-5]\d)?/g)].map(
     (match) =>
@@ -603,6 +675,7 @@ export function parseStructuredWorkbook(workbook: AnalysedWorkbook) {
       ...regionalMatrices(sheet),
       ...standaloneTables(sheet),
       ...seoulGrids(sheet),
+      ...seoulReturnRoutes(sheet),
       ...arrowTextRoutes(sheet),
     ]),
   );
