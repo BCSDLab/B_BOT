@@ -369,6 +369,63 @@ describe("버스 timetable 반영", () => {
     ]);
   });
 
+  it("서울 교대역처럼 이름이 다른 같은 정류장(교대 = 3호선 교대역 14번 출구)은 중복 없이 하나로 합친다", async () => {
+    const seoulGyodae: BusConversion = {
+      ...conversion,
+      payloads: [
+        {
+          target: "commuting",
+          semester_type: "REGULAR",
+          body: {
+            commuting_bus_timetables: [
+              {
+                region: "서울",
+                route_type: "등교",
+                route_name: "서울 교대역",
+                node_info: [
+                  { name: "3호선 교대역 14번 출구(메가커피앞)" },
+                  { name: "죽전 정류장(간이)" },
+                  { name: "대학" },
+                ],
+                route_info: [{ name: "등교", arrival_time: ["07:20", "07:40", "08:50"] }],
+              },
+              {
+                region: "서울",
+                route_type: "하교",
+                route_name: "서울 교대역",
+                node_info: [
+                  { name: "대학" },
+                  { name: "죽전 정류장(간이)" },
+                  { name: "남부터미널" },
+                  { name: "교대" },
+                ],
+                route_info: [{ name: "하교", arrival_time: ["18:10", "하차", "하차", "하차"] }],
+              },
+            ],
+          },
+        },
+      ],
+    };
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await submitBusTimetables([seoulGyodae], auth);
+
+    const body = JSON.parse(String((fetchMock.mock.calls[0] as [URL, RequestInit])[1].body));
+    expect(body.commuting_bus_timetables).toHaveLength(1);
+    // "교대"가 "3호선 교대역 14번 출구"와 별개 정류장으로 중복 추가되지 않는다.
+    expect(body.commuting_bus_timetables[0].node_info.map((n: { name: string }) => n.name)).toEqual([
+      "3호선 교대역 14번 출구",
+      "죽전 정류장",
+      "대학",
+      "남부터미널",
+    ]);
+    expect(body.commuting_bus_timetables[0].route_info).toEqual([
+      { name: "등교", detail: null, arrival_time: ["07:20", "07:40", "08:50", null] },
+      { name: "하교", detail: null, arrival_time: ["하차", "하차", "18:10", "하차"] },
+    ]);
+  });
+
   it("정류장을 하나도 공유하지 않는 노선은 이름이 같아도 합치지 않는다", async () => {
     const unrelated: BusConversion = {
       ...conversion,

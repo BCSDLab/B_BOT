@@ -64,6 +64,19 @@ function nodeOrderRelation(
 }
 
 /**
+ * 이름이 달라도 같은 물리적 정류장인 경우(예: 서울 하교 종점 "교대"는 등교
+ * 출발점 "3호선 교대역 14번 출구(메가커피앞)"와 같은 곳이다 — 확인됨).
+ * 정류장 이름만 보고는 기계적으로 판단할 수 없어 알려진 짝만 표로 둔다.
+ * 이 시점(제출 직전 병합)의 node_info.name은 아직 `splitParen` 전 원문
+ * 그대로라 괄호까지 포함된 값으로 등록해 둔다. 동일성 판단에만 쓰고, 실제
+ * 표시 이름은 먼저 등장한(=등교 쪽) 원문 그대로 남긴다.
+ */
+const NODE_NAME_ALIASES: Record<string, string> = {
+  교대: "3호선 교대역 14번 출구(메가커피앞)",
+};
+const nodeMergeKey = (name: string) => NODE_NAME_ALIASES[name] ?? name;
+
+/**
  * 등교/하교가 정류장을 일부만 공유하는 경우(예: 서울 교대역 — 등교는
  * 동천역·신갈을 거치고 하교는 대신 남부터미널에서 내린다) 정류장 목록을
  * 합집합으로 만들고, 각 회차는 자신이 실제로 서는 자리에만 시간을 채우고
@@ -75,23 +88,27 @@ function nodeOrderRelation(
  */
 function unionMergeNodes(a: BusRoute, b: BusRoute): BusRoute | undefined {
   const shared = a.node_info.some((nodeA) =>
-    b.node_info.some((nodeB) => nodeB.name === nodeA.name),
+    b.node_info.some((nodeB) => nodeMergeKey(nodeB.name) === nodeMergeKey(nodeA.name)),
   );
   if (!shared) return undefined;
   const names: string[] = [];
   const seen = new Set<string>();
   for (const route of [a, b])
-    for (const node of route.node_info)
-      if (!seen.has(node.name)) {
-        seen.add(node.name);
+    for (const node of route.node_info) {
+      const key = nodeMergeKey(node.name);
+      if (!seen.has(key)) {
+        seen.add(key);
         names.push(node.name);
       }
+    }
   const remap = (route: BusRoute) => {
-    const indexByName = new Map(route.node_info.map((node, index) => [node.name, index]));
+    const indexByKey = new Map(
+      route.node_info.map((node, index) => [nodeMergeKey(node.name), index]),
+    );
     return route.route_info.map((trip) => ({
       ...trip,
       arrival_time: names.map((name) => {
-        const index = indexByName.get(name);
+        const index = indexByKey.get(nodeMergeKey(name));
         return index === undefined ? null : trip.arrival_time[index];
       }),
     }));
