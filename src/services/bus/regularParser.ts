@@ -490,6 +490,15 @@ function standaloneTables(
         const region =
           sourceRegion(`${title} ${usedRows.map((row) => row.name).join(" ")}`) ??
           "천안";
+        // KOIN Admin API는 route_info[].running_days를 받지 않는다. 셔틀
+        // 노선이 특정 요일(예: 토요일) 전용이면 그 제한이 route_name 뒤
+        // 괄호(→ sub_name)로만 살아남는다 — 안 붙이면 조용히 사라진다(프로덕션
+        // 실제 데이터 `_id: 675ab70cff5ec5aab5eaee3e` "일학습병행대학 시내"
+        // sub_name "토요일" 확인됨). 표 전체가 하루로만 도는 게 확실할 때만
+        // 붙이고, 요일이 여럿 섞여 있으면(예: 평일 순환) 잘못 단정하지 않는다.
+        const shuttleDays = target === "shuttle" ? sourceDays(title) : undefined;
+        const shuttleDaySuffix =
+          shuttleDays?.length === 1 ? `(${KOREAN_DAY[shuttleDays[0]]})` : "";
         routes.push({
           target,
           route: {
@@ -498,7 +507,10 @@ function standaloneTables(
             // 통학(commuting) 노선은 등교/하교 방향이 route_info[].name과
             // route_type에 이미 담기니, route_name엔 지역명만 남긴다
             // (프로덕션 실제 표기: "세종 등교/하교"가 아니라 "세종").
-            route_name: target === "commuting" ? region : shuttleRouteName(sheet, header, title),
+            route_name:
+              target === "commuting"
+                ? region
+                : `${shuttleRouteName(sheet, header, title)}${shuttleDaySuffix}`,
             node_info: usedRows.map((row) => ({ name: row.name })),
             route_info: routeInfo,
           },

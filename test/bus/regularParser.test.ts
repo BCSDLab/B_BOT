@@ -100,7 +100,9 @@ describe("parseStructuredWorkbook", () => {
     };
 
     const routes = parseStructuredWorkbook(weekend);
-    const route = routes.find((r) => r.route.route_name === "일학습병행대학 천안시내");
+    // KOIN Admin API는 route_info[].running_days를 받지 않으므로, 토요일
+    // 전용 셔틀이라는 제한은 route_name 뒤 괄호(→ sub_name)로만 남는다.
+    const route = routes.find((r) => r.route.route_name === "일학습병행대학 천안시내(토요일)");
     expect(route).toBeDefined();
     expect(route!.target).toBe("shuttle");
     expect(route!.route.route_info.map((trip) => trip.name)).toEqual([
