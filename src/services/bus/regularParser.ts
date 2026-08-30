@@ -541,32 +541,44 @@ function seoulGrids(
         }))
         .filter((trip) => trip.arrival_time.some((value) => value !== null));
       if (!trips.length) continue;
-      const baseName = originStation ? `서울 등교 추가 ${originStation}` : "서울";
-      // 프로덕션 표기(예: "서울 하교 추가 1"/"서울 하교 추가 2")는 배차가
-      // 여러 개면(예: 같은 출발지의 월요일 1호차/2호차) 노선을 회차마다 별도
-      // 문서로 나눈다 — 한 route_name 아래 sub_name만 다르게 묶으면 앱에서
-      // 같은 이름의 노선이 두 번 뜨는 문제가 있었다. 요일은 KOIN Admin API가
+      // 프로덕션 표기(예: `_id: 69a5a710...` "서울 교대역" sub_name "주중" vs
+      // `_id: 675ab6d6...` "서울 등교 추가 교대역" sub_name "월요일")는 매일
+      // 도는 기본 배차와 특정 요일에만 도는 추가 배차의 route_name 자체가
+      // 다르다 — "등교 추가"는 추가 배차에만 붙는다. 배차가 여러 개면(같은
+      // 요일 그룹 안에 1호차/2호차 등) 회차마다 별도 문서로 나눈다 — 한
+      // route_name 아래 sub_name만 다르게 묶으면 앱에서 같은 이름 노선이 두
+      // 번 뜨는 문제가 있었다. 요일은 KOIN Admin API가
       // route_info[].running_days를 받지 않으므로(name/detail/arrival_time만
       // 있다) route_name 뒤 괄호(→ sub_name)로 담는다.
-      trips.forEach((trip, index) => {
-        const name = trips.length > 1 ? `${baseName} ${index + 1}` : baseName;
-        routes.push({
-          target: "commuting",
-          route: {
-            region: "서울",
-            route_type: "등교",
-            route_name: `${name}(${dayGroupLabel(trip.label)})`,
-            node_info: nodeRows.map((row) => ({ name: row.name })),
-            route_info: [
-              {
-                name: "등교",
-                ...(sourceDays(trip.label) ? { running_days: sourceDays(trip.label) } : {}),
-                arrival_time: trip.arrival_time,
-              },
-            ],
-          },
+      const weekdayBase = originStation ? `서울 ${originStation}` : "서울";
+      const additionalBase = originStation ? `서울 등교 추가 ${originStation}` : "서울 등교 추가";
+      const dayGroups = new Map<string, typeof trips>();
+      for (const trip of trips) {
+        const day = dayGroupLabel(trip.label);
+        dayGroups.set(day, [...(dayGroups.get(day) ?? []), trip]);
+      }
+      for (const [day, dayTrips] of dayGroups) {
+        const base = day === "주중" ? weekdayBase : additionalBase;
+        dayTrips.forEach((trip, index) => {
+          const name = dayTrips.length > 1 ? `${base} ${index + 1}` : base;
+          routes.push({
+            target: "commuting",
+            route: {
+              region: "서울",
+              route_type: "등교",
+              route_name: `${name}(${day})`,
+              node_info: nodeRows.map((row) => ({ name: row.name })),
+              route_info: [
+                {
+                  name: "등교",
+                  ...(sourceDays(trip.label) ? { running_days: sourceDays(trip.label) } : {}),
+                  arrival_time: trip.arrival_time,
+                },
+              ],
+            },
+          });
         });
-      });
+      }
     }
   }
   return routes;
@@ -613,34 +625,40 @@ function seoulReturnRoutes(
     }
     if (nodes.length < 2) continue;
     const dispatches = [...String(anchor.value).matchAll(MULTI_DEPARTURE)];
-    // 프로덕션 표기(예: "서울 하교 추가 1"/"서울 하교 추가 2")처럼 배차가
-    // 여러 개면 회차마다 별도 문서로 나눈다 — 등교 쪽과 같은 이유(한 route_name
-    // 아래 sub_name만 다르게 묶으면 앱에서 같은 이름 노선이 두 번 뜨는 문제).
-    const baseName = dispatches.length > 1 ? "서울 하교 추가" : "서울";
-    dispatches.forEach((match, index) => {
-      const name = dispatches.length > 1 ? `${baseName} ${index + 1}` : baseName;
-      routes.push({
-        target: "commuting",
-        route: {
-          region: "서울",
-          route_type: "하교",
-          route_name: `${name}(${dayGroupLabel(match[2])})`,
-          node_info: nodes.map((node) => ({ name: node.name })),
-          route_info: [
-            {
-              name: "하교",
-              ...(sourceDays(match[2]) ? { running_days: sourceDays(match[2]) } : {}),
-              arrival_time: [
-                match[1],
-                ...nodes
-                  .slice(1)
-                  .map((node) => arrival(at.get(key(node.row, anchor.column))) ?? null),
-              ],
-            },
-          ],
-        },
+    // 등교 쪽과 같은 이유로, 매일 도는 기본 배차(주중)는 "하교 추가" 없이
+    // 그냥 "서울"로, 특정 요일에만 도는 추가 배차만 "서울 하교 추가"로 나눈다.
+    const dayGroups = new Map<string, RegExpMatchArray[]>();
+    for (const match of dispatches) {
+      const day = dayGroupLabel(match[2]);
+      dayGroups.set(day, [...(dayGroups.get(day) ?? []), match]);
+    }
+    for (const [day, dayDispatches] of dayGroups) {
+      const base = day === "주중" ? "서울" : "서울 하교 추가";
+      dayDispatches.forEach((match, index) => {
+        const name = dayDispatches.length > 1 ? `${base} ${index + 1}` : base;
+        routes.push({
+          target: "commuting",
+          route: {
+            region: "서울",
+            route_type: "하교",
+            route_name: `${name}(${day})`,
+            node_info: nodes.map((node) => ({ name: node.name })),
+            route_info: [
+              {
+                name: "하교",
+                ...(sourceDays(match[2]) ? { running_days: sourceDays(match[2]) } : {}),
+                arrival_time: [
+                  match[1],
+                  ...nodes
+                    .slice(1)
+                    .map((node) => arrival(at.get(key(node.row, anchor.column))) ?? null),
+                ],
+              },
+            ],
+          },
+        });
       });
-    });
+    }
   }
   return routes;
 }

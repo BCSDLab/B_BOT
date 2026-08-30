@@ -183,15 +183,17 @@ describe("parseStructuredWorkbook", () => {
 
     const routes = parseStructuredWorkbook(seoul);
     const seoulRoutes = routes.filter((r) => r.route.region === "서울");
-    // 프로덕션 표기(예: "서울 하교 추가 1"/"서울 하교 추가 2")를 따라, 배차가
-    // 여러 개면(교대역: 월(1호차)/월(2호차)/화~금) 한 route_name에 route_info를
-    // 여러 개 담지 않고 회차마다 별도 문서로 나눈다 — 같은 route_name 아래
-    // sub_name만 다르게 묶으면 앱에서 같은 이름 노선이 두 번 뜨는 문제가 있었다.
-    // 요일은 route_name 뒤 괄호(→ sub_name)로 담는다.
+    // 프로덕션 표기(예: `_id: 69a5a710...` "서울 교대역" sub_name "주중" vs
+    // `_id: 675ab6d6...` "서울 등교 추가 교대역" sub_name "월요일")를 따라,
+    // 매일 도는 기본 배차(화~금 → "주중")는 "등교 추가" 없이 "서울 OO역"으로,
+    // 특정 요일에만 도는 추가 배차만 "서울 등교 추가 OO역"으로 나눈다. 같은
+    // 요일에 배차가 여러 개면(월(1호차)/월(2호차)) 회차마다 번호를 붙인다 —
+    // 같은 route_name 아래 sub_name만 다르게 묶으면 앱에서 같은 이름 노선이
+    // 두 번 뜨는 문제가 있었다. 요일은 route_name 뒤 괄호(→ sub_name)로 담는다.
     expect(seoulRoutes.map((r) => r.route.route_name).sort()).toEqual([
+      "서울 교대역(주중)",
       "서울 등교 추가 교대역 1(월요일)",
       "서울 등교 추가 교대역 2(월요일)",
-      "서울 등교 추가 교대역 3(주중)",
       "서울 등교 추가 동천역(월요일)",
     ]);
 
@@ -245,20 +247,21 @@ describe("parseStructuredWorkbook", () => {
     const returns = routes.filter(
       (r) => r.route.region === "서울" && r.route.route_type === "하교",
     );
-    // 배차가 2개(14:10(금), 18:10(월~금))라 프로덕션 표기("서울 하교 추가
-    // 1"/"2")대로 회차마다 별도 문서로 나눈다.
+    // 매일 도는 기본 배차(월~금)는 "서울"로, 특정 요일(금)에만 도는 추가
+    // 배차는 "서울 하교 추가"로 나뉜다. 같은 요일 그룹에 배차가 하나뿐이면
+    // 번호는 붙지 않는다.
     expect(returns.map((r) => r.route.route_name).sort()).toEqual([
-      "서울 하교 추가 1(금요일)",
-      "서울 하교 추가 2(주중)",
+      "서울 하교 추가(금요일)",
+      "서울(주중)",
     ]);
 
-    const first = returns.find((r) => r.route.route_name === "서울 하교 추가 1(금요일)")!;
-    expect(first.route.node_info).toEqual([
+    const friday = returns.find((r) => r.route.route_name === "서울 하교 추가(금요일)")!;
+    expect(friday.route.node_info).toEqual([
       { name: "대학" },
       { name: "죽전" },
       { name: "교대" },
     ]);
-    expect(first.route.route_info).toEqual([
+    expect(friday.route.route_info).toEqual([
       {
         name: "하교",
         running_days: ["FRI"],
@@ -266,8 +269,8 @@ describe("parseStructuredWorkbook", () => {
       },
     ]);
 
-    const second = returns.find((r) => r.route.route_name === "서울 하교 추가 2(주중)")!;
-    expect(second.route.route_info).toEqual([
+    const weekday = returns.find((r) => r.route.route_name === "서울(주중)")!;
+    expect(weekday.route.route_info).toEqual([
       {
         name: "하교",
         running_days: ["MON", "TUE", "WED", "THU", "FRI"],
