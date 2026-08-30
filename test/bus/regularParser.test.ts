@@ -310,4 +310,50 @@ describe("parseStructuredWorkbook", () => {
     expect(route!.route.route_name).toBe("대전(일요일)");
     expect(route!.route.route_info[0].running_days).toEqual(["SUN"]);
   });
+
+  it("한 셀에 쉼표/마침표로 묶인 정류장(예: '동우@,신계초,운전리.연춘리')을 각각 나눈다", () => {
+    const wb: AnalysedWorkbook = {
+      sheets: [
+        {
+          name: "REGULAR",
+          cells: [
+            cell(1, 1, "천안 지역 등교"),
+            cell(2, 1, "정류장"),
+            cell(2, 2, "천안역"),
+            cell(3, 1, "천안역"),
+            cell(4, 1, "삼룡교(유니클로, 구 한방병원)"),
+            cell(5, 1, "동우@,신계초,운전리.연춘리"),
+            cell(6, 1, "대학"),
+            cell(3, 2, "08:00"),
+            cell(4, 2, "08:10"),
+            cell(5, 2, "승하차"),
+            cell(6, 2, "08:50"),
+          ],
+          merges: [],
+        },
+      ],
+      tables: [],
+    };
+
+    const routes = parseStructuredWorkbook(wb);
+    const route = routes.find((r) => r.route.route_name === "천안역")!;
+    expect(route.route.node_info.map((node) => node.name)).toEqual([
+      "천안역",
+      "삼룡교(유니클로, 구 한방병원)",
+      "동우@",
+      "신계초",
+      "운전리",
+      "연춘리",
+      "대학",
+    ]);
+    expect(route.route.route_info[0].arrival_time).toEqual([
+      "08:00",
+      "08:10",
+      "승하차",
+      "승하차",
+      "승하차",
+      "승하차",
+      "08:50",
+    ]);
+  });
 });

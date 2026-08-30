@@ -690,6 +690,57 @@ function arrowTextRoutes(
   return routes;
 }
 
+/**
+ * 정류장 이름 셀 하나에 쉼표/마침표로 여러 정류장이 함께 적힌 경우
+ * (예: "동우@,신계초,운전리.연춘리") 각각을 별개 정류장으로 나눈다.
+ * 괄호 안 쉼표(예: "삼룡교(유니클로, 구 한방병원)")는 정류장 이름의 일부이므로
+ * 나누지 않는다.
+ */
+function splitCombinedStopName(name: string): string[] {
+  const parts: string[] = [];
+  let depth = 0;
+  let current = "";
+  for (const char of name) {
+    if (char === "(") depth += 1;
+    if (char === ")") depth -= 1;
+    if ((char === "," || char === ".") && depth === 0) {
+      parts.push(current.trim());
+      current = "";
+    } else {
+      current += char;
+    }
+  }
+  if (current.trim()) parts.push(current.trim());
+  return parts.length > 1 && parts.every(Boolean) ? parts : [name];
+}
+
+/**
+ * 위 정류장 분리를 노선 전체(node_info + route_info)에 적용한다. 분리된
+ * 정류장들은 원래 한 칸이었으므로 같은 회차 도착시각을 그대로 나눠 갖는다.
+ */
+function splitCombinedStops(route: BusRoute): BusRoute {
+  const expandedCounts: number[] = [];
+  const node_info: BusRoute["node_info"] = [];
+  let changed = false;
+  for (const node of route.node_info) {
+    const parts = splitCombinedStopName(node.name);
+    if (parts.length > 1) changed = true;
+    expandedCounts.push(parts.length);
+    for (const name of parts) node_info.push({ ...node, name });
+  }
+  if (!changed) return route;
+  return {
+    ...route,
+    node_info,
+    route_info: route.route_info.map((trip) => ({
+      ...trip,
+      arrival_time: trip.arrival_time.flatMap((time, index) =>
+        Array(expandedCounts[index]).fill(time),
+      ),
+    })),
+  };
+}
+
 function unique(routes: Array<{ target: BusTarget; route: BusRoute }>) {
   const seen = new Set<string>();
   return routes.filter(({ target, route }) => {
@@ -710,12 +761,14 @@ function unique(routes: Array<{ target: BusTarget; route: BusRoute }>) {
 /** Parses layouts by semantic headings, merged ranges and time-bearing columns; no fixed row numbers. */
 export function parseStructuredWorkbook(workbook: AnalysedWorkbook) {
   return unique(
-    workbook.sheets.flatMap((sheet) => [
-      ...regionalMatrices(sheet),
-      ...standaloneTables(sheet),
-      ...seoulGrids(sheet),
-      ...seoulReturnRoutes(sheet),
-      ...arrowTextRoutes(sheet),
-    ]),
+    workbook.sheets
+      .flatMap((sheet) => [
+        ...regionalMatrices(sheet),
+        ...standaloneTables(sheet),
+        ...seoulGrids(sheet),
+        ...seoulReturnRoutes(sheet),
+        ...arrowTextRoutes(sheet),
+      ])
+      .map(({ target, route }) => ({ target, route: splitCombinedStops(route) })),
   );
 }
