@@ -72,4 +72,44 @@ describe("parseStructuredWorkbook", () => {
       arrival_time: ["08:10", "08:20", "08:50"],
     });
   });
+
+  it("주말 셔틀은 등교/하교를 한 노선에 담고, 소속을 상위 제목에서 찾아 회차명에 방향을 붙인다", () => {
+    const weekend: AnalysedWorkbook = {
+      sheets: [
+        {
+          name: "REGULAR",
+          cells: [
+            cell(8, 1, "2026학년도 학기 중 일학습병행대학 주말통학버스 운행시간표"),
+            cell(9, 1, "(천안시내) 토요일 통학 셔틀버스"),
+            cell(10, 1, "정류장"),
+            cell(10, 2, "등교 2회"),
+            cell(10, 4, "하교 2회"),
+            cell(11, 1, "두정역"),
+            cell(11, 2, "08:00"),
+            cell(11, 3, "10:10"),
+            cell(12, 1, "대학"),
+            cell(12, 2, "도착"),
+            cell(12, 3, "도착"),
+            cell(12, 4, "19:10"),
+            cell(12, 5, "19:20"),
+          ],
+          merges: [],
+        },
+      ],
+      tables: [],
+    };
+
+    const routes = parseStructuredWorkbook(weekend);
+    const route = routes.find((r) => r.route.route_name === "일학습병행대학 천안시내");
+    expect(route).toBeDefined();
+    expect(route!.target).toBe("shuttle");
+    expect(route!.route.route_info.map((trip) => trip.name)).toEqual([
+      "1회(등교)",
+      "2회(등교)",
+      "3회(하교)",
+      "4회(하교)",
+    ]);
+    for (const trip of route!.route.route_info)
+      expect(trip.running_days).toEqual(["SAT"]);
+  });
 });

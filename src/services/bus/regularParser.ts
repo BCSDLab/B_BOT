@@ -364,6 +364,14 @@ function standaloneTables(
       }
     }
     if (!tripColumns.length) continue;
+    // "등교 1회"/"하교 2회"처럼 방향이 라벨에 섞여 있으면 "N회(방향)"로
+    // 바꾸고, 방향과 무관하게 표에 나온 순서대로 번호를 새로 매긴다(등교
+    // 1·2회 다음 하교가 3·4회로 이어짐) — KOIN Admin API가 회차명 끝의
+    // "(...)"만 방향(detail)으로 떼어내므로 이 포맷이어야 방향이 산다.
+    for (const [index, trip] of tripColumns.entries()) {
+      const direction = trip.label.match(/(등교|하교)/)?.[1];
+      trip.label = `${index + 1}회${direction ? `(${direction})` : ""}`;
+    }
     const rowCandidates: Array<{ row: number; name: string }> = [];
     let empty = 0;
     for (let row = header.row + 1; row < header.row + 35; row += 1) {
