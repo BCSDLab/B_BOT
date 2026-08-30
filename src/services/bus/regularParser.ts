@@ -20,6 +20,16 @@ const KOREAN_DAY: Record<Day, string> = {
 const DAY_ORDER = Object.keys(KOREAN_DAY) as Day[];
 
 /**
+ * 서울의 매일 도는 기본(주중) 통학 배차가 붙는 route_name. 등교("서울
+ * 교대역")와 하교가 이 이름을 공유해야 admin API 전송 직전
+ * mergeCommutingDirections가 정류장 합집합으로 한 문서에 합친다(프로덕션
+ * 실제 데이터 `_id: 69a5a710...`도 등교/하교가 "서울 교대역" 한 문서에
+ * 있었다) — 서울은 실제로 도는 정규 노선이 교대역 기준 하나뿐이라 하드코딩
+ * 해도 된다(동천역은 항상 월요일 전용 추가편일 뿐 기본 배차가 없다).
+ */
+const SEOUL_BASE_ROUTE_NAME = "서울 교대역";
+
+/**
  * 요일 목록을 표시용 이름으로 정리한다. 특정 하루뿐이면 그 요일명("월요일")을,
  * 여러 날에 걸치면(기본 운행) "주중"을 쓴다.
  */
@@ -582,7 +592,8 @@ function seoulGrids(
       // API가 route_info[].running_days를 받지 않으므로(name/detail/
       // arrival_time만 있다) route_name 뒤 괄호(→ sub_name)로 담는다.
       const trips = mergeIdenticalTrips(rawTrips);
-      const weekdayBase = originStation ? `서울 ${originStation}` : "서울";
+      const weekdayBase =
+        originStation === "교대역" ? SEOUL_BASE_ROUTE_NAME : originStation ? `서울 ${originStation}` : "서울";
       const additionalBase = originStation ? `서울 등교 추가 ${originStation}` : "서울 등교 추가";
       const dayGroups = new Map<string, typeof trips>();
       for (const trip of trips) {
@@ -657,15 +668,18 @@ function seoulReturnRoutes(
     }
     if (nodes.length < 2) continue;
     const dispatches = [...String(anchor.value).matchAll(MULTI_DEPARTURE)];
-    // 등교 쪽과 같은 이유로, 매일 도는 기본 배차(주중)는 "하교 추가" 없이
-    // 그냥 "서울"로, 특정 요일에만 도는 추가 배차만 "서울 하교 추가"로 나눈다.
+    // 매일 도는 기본 배차(주중)는 등교 쪽 기본 배차와 같은 route_name(=
+    // SEOUL_BASE_ROUTE_NAME)을 써야 admin API 전송 직전 mergeCommutingDirections가
+    // 같은 문서로 합친다(프로덕션 실제 데이터 `_id: 69a5a710...`도 등교/하교가
+    // 함께 "서울 교대역" 한 문서에 있다). 특정 요일에만 도는 추가 배차만
+    // "서울 하교 추가"로 나눈다.
     const dayGroups = new Map<string, RegExpMatchArray[]>();
     for (const match of dispatches) {
       const day = dayGroupLabel(match[2]);
       dayGroups.set(day, [...(dayGroups.get(day) ?? []), match]);
     }
     for (const [day, dayDispatches] of dayGroups) {
-      const base = day === "주중" ? "서울" : "서울 하교 추가";
+      const base = day === "주중" ? SEOUL_BASE_ROUTE_NAME : "서울 하교 추가";
       dayDispatches.forEach((match, index) => {
         const name = dayDispatches.length > 1 ? `${base} ${index + 1}` : base;
         routes.push({

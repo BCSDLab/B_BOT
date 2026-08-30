@@ -64,14 +64,55 @@ function nodeOrderRelation(
 }
 
 /**
+ * 등교/하교가 정류장을 일부만 공유하는 경우(예: 서울 교대역 — 등교는
+ * 동천역·신갈을 거치고 하교는 대신 남부터미널에서 내린다) 정류장 목록을
+ * 합집합으로 만들고, 각 회차는 자신이 실제로 서는 자리에만 시간을 채우고
+ * 나머지는 null로 둔다. 프로덕션 실제 데이터(`_id: 69a5a710...` "서울
+ * 교대역")가 이 방식으로 등교/하교를 한 문서에 담고 있었다(다만 그 문서는
+ * 정류장 자리를 손으로 재활용해 "남부터미널 하차" 같은 설명 문구를 시간
+ * 자리에 넣었는데, 우리는 그 대신 정류장을 실제로 다 나열하고 null로 비운다).
+ * 정류장을 하나도 공유하지 않으면(진짜 무관한 노선) 합치지 않는다.
+ */
+function unionMergeNodes(a: BusRoute, b: BusRoute): BusRoute | undefined {
+  const shared = a.node_info.some((nodeA) =>
+    b.node_info.some((nodeB) => nodeB.name === nodeA.name),
+  );
+  if (!shared) return undefined;
+  const names: string[] = [];
+  const seen = new Set<string>();
+  for (const route of [a, b])
+    for (const node of route.node_info)
+      if (!seen.has(node.name)) {
+        seen.add(node.name);
+        names.push(node.name);
+      }
+  const remap = (route: BusRoute) => {
+    const indexByName = new Map(route.node_info.map((node, index) => [node.name, index]));
+    return route.route_info.map((trip) => ({
+      ...trip,
+      arrival_time: names.map((name) => {
+        const index = indexByName.get(name);
+        return index === undefined ? null : trip.arrival_time[index];
+      }),
+    }));
+  };
+  return {
+    ...a,
+    node_info: names.map((name) => ({ name })),
+    route_info: [...remap(a), ...remap(b)],
+  };
+}
+
+/**
  * KOIN Admin API의 commuting upsert 키는 (region, route_type, route_name,
  * sub_name)인데, commuting route_type은 방향과 무관하게 항상 "주중"으로
  * 고정해서 보낸다(`adminRouteType`). 그래서 같은 region+route_name의 등교와
  * 하교를 별도 문서 두 개로 PUT하면 키가 완전히 같아져, 나중에 보낸 쪽이
  * 먼저 것을 덮어쓴다(DB에 하교만 남는 이유). 정류장 순서가 같거나(등교 노선
  * 역순 자동계산) 정확히 반대(원본에 별도 하교 표가 있는 경우)면 한 문서의
- * route_info 배열로 합쳐서 이 충돌을 피한다. 정류장이 다르면(무관한 노선)
- * 합치지 않는다.
+ * route_info 배열로 합쳐서 이 충돌을 피한다. 순서가 안 맞아도 정류장을 일부
+ * 공유하면 합집합으로 합친다(unionMergeNodes). 정류장을 하나도 공유하지
+ * 않으면(무관한 노선) 합치지 않는다.
  */
 function mergeCommutingDirections(routes: BusRoute[]): BusRoute[] {
   const merged: BusRoute[] = [];
@@ -88,15 +129,21 @@ function mergeCommutingDirections(routes: BusRoute[]): BusRoute[] {
       )
         continue;
       const relation = nodeOrderRelation(current.node_info, candidate.node_info);
-      if (!relation) continue;
-      const candidateRouteInfo =
-        relation === "same"
-          ? candidate.route_info
-          : candidate.route_info.map((trip) => ({
-              ...trip,
-              arrival_time: [...trip.arrival_time].reverse(),
-            }));
-      current = { ...current, route_info: [...current.route_info, ...candidateRouteInfo] };
+      if (relation) {
+        const candidateRouteInfo =
+          relation === "same"
+            ? candidate.route_info
+            : candidate.route_info.map((trip) => ({
+                ...trip,
+                arrival_time: [...trip.arrival_time].reverse(),
+              }));
+        current = { ...current, route_info: [...current.route_info, ...candidateRouteInfo] };
+        consumed.add(other);
+        continue;
+      }
+      const unioned = unionMergeNodes(current, candidate);
+      if (!unioned) continue;
+      current = unioned;
       consumed.add(other);
     }
     merged.push(current);

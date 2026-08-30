@@ -318,7 +318,58 @@ describe("버스 timetable 반영", () => {
     ]);
   });
 
-  it("정류장이 다른 노선은 이름이 같아도 합치지 않는다", async () => {
+  it("정류장을 일부만 공유하는 노선(서울 교대역처럼)은 합집합으로 합친다", async () => {
+    // 프로덕션 실제 데이터(`_id: 69a5a710...` "서울 교대역")처럼, 등교는
+    // 동천역을 거치고 하교는 대신 남부터미널에서 내리는 경우 — 순서가
+    // 같지도 정반대도 아니지만 "터미널"/"대학"을 공유하므로 한 문서로
+    // 합치고, 서로 서지 않는 정류장은 null로 채운다.
+    const partiallyShared: BusConversion = {
+      ...conversion,
+      payloads: [
+        {
+          target: "commuting",
+          semester_type: "REGULAR",
+          body: {
+            commuting_bus_timetables: [
+              {
+                region: "천안",
+                route_type: "등교",
+                route_name: "터미널",
+                node_info: [{ name: "터미널" }, { name: "동천역" }, { name: "대학" }],
+                route_info: [{ name: "등교", arrival_time: ["08:10", "08:20", "08:50"] }],
+              },
+              {
+                region: "천안",
+                route_type: "하교",
+                route_name: "터미널",
+                node_info: [{ name: "터미널" }, { name: "두정역" }, { name: "대학" }],
+                route_info: [{ name: "하교", arrival_time: ["18:10", "18:20", "18:50"] }],
+              },
+            ],
+          },
+        },
+      ],
+    };
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await submitBusTimetables([partiallyShared], auth);
+
+    const body = JSON.parse(String((fetchMock.mock.calls[0] as [URL, RequestInit])[1].body));
+    expect(body.commuting_bus_timetables).toHaveLength(1);
+    expect(body.commuting_bus_timetables[0].node_info.map((n: { name: string }) => n.name)).toEqual([
+      "터미널",
+      "동천역",
+      "대학",
+      "두정역",
+    ]);
+    expect(body.commuting_bus_timetables[0].route_info).toEqual([
+      { name: "등교", detail: null, arrival_time: ["08:10", "08:20", "08:50", null] },
+      { name: "하교", detail: null, arrival_time: ["18:10", null, "18:50", "18:20"] },
+    ]);
+  });
+
+  it("정류장을 하나도 공유하지 않는 노선은 이름이 같아도 합치지 않는다", async () => {
     const unrelated: BusConversion = {
       ...conversion,
       payloads: [
@@ -331,14 +382,14 @@ describe("버스 timetable 반영", () => {
                 region: "천안",
                 route_type: "등교",
                 route_name: "터미널",
-                node_info: [{ name: "터미널" }, { name: "대학" }],
+                node_info: [{ name: "정류장A" }, { name: "정류장B" }],
                 route_info: [{ name: "등교", arrival_time: ["08:10", "08:50"] }],
               },
               {
                 region: "천안",
                 route_type: "하교",
                 route_name: "터미널",
-                node_info: [{ name: "터미널" }, { name: "두정역" }, { name: "대학" }],
+                node_info: [{ name: "정류장C" }, { name: "정류장D" }, { name: "정류장E" }],
                 route_info: [{ name: "하교", arrival_time: ["18:10", "18:20", "18:50"] }],
               },
             ],

@@ -257,12 +257,14 @@ describe("parseStructuredWorkbook", () => {
     const returns = routes.filter(
       (r) => r.route.region === "서울" && r.route.route_type === "하교",
     );
-    // 매일 도는 기본 배차(월~금)는 "서울"로, 특정 요일(금)에만 도는 추가
-    // 배차는 "서울 하교 추가"로 나뉜다. 같은 요일 그룹에 배차가 하나뿐이면
-    // 번호는 붙지 않는다.
+    // 매일 도는 기본 배차(월~금)는 등교 쪽 기본 배차와 같은 이름
+    // (SEOUL_BASE_ROUTE_NAME="서울 교대역")을 써야 admin API 전송 직전
+    // mergeCommutingDirections가 한 문서로 합친다. 특정 요일(금)에만 도는
+    // 추가 배차는 "서울 하교 추가"로 나뉜다. 같은 요일 그룹에 배차가 하나뿐
+    // 이면 번호는 붙지 않는다.
     expect(returns.map((r) => r.route.route_name).sort()).toEqual([
+      "서울 교대역(주중)",
       "서울 하교 추가(금요일)",
-      "서울(주중)",
     ]);
 
     const friday = returns.find((r) => r.route.route_name === "서울 하교 추가(금요일)")!;
@@ -279,7 +281,7 @@ describe("parseStructuredWorkbook", () => {
       },
     ]);
 
-    const weekday = returns.find((r) => r.route.route_name === "서울(주중)")!;
+    const weekday = returns.find((r) => r.route.route_name === "서울 교대역(주중)")!;
     expect(weekday.route.route_info).toEqual([
       {
         name: "하교",
