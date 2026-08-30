@@ -183,33 +183,40 @@ describe("parseStructuredWorkbook", () => {
 
     const routes = parseStructuredWorkbook(seoul);
     const seoulRoutes = routes.filter((r) => r.route.region === "서울");
+    // 프로덕션 표기(예: "서울 하교 추가 1"/"서울 하교 추가 2")를 따라, 배차가
+    // 여러 개면(교대역: 월(1호차)/월(2호차)/화~금) 한 route_name에 route_info를
+    // 여러 개 담지 않고 회차마다 별도 문서로 나눈다 — 같은 route_name 아래
+    // sub_name만 다르게 묶으면 앱에서 같은 이름 노선이 두 번 뜨는 문제가 있었다.
+    // 요일은 route_name 뒤 괄호(→ sub_name)로 담는다.
     expect(seoulRoutes.map((r) => r.route.route_name).sort()).toEqual([
-      "서울 등교 추가 교대역",
-      "서울 등교 추가 동천역",
+      "서울 등교 추가 교대역 1(월요일)",
+      "서울 등교 추가 교대역 2(월요일)",
+      "서울 등교 추가 교대역 3(주중)",
+      "서울 등교 추가 동천역(월요일)",
     ]);
 
-    const gyodae = seoulRoutes.find((r) => r.route.route_name === "서울 등교 추가 교대역")!;
-    expect(gyodae.route.node_info).toEqual([
+    const gyodae1 = seoulRoutes.find(
+      (r) => r.route.route_name === "서울 등교 추가 교대역 1(월요일)",
+    )!;
+    expect(gyodae1.route.node_info).toEqual([
       { name: "교대역" },
       { name: "동천역" },
       { name: "대학" },
     ]);
     // KOIN 사이트는 route_type이 WEEKDAYS(통학)인 노선의 등교/하교를
-    // route_info[].name이 정확히 "등교"/"하교"인지로 구분하고, admin API는
-    // route_info[].running_days를 받지 않는다. 그래서 요일은 name 자체가
-    // 아니라 괄호 안(→ admin API가 name/detail로 나눠 받는 detail)에 담는다.
-    expect(gyodae.route.route_info.map((trip) => trip.name)).toEqual([
-      "등교(월요일)",
-      "등교(월요일)",
-      "등교(주중)",
+    // route_info[].name이 정확히 "등교"/"하교"인지로 구분하므로, name 자체는
+    // 그대로 둔다.
+    expect(gyodae1.route.route_info).toEqual([
+      { name: "등교", running_days: ["MON"], arrival_time: ["07:10", null, "08:40"] },
     ]);
-    expect(gyodae.route.route_info[0].arrival_time).toEqual(["07:10", null, "08:40"]);
 
-    const dongcheon = seoulRoutes.find((r) => r.route.route_name === "서울 등교 추가 동천역")!;
+    const dongcheon = seoulRoutes.find(
+      (r) => r.route.route_name === "서울 등교 추가 동천역(월요일)",
+    )!;
     expect(dongcheon.route.node_info).toEqual([{ name: "동천역" }, { name: "대학" }]);
     expect(dongcheon.route.route_info).toHaveLength(1);
     expect(dongcheon.route.route_info[0]).toMatchObject({
-      name: "등교(월요일)",
+      name: "등교",
       arrival_time: ["07:30", "08:40"],
     });
   });
@@ -235,24 +242,34 @@ describe("parseStructuredWorkbook", () => {
     };
 
     const routes = parseStructuredWorkbook(seoulReturn);
-    const route = routes.find(
+    const returns = routes.filter(
       (r) => r.route.region === "서울" && r.route.route_type === "하교",
     );
-    expect(route).toBeDefined();
-    expect(route!.route.route_name).toBe("서울");
-    expect(route!.route.node_info).toEqual([
+    // 배차가 2개(14:10(금), 18:10(월~금))라 프로덕션 표기("서울 하교 추가
+    // 1"/"2")대로 회차마다 별도 문서로 나눈다.
+    expect(returns.map((r) => r.route.route_name).sort()).toEqual([
+      "서울 하교 추가 1(금요일)",
+      "서울 하교 추가 2(주중)",
+    ]);
+
+    const first = returns.find((r) => r.route.route_name === "서울 하교 추가 1(금요일)")!;
+    expect(first.route.node_info).toEqual([
       { name: "대학" },
       { name: "죽전" },
       { name: "교대" },
     ]);
-    expect(route!.route.route_info).toEqual([
+    expect(first.route.route_info).toEqual([
       {
-        name: "하교(금요일)",
+        name: "하교",
         running_days: ["FRI"],
         arrival_time: ["14:10", "하차", "하차"],
       },
+    ]);
+
+    const second = returns.find((r) => r.route.route_name === "서울 하교 추가 2(주중)")!;
+    expect(second.route.route_info).toEqual([
       {
-        name: "하교(주중)",
+        name: "하교",
         running_days: ["MON", "TUE", "WED", "THU", "FRI"],
         arrival_time: ["18:10", "하차", "하차"],
       },
