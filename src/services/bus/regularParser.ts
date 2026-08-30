@@ -17,6 +17,18 @@ const KOREAN_DAY: Record<Day, string> = {
   SUN: "일요일",
 };
 
+/**
+ * 프로덕션 실데이터(예: `_id: 675ab6d6...`, route_name "서울 등교 추가 교대역",
+ * sub_name "월요일")를 그대로 따른다 — 요일 구분은 route_info[].name(항상
+ * "등교"/"하교"로 고정)이 아니라 문서 단위 sub_name으로 표시된다. 특정 하루만
+ * 도는 회차는 그 요일명("월요일")을, 화~금처럼 여러 날에 걸치면(기본 운행)
+ * "주중"을 쓴다(예: `_id: 69a5a710...`, sub_name "주중").
+ */
+function dayGroupLabel(label: string): string {
+  const days = sourceDays(label);
+  return days?.length === 1 ? KOREAN_DAY[days[0]] : "주중";
+}
+
 const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
 const MARKERS = new Set([
   "도착",
@@ -516,34 +528,46 @@ function seoulGrids(
         if (hasAny) nodeRows.push({ row, name });
       }
       if (!nodeRows.length) continue;
-      const routeInfo = columns
-        .map((column) => {
-          const label = clean(at.get(key(header.row, column)));
-          return {
-            // KOIN 사이트는 route_type이 WEEKDAYS(통학)인 노선의 등교/하교를
-            // route_info[].name이 정확히 "등교"/"하교"인지로 구분한다.
-            name: "등교",
-            ...(sourceDays(label) ? { running_days: sourceDays(label) } : {}),
-            arrival_time: nodeRows.map(
-              (row) => arrival(at.get(key(row.row, column))) ?? null,
-            ),
-          };
-        })
-        .filter((info) => info.arrival_time.some((value) => value !== null));
-      if (!routeInfo.length) continue;
       const originStation = origin
         ? origin.replace(/\s*출발\s*$/, "").replace(/(?<!역)$/, "역")
         : undefined;
-      routes.push({
-        target: "commuting",
-        route: {
-          region: "서울",
-          route_type: "등교",
-          route_name: originStation ? `서울 등교 추가 ${originStation}` : "서울",
-          node_info: nodeRows.map((row) => ({ name: row.name })),
-          route_info: routeInfo,
-        },
-      });
+      const baseRouteName = originStation ? `서울 등교 추가 ${originStation}` : "서울";
+      // 프로덕션은 요일을 route_info[].name이 아니라 문서 단위 sub_name으로
+      // 구분한다(예: "월요일" 전용 추가편과 "주중" 기본편이 같은 route_name의
+      // 별개 문서로 존재). 그래서 같은 출발지라도 요일이 다르면 회차를 한
+      // route_info 배열에 섞지 않고 route_name 뒤 괄호(→ sub_name)로 나눠
+      // 별개 문서를 만든다.
+      const dayGroups = new Map<string, number[]>();
+      for (const column of columns) {
+        const label = clean(at.get(key(header.row, column)));
+        const day = dayGroupLabel(label);
+        dayGroups.set(day, [...(dayGroups.get(day) ?? []), column]);
+      }
+      for (const [day, dayColumns] of dayGroups) {
+        const routeInfo = dayColumns
+          .map((column) => {
+            const label = clean(at.get(key(header.row, column)));
+            return {
+              name: "등교",
+              ...(sourceDays(label) ? { running_days: sourceDays(label) } : {}),
+              arrival_time: nodeRows.map(
+                (row) => arrival(at.get(key(row.row, column))) ?? null,
+              ),
+            };
+          })
+          .filter((info) => info.arrival_time.some((value) => value !== null));
+        if (!routeInfo.length) continue;
+        routes.push({
+          target: "commuting",
+          route: {
+            region: "서울",
+            route_type: "등교",
+            route_name: `${baseRouteName}(${day})`,
+            node_info: nodeRows.map((row) => ({ name: row.name })),
+            route_info: routeInfo,
+          },
+        });
+      }
     }
   }
   return routes;
@@ -590,28 +614,35 @@ function seoulReturnRoutes(
     }
     if (nodes.length < 2) continue;
     const dispatches = [...String(anchor.value).matchAll(MULTI_DEPARTURE)];
-    // KOIN 사이트는 route_type이 WEEKDAYS(통학)인 노선의 등교/하교를
-    // route_info[].name이 정확히 "등교"/"하교"인지로 구분한다.
-    const routeInfo = dispatches.map((match) => ({
-      name: "하교",
-      ...(sourceDays(match[2]) ? { running_days: sourceDays(match[2]) } : {}),
-      arrival_time: [
-        match[1],
-        ...nodes
-          .slice(1)
-          .map((node) => arrival(at.get(key(node.row, anchor.column))) ?? null),
-      ],
-    }));
-    routes.push({
-      target: "commuting",
-      route: {
-        region: "서울",
-        route_type: "하교",
-        route_name: "서울",
-        node_info: nodes.map((node) => ({ name: node.name })),
-        route_info: routeInfo,
-      },
-    });
+    // 등교 쪽과 같은 이유로 요일은 route_info[].name(항상 "하교")이 아니라
+    // 문서 단위 sub_name(route_name 뒤 괄호)으로 구분한다.
+    const dayGroups = new Map<string, RegExpMatchArray[]>();
+    for (const match of dispatches) {
+      const day = dayGroupLabel(match[2]);
+      dayGroups.set(day, [...(dayGroups.get(day) ?? []), match]);
+    }
+    for (const [day, dayDispatches] of dayGroups) {
+      const routeInfo = dayDispatches.map((match) => ({
+        name: "하교",
+        ...(sourceDays(match[2]) ? { running_days: sourceDays(match[2]) } : {}),
+        arrival_time: [
+          match[1],
+          ...nodes
+            .slice(1)
+            .map((node) => arrival(at.get(key(node.row, anchor.column))) ?? null),
+        ],
+      }));
+      routes.push({
+        target: "commuting",
+        route: {
+          region: "서울",
+          route_type: "하교",
+          route_name: `서울(${day})`,
+          node_info: nodes.map((node) => ({ name: node.name })),
+          route_info: routeInfo,
+        },
+      });
+    }
   }
   return routes;
 }
