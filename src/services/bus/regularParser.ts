@@ -145,7 +145,16 @@ function regionalMatrices(
       const rowValues = stopRows.map((row) =>
         arrivalList(at.get(key(row.row, column))),
       );
-      if (!label || !rowValues.some((value) => value !== undefined)) continue;
+      if (
+        !label ||
+        // "운행기간 : ..." 같은 안내 문구가 옆 칸까지 넓게 병합돼 있으면, 그
+        // 병합 범위의 각 열이 마치 회차 헤더처럼 보인다. 실제로는 다른
+        // 표(예: 세종 노선)의 값이 같은 행 번호에 우연히 걸쳐 회차로 잘못
+        // 잡히니 이런 안내문 라벨은 열 헤더로 쓰지 않는다.
+        /^운행기간/.test(label) ||
+        !rowValues.some((value) => value !== undefined)
+      )
+        continue;
       const localHeading = clean(
         masters
           .filter(
@@ -342,40 +351,53 @@ function standaloneTables(
     const target: BusTarget = /셔틀|통학버스|대학원/.test(title)
       ? "shuttle"
       : "commuting";
+    // "등교 1회"/"등교 2회"처럼 같은 방향의 회차별 컬럼은 방향(등교/하교)
+    // 단위로 한 노선에 묶는다. 회차마다 별도 노선으로 등록되면(예: 토요일
+    // 셔틀버스) 실제로는 하나의 노선인데 회차 수만큼 노선이 쪼개져 보인다.
+    const tripGroups = new Map<
+      string,
+      { direction?: string; trips: Array<{ column: number; label: string }> }
+    >();
     for (const trip of tripColumns) {
-      const selected = rowCandidates
-        .map((row) => ({
-          ...row,
-          value: arrival(at.get(key(row.row, trip.column))),
+      const match = trip.label.match(/^(등교|하교)\s*(.*)$/);
+      const direction = match?.[1];
+      const round = match ? match[2].trim() || trip.label : trip.label;
+      const groupKey = direction ?? "";
+      const group = tripGroups.get(groupKey) ?? { direction, trips: [] };
+      group.trips.push({ column: trip.column, label: round });
+      tripGroups.set(groupKey, group);
+    }
+    for (const { direction: groupDirection, trips } of tripGroups.values()) {
+      const usedRows = rowCandidates.filter((row) =>
+        trips.some(
+          (trip) => arrival(at.get(key(row.row, trip.column))) !== undefined,
+        ),
+      );
+      if (!usedRows.length) continue;
+      const routeInfo = trips
+        .map((trip) => ({
+          name: trip.label,
+          ...(sourceDays(title) ? { running_days: sourceDays(title) } : {}),
+          arrival_time: usedRows.map(
+            (row) => arrival(at.get(key(row.row, trip.column))) ?? null,
+          ),
         }))
-        .filter(
-          (row): row is typeof row & { value: ArrivalTime } =>
-            row.value !== undefined,
-        );
-      if (!selected.length) continue;
-      const normalizedLabel = trip.label;
-      const direction = target === "shuttle" ? "셔틀" : sourceDirection(title);
+        .filter((info) => info.arrival_time.some((value) => value !== null));
+      if (!routeInfo.length) continue;
+      const direction =
+        target === "shuttle"
+          ? (groupDirection ?? "셔틀")
+          : (groupDirection ?? sourceDirection(title));
       routes.push({
         target,
         route: {
           region:
-            sourceRegion(
-              `${title} ${selected.map((row) => row.name).join(" ")}`,
-            ) ?? "천안",
+            sourceRegion(`${title} ${usedRows.map((row) => row.name).join(" ")}`) ??
+            "천안",
           route_type: direction,
-          route_name:
-            tripColumns.length === 1 &&
-            /^(1회|예정시간|시간)$/.test(normalizedLabel)
-              ? title
-              : `${title} ${normalizedLabel}`,
-          node_info: selected.map((row) => ({ name: row.name })),
-          route_info: [
-            {
-              name: normalizedLabel,
-              ...(sourceDays(title) ? { running_days: sourceDays(title) } : {}),
-              arrival_time: selected.map((row) => row.value),
-            },
-          ],
+          route_name: groupDirection ? `${title} ${groupDirection}` : title,
+          node_info: usedRows.map((row) => ({ name: row.name })),
+          route_info: routeInfo,
         },
       });
     }

@@ -126,6 +126,9 @@ export function buildReviewApprovalBlocks(
   if (outcome.noDaysRouteCount > 0) {
     lines.push(`:large_blue_circle: 운행요일 미지정 노선 *${outcome.noDaysRouteCount}개*`);
   }
+  // 이 메시지가 최상위(감지 흐름)일 수 있다 — !수정은 parentTs(스레드 답글)로만
+  // 변환 건을 찾으므로, 새 메시지로 치면 조용히 무시된다.
+  lines.push("수정할 내용은 이 메시지에 *스레드로 답글*로 `!수정`을 입력해주세요.");
 
   return [
     { type: "section", text: { type: "mrkdwn", text: lines.join("\n") } },
