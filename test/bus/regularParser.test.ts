@@ -184,11 +184,11 @@ describe("parseStructuredWorkbook", () => {
     const routes = parseStructuredWorkbook(seoul);
     const seoulRoutes = routes.filter((r) => r.route.region === "서울");
     expect(seoulRoutes.map((r) => r.route.route_name).sort()).toEqual([
-      "서울 교대",
-      "서울 동천",
+      "서울 교대역",
+      "서울 동천역",
     ]);
 
-    const gyodae = seoulRoutes.find((r) => r.route.route_name === "서울 교대")!;
+    const gyodae = seoulRoutes.find((r) => r.route.route_name === "서울 교대역")!;
     expect(gyodae.route.node_info).toEqual([
       { name: "교대역" },
       { name: "동천역" },
@@ -201,7 +201,7 @@ describe("parseStructuredWorkbook", () => {
     ]);
     expect(gyodae.route.route_info[0].arrival_time).toEqual(["07:10", null, "08:40"]);
 
-    const dongcheon = seoulRoutes.find((r) => r.route.route_name === "서울 동천")!;
+    const dongcheon = seoulRoutes.find((r) => r.route.route_name === "서울 동천역")!;
     expect(dongcheon.route.node_info).toEqual([{ name: "동천역" }, { name: "대학" }]);
     expect(dongcheon.route.route_info).toHaveLength(1);
     expect(dongcheon.route.route_info[0]).toMatchObject({

@@ -509,7 +509,7 @@ function seoulGrids(
           region: "서울",
           route_type: "등교",
           route_name: origin
-            ? `서울 ${origin.replace(/\s*출발\s*$/, "")}`
+            ? `서울 ${origin.replace(/\s*출발\s*$/, "").replace(/(?<!역)$/, "역")}`
             : `서울 ${routeInfo[0].name}`,
           node_info: nodeRows.map((row) => ({ name: row.name })),
           route_info: routeInfo,
