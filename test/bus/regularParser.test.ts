@@ -186,21 +186,22 @@ describe("parseStructuredWorkbook", () => {
     // 프로덕션 표기(예: `_id: 69a5a710...` "서울 교대역" sub_name "주중" vs
     // `_id: 675ab6d6...` "서울 등교 추가 교대역" sub_name "월요일")를 따라,
     // 매일 도는 기본 배차(화~금 → "주중")는 "등교 추가" 없이 "서울 OO역"으로,
-    // 특정 요일에만 도는 추가 배차만 "서울 등교 추가 OO역"으로 나눈다. 같은
-    // 요일에 배차가 여러 개면(월(1호차)/월(2호차)) 회차마다 번호를 붙인다 —
+    // 특정 요일에만 도는 추가 배차만 "서울 등교 추가 OO역"으로 나눈다. 도착
+    // 시각이 같은 월(2호차)와 화~금은 같은 물리적 배차라 하나로 합쳐져
+    // "서울 교대역(주중)"이 되고, 시각이 다른 월(1호차)만 별도 "추가" 문서로
+    // 남는다(번호는 같은 요일 그룹에 배차가 여전히 여러 개일 때만 붙는다) —
     // 같은 route_name 아래 sub_name만 다르게 묶으면 앱에서 같은 이름 노선이
     // 두 번 뜨는 문제가 있었다. 요일은 route_name 뒤 괄호(→ sub_name)로 담는다.
     expect(seoulRoutes.map((r) => r.route.route_name).sort()).toEqual([
       "서울 교대역(주중)",
-      "서울 등교 추가 교대역 1(월요일)",
-      "서울 등교 추가 교대역 2(월요일)",
+      "서울 등교 추가 교대역(월요일)",
       "서울 등교 추가 동천역(월요일)",
     ]);
 
-    const gyodae1 = seoulRoutes.find(
-      (r) => r.route.route_name === "서울 등교 추가 교대역 1(월요일)",
+    const gyodaeExtra = seoulRoutes.find(
+      (r) => r.route.route_name === "서울 등교 추가 교대역(월요일)",
     )!;
-    expect(gyodae1.route.node_info).toEqual([
+    expect(gyodaeExtra.route.node_info).toEqual([
       { name: "교대역" },
       { name: "동천역" },
       { name: "대학" },
@@ -208,8 +209,17 @@ describe("parseStructuredWorkbook", () => {
     // KOIN 사이트는 route_type이 WEEKDAYS(통학)인 노선의 등교/하교를
     // route_info[].name이 정확히 "등교"/"하교"인지로 구분하므로, name 자체는
     // 그대로 둔다.
-    expect(gyodae1.route.route_info).toEqual([
+    expect(gyodaeExtra.route.route_info).toEqual([
       { name: "등교", running_days: ["MON"], arrival_time: ["07:10", null, "08:40"] },
+    ]);
+
+    const gyodaeBase = seoulRoutes.find((r) => r.route.route_name === "서울 교대역(주중)")!;
+    expect(gyodaeBase.route.route_info).toEqual([
+      {
+        name: "등교",
+        running_days: ["MON", "TUE", "WED", "THU", "FRI"],
+        arrival_time: ["07:20", "07:40", "08:50"],
+      },
     ]);
 
     const dongcheon = seoulRoutes.find(

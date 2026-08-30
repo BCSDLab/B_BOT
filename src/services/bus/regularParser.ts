@@ -17,17 +17,47 @@ const KOREAN_DAY: Record<Day, string> = {
   SUN: "일요일",
 };
 
+const DAY_ORDER = Object.keys(KOREAN_DAY) as Day[];
+
 /**
- * 회차 라벨("월(1호차)", "화~금")을 표시용 요일 이름으로 정리한다. 특정 하루만
- * 도는 회차는 그 요일명("월요일")을, 화~금처럼 여러 날에 걸치면(기본 운행)
- * "주중"을 쓴다. admin API는 route_info[].running_days를 받지 않으므로
- * (AdminCommutingBusUpdateRequest에 name/detail/arrival_time만 있다) 요일은
- * route_info[].name 뒤 괄호에 담아 detail로 보낸다 — name 자체는 KOIN 사이트가
- * WEEKDAYS 노선의 등교/하교 판별에 정확히 일치시켜 보는 값이라 그대로 둔다.
+ * 요일 목록을 표시용 이름으로 정리한다. 특정 하루뿐이면 그 요일명("월요일")을,
+ * 여러 날에 걸치면(기본 운행) "주중"을 쓴다.
  */
-function dayGroupLabel(label: string): string {
-  const days = sourceDays(label);
+function dayLabelFromDays(days: Day[] | undefined): string {
   return days?.length === 1 ? KOREAN_DAY[days[0]] : "주중";
+}
+
+/** 회차 라벨("월(1호차)", "화~금")을 표시용 요일 이름으로 정리한다. */
+function dayGroupLabel(label: string): string {
+  return dayLabelFromDays(sourceDays(label));
+}
+
+/**
+ * "월(2호차)"(월요일)와 "화~금"(화~금)처럼 도착시각이 완전히 같은 회차는 요일
+ * 표기만 다를 뿐 같은 물리적 배차다(예: 07:20 버스가 월요일엔 "2호차"로,
+ * 나머지 평일엔 "화~금"으로 각각 표에 적혀 있을 뿐). 이런 회차를 각자 요일로
+ * 따로 문서화하면 "서울 등교 추가 교대역 2(월요일)"처럼 매일 도는 배차가
+ * 마치 월요일 전용 추가편인 것처럼 잘못 보인다. 도착시각이 같은 회차는 요일을
+ * 합쳐 하나로 묶는다 — 합친 요일이 평일 전체면 "주중"(기본 배차)이 된다.
+ */
+function mergeIdenticalTrips(
+  trips: Array<{ label: string; arrival_time: ArrivalTime[] }>,
+): Array<{ days: Day[] | undefined; arrival_time: ArrivalTime[] }> {
+  const merged: Array<{ key: string; days: Set<Day>; arrival_time: ArrivalTime[] }> = [];
+  for (const trip of trips) {
+    const key = JSON.stringify(trip.arrival_time);
+    const days = sourceDays(trip.label) ?? [];
+    const existing = merged.find((entry) => entry.key === key);
+    if (existing) {
+      for (const day of days) existing.days.add(day);
+    } else {
+      merged.push({ key, days: new Set(days), arrival_time: trip.arrival_time });
+    }
+  }
+  return merged.map(({ days, arrival_time }) => ({
+    days: days.size ? DAY_ORDER.filter((day) => days.has(day)) : undefined,
+    arrival_time,
+  }));
 }
 
 const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -532,7 +562,7 @@ function seoulGrids(
       const originStation = origin
         ? origin.replace(/\s*출발\s*$/, "").replace(/(?<!역)$/, "역")
         : undefined;
-      const trips = columns
+      const rawTrips = columns
         .map((column) => ({
           label: clean(at.get(key(header.row, column))),
           arrival_time: nodeRows.map(
@@ -540,21 +570,23 @@ function seoulGrids(
           ),
         }))
         .filter((trip) => trip.arrival_time.some((value) => value !== null));
-      if (!trips.length) continue;
+      if (!rawTrips.length) continue;
       // 프로덕션 표기(예: `_id: 69a5a710...` "서울 교대역" sub_name "주중" vs
       // `_id: 675ab6d6...` "서울 등교 추가 교대역" sub_name "월요일")는 매일
       // 도는 기본 배차와 특정 요일에만 도는 추가 배차의 route_name 자체가
-      // 다르다 — "등교 추가"는 추가 배차에만 붙는다. 배차가 여러 개면(같은
-      // 요일 그룹 안에 1호차/2호차 등) 회차마다 별도 문서로 나눈다 — 한
-      // route_name 아래 sub_name만 다르게 묶으면 앱에서 같은 이름 노선이 두
-      // 번 뜨는 문제가 있었다. 요일은 KOIN Admin API가
-      // route_info[].running_days를 받지 않으므로(name/detail/arrival_time만
-      // 있다) route_name 뒤 괄호(→ sub_name)로 담는다.
+      // 다르다 — "등교 추가"는 추가 배차에만 붙는다. 도착시각이 같은 회차는
+      // 같은 물리적 배차이므로 요일을 합쳐 하나로 묶고(mergeIdenticalTrips),
+      // 합친 요일이 남으면(같은 요일 그룹 안에 1호차/2호차 등) 회차마다
+      // 별도 문서로 나눈다 — 한 route_name 아래 sub_name만 다르게 묶으면
+      // 앱에서 같은 이름 노선이 두 번 뜨는 문제가 있었다. 요일은 KOIN Admin
+      // API가 route_info[].running_days를 받지 않으므로(name/detail/
+      // arrival_time만 있다) route_name 뒤 괄호(→ sub_name)로 담는다.
+      const trips = mergeIdenticalTrips(rawTrips);
       const weekdayBase = originStation ? `서울 ${originStation}` : "서울";
       const additionalBase = originStation ? `서울 등교 추가 ${originStation}` : "서울 등교 추가";
       const dayGroups = new Map<string, typeof trips>();
       for (const trip of trips) {
-        const day = dayGroupLabel(trip.label);
+        const day = dayLabelFromDays(trip.days);
         dayGroups.set(day, [...(dayGroups.get(day) ?? []), trip]);
       }
       for (const [day, dayTrips] of dayGroups) {
@@ -571,7 +603,7 @@ function seoulGrids(
               route_info: [
                 {
                   name: "등교",
-                  ...(sourceDays(trip.label) ? { running_days: sourceDays(trip.label) } : {}),
+                  ...(trip.days ? { running_days: trip.days } : {}),
                   arrival_time: trip.arrival_time,
                 },
               ],
