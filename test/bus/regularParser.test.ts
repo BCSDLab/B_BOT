@@ -112,4 +112,35 @@ describe("parseStructuredWorkbook", () => {
     for (const trip of route!.route.route_info)
       expect(trip.running_days).toEqual(["SAT"]);
   });
+
+  it("헤더 행에 옆으로 넓게 걸린 '운행기간' 안내문을 회차로 잡지 않는다", () => {
+    const withNoticeCell: AnalysedWorkbook = {
+      sheets: [
+        {
+          name: "REGULAR",
+          cells: [
+            cell(1, 1, "청주 지역 등교"),
+            cell(1, 4, "청주 셔틀(본교-청주-본교)"),
+            cell(2, 1, "정류장"),
+            cell(2, 4, "1회"),
+            cell(2, 5, "2회"),
+            cell(2, 7, "운행기간 : 2026.01.01 ~ 2026.02.01"),
+            cell(3, 1, "정류장A"),
+            cell(3, 4, "08:00"),
+            cell(3, 5, "09:00"),
+            // 실제 파일에서 이 자리는 안내문 셀이 넓게 병합돼 있었고, 그 아래
+            // 다른 표의 시각이 같은 행 번호에 우연히 걸쳐 회차처럼 보였다.
+            cell(3, 7, "10:00"),
+          ],
+          merges: [],
+        },
+      ],
+      tables: [],
+    };
+
+    const routes = parseStructuredWorkbook(withNoticeCell);
+    const route = routes.find((r) => r.route.route_name === "청주 셔틀");
+    expect(route).toBeDefined();
+    expect(route!.route.route_info.map((trip) => trip.name)).toEqual(["1회", "2회"]);
+  });
 });
