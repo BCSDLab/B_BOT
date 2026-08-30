@@ -395,7 +395,10 @@ function standaloneTables(
             sourceRegion(`${title} ${usedRows.map((row) => row.name).join(" ")}`) ??
             "천안",
           route_type: direction,
-          route_name: groupDirection ? `${title} ${groupDirection}` : title,
+          // 등교/하교 구분은 route_type에 이미 담기니 route_name에 방향을
+          // 또 붙이면 같은 노선이 이름만 갈라져 보인다. 이름은 항상 원문
+          // 제목 그대로 둔다.
+          route_name: title,
           node_info: usedRows.map((row) => ({ name: row.name })),
           route_info: routeInfo,
         },
