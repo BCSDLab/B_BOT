@@ -42,7 +42,9 @@ describe("parseStructuredWorkbook", () => {
     const commuting = routes.filter((r) => r.target === "commuting");
     const shuttle = routes.filter((r) => r.target === "shuttle");
 
-    const joined = commuting.find((r) => r.route.route_name === "천안역")!;
+    // KOIN Admin API는 route_info[].running_days를 받지 않으므로, 평일
+    // 운행이라는 사실은 route_name 뒤 괄호(→ sub_name "주중")로만 남는다.
+    const joined = commuting.find((r) => r.route.route_name === "천안역(주중)")!;
     expect(joined.route.node_info).toEqual([{ name: "천안역" }, { name: "터미널" }]);
     expect(joined.route.route_info).toHaveLength(2);
     expect(joined.route.route_info[0]).toMatchObject({
@@ -56,7 +58,7 @@ describe("parseStructuredWorkbook", () => {
     for (const trip of joined.route.route_info)
       expect(trip.running_days).toEqual(["MON", "TUE", "WED", "THU", "FRI"]);
 
-    const plain = commuting.find((r) => r.route.route_name === "터미널")!;
+    const plain = commuting.find((r) => r.route.route_name === "터미널(주중)")!;
     expect(plain.route.route_info).toHaveLength(1);
     expect(plain.route.route_info[0]).toMatchObject({
       name: "등교",
@@ -64,7 +66,7 @@ describe("parseStructuredWorkbook", () => {
     });
 
     expect(shuttle).toHaveLength(1);
-    expect(shuttle[0].route.route_name).toBe("천안 셔틀");
+    expect(shuttle[0].route.route_name).toBe("천안 셔틀(주중)");
     expect(shuttle[0].route.node_info).toHaveLength(3);
     expect(shuttle[0].route.route_info).toHaveLength(1);
     expect(shuttle[0].route.route_info[0]).toMatchObject({
@@ -141,7 +143,7 @@ describe("parseStructuredWorkbook", () => {
     };
 
     const routes = parseStructuredWorkbook(withNoticeCell);
-    const route = routes.find((r) => r.route.route_name === "청주 셔틀");
+    const route = routes.find((r) => r.route.route_name === "청주 셔틀(주중)");
     expect(route).toBeDefined();
     expect(route!.route.route_info.map((trip) => trip.name)).toEqual(["1회", "2회"]);
   });
@@ -375,7 +377,7 @@ describe("parseStructuredWorkbook", () => {
     };
 
     const routes = parseStructuredWorkbook(wb);
-    const route = routes.find((r) => r.route.route_name === "천안역")!;
+    const route = routes.find((r) => r.route.route_name === "천안역(주중)")!;
     expect(route.route.node_info.map((node) => node.name)).toEqual([
       "천안역",
       "삼룡교(유니클로, 구 한방병원)",

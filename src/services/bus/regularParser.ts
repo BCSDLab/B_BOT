@@ -271,7 +271,11 @@ function regionalMatrices(
         route: {
           region: sourceRegion(clean(headingCell.value)) ?? column.label,
           route_type: "등교",
-          route_name: column.label,
+          // KOIN Admin API는 route_info[].running_days를 받지 않는다. 이
+          // 표의 통학 노선은 전부 평일(주중) 운행이 기본값이라(위
+          // running_days: [...WEEKDAYS]), 프로덕션 실제 표기(`_id:
+          // 69a5a710...` sub_name "주중")대로 sub_name에 남겨 둔다.
+          route_name: `${column.label}(주중)`,
           node_info: selected.map((row) => ({ name: row.name })),
           route_info: routeInfo,
         },
@@ -300,6 +304,11 @@ function regionalMatrices(
           heading,
         ),
       );
+      // 프로덕션 실제 표기(`_id: 675ab5eb...` "천안 셔틀" sub_name "주중")를
+      // 따른다 — 요일 제한 없이 매일 도는 순환 셔틀도 sub_name "주중"을 쓴다.
+      const shuttleHeadingDays = sourceDays(heading);
+      const shuttleHeadingDaySuffix =
+        shuttleHeadingDays?.length === 1 ? KOREAN_DAY[shuttleHeadingDays[0]] : "주중";
       routes.push({
         target: "shuttle",
         route: {
@@ -308,7 +317,7 @@ function regionalMatrices(
             sourceRegion(clean(headingCell.value)) ??
             "천안",
           route_type: "셔틀",
-          route_name: heading.replace(/\s*\(.*/, "").trim(),
+          route_name: `${heading.replace(/\s*\(.*/, "").trim()}(${shuttleHeadingDaySuffix})`,
           node_info: usedRows.map((row) => ({ name: row.name })),
           route_info: routeInfo,
         },
@@ -507,9 +516,12 @@ function standaloneTables(
             // 통학(commuting) 노선은 등교/하교 방향이 route_info[].name과
             // route_type에 이미 담기니, route_name엔 지역명만 남긴다
             // (프로덕션 실제 표기: "세종 등교/하교"가 아니라 "세종").
+            // KOIN Admin API는 route_info[].running_days를 받지 않으므로,
+            // 통학 노선의 평일 운행 기본값도 sub_name "주중"으로 남긴다
+            // (프로덕션 실제 표기 `_id: 69a5a710...` "세종" sub_name "주중").
             route_name:
               target === "commuting"
-                ? region
+                ? `${region}(주중)`
                 : `${shuttleRouteName(sheet, header, title)}${shuttleDaySuffix}`,
             node_info: usedRows.map((row) => ({ name: row.name })),
             route_info: routeInfo,
