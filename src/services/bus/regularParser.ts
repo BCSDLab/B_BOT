@@ -466,29 +466,53 @@ function seoulGrids(
         break;
       }
     }
+    // "교대 출발"/"동천 출발"처럼 회차 헤더 한 줄 위에 출발지가 따로 있으면,
+    // 그 출발지가 같은 회차들(예: 월(1호차)/월(2호차)/화~금)은 한 노선으로
+    // 묶는다. 출발지 표기가 없는 파일은 기존처럼 회차 컬럼마다 별도 노선을
+    // 유지한다(출발지가 없으면 컬럼별로 서로 다른 그룹 키를 준다).
+    const originRow = header.row - 1;
+    const groups = new Map<string, { origin: string | null; columns: number[] }>();
     for (const column of tripColumns) {
-      const label = clean(at.get(key(header.row, column)));
-      const nodes: Array<{ name: string; time: ArrivalTime }> = [];
+      const origin = clean(at.get(key(originRow, column))) || null;
+      const groupKey = origin ?? `column:${column}`;
+      const group = groups.get(groupKey) ?? { origin, columns: [] };
+      group.columns.push(column);
+      groups.set(groupKey, group);
+    }
+    for (const { origin, columns } of groups.values()) {
+      const nodeRows: Array<{ row: number; name: string }> = [];
       for (let row = header.row + 1; row < tableEnd; row += 1) {
         const name = clean(at.get(key(row, header.column)));
-        const time = arrival(at.get(key(row, column)));
-        if (name && time) nodes.push({ name, time });
+        if (!name) continue;
+        const hasAny = columns.some(
+          (column) => arrival(at.get(key(row, column))) !== undefined,
+        );
+        if (hasAny) nodeRows.push({ row, name });
       }
-      if (!nodes.length) continue;
+      if (!nodeRows.length) continue;
+      const routeInfo = columns
+        .map((column) => {
+          const label = clean(at.get(key(header.row, column)));
+          return {
+            name: label,
+            ...(sourceDays(label) ? { running_days: sourceDays(label) } : {}),
+            arrival_time: nodeRows.map(
+              (row) => arrival(at.get(key(row.row, column))) ?? null,
+            ),
+          };
+        })
+        .filter((info) => info.arrival_time.some((value) => value !== null));
+      if (!routeInfo.length) continue;
       routes.push({
         target: "commuting",
         route: {
           region: "서울",
           route_type: "등교",
-          route_name: `서울 ${label}`,
-          node_info: nodes.map((node) => ({ name: node.name })),
-          route_info: [
-            {
-              name: "등교",
-              ...(sourceDays(label) ? { running_days: sourceDays(label) } : {}),
-              arrival_time: nodes.map((node) => node.time),
-            },
-          ],
+          route_name: origin
+            ? `서울 ${origin.replace(/\s*출발\s*$/, "")}`
+            : `서울 ${routeInfo[0].name}`,
+          node_info: nodeRows.map((row) => ({ name: row.name })),
+          route_info: routeInfo,
         },
       });
     }

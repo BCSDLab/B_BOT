@@ -143,4 +143,70 @@ describe("parseStructuredWorkbook", () => {
     expect(route).toBeDefined();
     expect(route!.route.route_info.map((trip) => trip.name)).toEqual(["1회", "2회"]);
   });
+
+  it("서울 노선은 회차 컬럼을 출발지별로 묶는다", () => {
+    const seoul: AnalysedWorkbook = {
+      sheets: [
+        {
+          name: "REGULAR",
+          cells: [
+            cell(0, 1, "서울(월~금요일) 안내"),
+            cell(1, 1, "출발지 →"),
+            cell(1, 4, "교대 출발"),
+            cell(1, 5, "교대 출발"),
+            cell(1, 6, "교대 출발"),
+            cell(1, 7, "동천 출발"),
+            cell(2, 1, "노선"),
+            cell(2, 4, "월(1호차)"),
+            cell(2, 5, "월(2호차)"),
+            cell(2, 6, "화~금"),
+            cell(2, 7, "월(3호차)"),
+            cell(3, 1, "교대역"),
+            cell(3, 4, "07:10"),
+            cell(3, 5, "07:20"),
+            cell(3, 6, "07:20"),
+            cell(4, 1, "동천역"),
+            cell(4, 5, "07:40"),
+            cell(4, 6, "07:40"),
+            cell(4, 7, "07:30"),
+            cell(5, 1, "대학"),
+            cell(5, 4, "08:40"),
+            cell(5, 5, "08:50"),
+            cell(5, 6, "08:50"),
+            cell(5, 7, "08:40"),
+          ],
+          merges: [],
+        },
+      ],
+      tables: [],
+    };
+
+    const routes = parseStructuredWorkbook(seoul);
+    const seoulRoutes = routes.filter((r) => r.route.region === "서울");
+    expect(seoulRoutes.map((r) => r.route.route_name).sort()).toEqual([
+      "서울 교대",
+      "서울 동천",
+    ]);
+
+    const gyodae = seoulRoutes.find((r) => r.route.route_name === "서울 교대")!;
+    expect(gyodae.route.node_info).toEqual([
+      { name: "교대역" },
+      { name: "동천역" },
+      { name: "대학" },
+    ]);
+    expect(gyodae.route.route_info.map((trip) => trip.name)).toEqual([
+      "월(1호차)",
+      "월(2호차)",
+      "화~금",
+    ]);
+    expect(gyodae.route.route_info[0].arrival_time).toEqual(["07:10", null, "08:40"]);
+
+    const dongcheon = seoulRoutes.find((r) => r.route.route_name === "서울 동천")!;
+    expect(dongcheon.route.node_info).toEqual([{ name: "동천역" }, { name: "대학" }]);
+    expect(dongcheon.route.route_info).toHaveLength(1);
+    expect(dongcheon.route.route_info[0]).toMatchObject({
+      name: "월(3호차)",
+      arrival_time: ["07:30", "08:40"],
+    });
+  });
 });
