@@ -351,30 +351,17 @@ function standaloneTables(
     const target: BusTarget = /셔틀|통학버스|대학원/.test(title)
       ? "shuttle"
       : "commuting";
-    // "등교 1회"/"등교 2회"처럼 같은 방향의 회차별 컬럼은 방향(등교/하교)
-    // 단위로 한 노선에 묶는다. 회차마다 별도 노선으로 등록되면(예: 토요일
-    // 셔틀버스) 실제로는 하나의 노선인데 회차 수만큼 노선이 쪼개져 보인다.
-    const tripGroups = new Map<
-      string,
-      { direction?: string; trips: Array<{ column: number; label: string }> }
-    >();
-    for (const trip of tripColumns) {
-      const match = trip.label.match(/^(등교|하교)\s*(.*)$/);
-      const direction = match?.[1];
-      const round = match ? match[2].trim() || trip.label : trip.label;
-      const groupKey = direction ?? "";
-      const group = tripGroups.get(groupKey) ?? { direction, trips: [] };
-      group.trips.push({ column: trip.column, label: round });
-      tripGroups.set(groupKey, group);
-    }
-    for (const { direction: groupDirection, trips } of tripGroups.values()) {
-      const usedRows = rowCandidates.filter((row) =>
-        trips.some(
-          (trip) => arrival(at.get(key(row.row, trip.column))) !== undefined,
-        ),
-      );
-      if (!usedRows.length) continue;
-      const routeInfo = trips
+    // "등교 1회"/"하교 2회"처럼 방향이 라벨에 섞여 있어도 회차마다 별도
+    // 노선으로 쪼개지 않는다. "천안 셔틀"의 "토요일 오후"/"일요일 야간"
+    // 회차들처럼, 한 제목 아래 여러 회차(왕복 포함)를 route_info 배열
+    // 하나에 순서대로 담는 게 이 시트의 원래 표기 방식이다.
+    const usedRows = rowCandidates.filter((row) =>
+      tripColumns.some(
+        (trip) => arrival(at.get(key(row.row, trip.column))) !== undefined,
+      ),
+    );
+    if (usedRows.length) {
+      const routeInfo = tripColumns
         .map((trip) => ({
           name: trip.label,
           ...(sourceDays(title) ? { running_days: sourceDays(title) } : {}),
@@ -383,26 +370,21 @@ function standaloneTables(
           ),
         }))
         .filter((info) => info.arrival_time.some((value) => value !== null));
-      if (!routeInfo.length) continue;
-      const direction =
-        target === "shuttle"
-          ? (groupDirection ?? "셔틀")
-          : (groupDirection ?? sourceDirection(title));
-      routes.push({
-        target,
-        route: {
-          region:
-            sourceRegion(`${title} ${usedRows.map((row) => row.name).join(" ")}`) ??
-            "천안",
-          route_type: direction,
-          // 등교/하교 구분은 route_type에 이미 담기니 route_name에 방향을
-          // 또 붙이면 같은 노선이 이름만 갈라져 보인다. 이름은 항상 원문
-          // 제목 그대로 둔다.
-          route_name: title,
-          node_info: usedRows.map((row) => ({ name: row.name })),
-          route_info: routeInfo,
-        },
-      });
+      if (routeInfo.length) {
+        const direction = target === "shuttle" ? "셔틀" : sourceDirection(title);
+        routes.push({
+          target,
+          route: {
+            region:
+              sourceRegion(`${title} ${usedRows.map((row) => row.name).join(" ")}`) ??
+              "천안",
+            route_type: direction,
+            route_name: title,
+            node_info: usedRows.map((row) => ({ name: row.name })),
+            route_info: routeInfo,
+          },
+        });
+      }
     }
   }
   return routes;
