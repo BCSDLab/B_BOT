@@ -42,6 +42,10 @@ describe("synthesizeReturnRoutes: 등교 노선 역순 하교 자동 생성", ()
     expect(result).toHaveLength(2);
     const 하교 = result[1];
     expect(하교).toMatchObject({ region: "천안", route_type: "하교", route_name: "천안역" });
+    // KOIN 사이트는 route_type이 WEEKDAYS(통학)인 노선의 등교/하교를
+    // route_info[].name이 정확히 "등교"/"하교"인지로 구분한다. 등교 원본의
+    // trip.name("1회")을 그대로 베끼면 하교도 "등교"로 잘못 분류된다.
+    for (const trip of 하교.route_info) expect(trip.name).toBe("하교");
     expect(하교.node_info.map((node) => node.name)).toEqual([
       "대학(본교)",
       "중앙@",

@@ -82,7 +82,10 @@ function mirrorRoute(route: BusRoute, departure: number): BusRoute | undefined {
     const lastMinutes = parseTime(last);
     if (lastMinutes === null) return undefined;
     trips.push({
-      name: trip.name,
+      // WEEKDAYS 노선은 route_info[].name이 정확히 "하교"여야 KOIN
+      // 사이트가 등교 역순 노선을 하교로 인식한다(원본 trip.name "등교"를
+      // 그대로 베끼면 하교 노선도 "등교"로 잘못 분류된다).
+      name: "하교",
       ...(trip.running_days ? { running_days: trip.running_days } : {}),
       arrival_time: trip.arrival_time.slice().reverse().map((value) => {
         if (typeof value === "string") {
