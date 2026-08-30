@@ -253,6 +253,38 @@ function regionalMatrices(
   return routes;
 }
 
+/**
+ * "(천안시내) 토요일 통학 셔틀버스"처럼 표 제목이 지역만 괄호로 담고,
+ * 소속(예: 일학습병행대학)은 그 위 상위 제목("2026학년도 학기 중
+ * 일학습병행대학 주말통학버스 운행시간표")에만 있는 경우 그 소속을 찾아
+ * 합친다. 상위 제목이 없으면(예: "전문대학원 토요일 통학 셔틀버스"처럼
+ * 소속이 이미 제목 앞에 있는 경우) "요일 통학 셔틀버스" 군더더기만 뗀다.
+ * route_name은 이렇게 만들고, 방향·요일 판별에는 원래 title을 그대로 쓴다.
+ */
+function shuttleRouteName(
+  sheet: AnalysedSheet,
+  header: AnalysedCell,
+  title: string,
+): string {
+  const region = title.match(/^\(([^)]+)\)/)?.[1];
+  if (region) {
+    const outer = sheet.cells
+      .filter(
+        (cell) =>
+          isMaster(cell) &&
+          cell.row < header.row &&
+          cell.row >= header.row - 25 &&
+          /주말\s*통학\s*버스|주말\s*셔틀버스/.test(clean(cell.value)),
+      )
+      .sort((left, right) => right.row - left.row)[0];
+    const affiliation = clean(outer?.value ?? "").match(
+      /학기\s*중\s*(.+?)\s*주말/,
+    )?.[1];
+    return affiliation ? `${affiliation} ${region}` : region;
+  }
+  return title.replace(/\s*(?:토요일|일요일|주중|주말)?\s*통학\s*셔틀버스\s*$/, "");
+}
+
 function nearestTitle(sheet: AnalysedSheet, header: AnalysedCell): string {
   return clean(
     sheet.cells
@@ -379,7 +411,7 @@ function standaloneTables(
               sourceRegion(`${title} ${usedRows.map((row) => row.name).join(" ")}`) ??
               "천안",
             route_type: direction,
-            route_name: title,
+            route_name: shuttleRouteName(sheet, header, title),
             node_info: usedRows.map((row) => ({ name: row.name })),
             route_info: routeInfo,
           },
