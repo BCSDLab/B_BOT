@@ -77,6 +77,35 @@ const NODE_NAME_ALIASES: Record<string, string> = {
 const nodeMergeKey = (name: string) => NODE_NAME_ALIASES[name] ?? name;
 
 /**
+ * 정류장을 일부만 공유하는 두 노선을 합칠 때, 자동으로 만든 순서(먼저 등장한
+ * 쪽 전부 나열 후 남은 쪽 이어붙이기)가 실제 노선과 다른 경우가 있다(예: 서울
+ * 교대역 — 남부터미널은 실제로 교대와 죽전 사이에 있는데, 자동 순서는 맨
+ * 뒤로 보낸다). 확인된 노선만 정확한 순서를 명시해 둔다. route_name은 요일
+ * 괄호가 붙은 채로 들어오므로 그 앞부분만 비교한다.
+ */
+const KNOWN_NODE_ORDER: Record<string, string[]> = {
+  "서울 교대역": [
+    "3호선 교대역 14번 출구(메가커피앞)",
+    "남부터미널",
+    "동천역 환승정류장",
+    "죽전 정류장(간이)",
+    "신갈 정류장(간이)",
+    "대학",
+  ],
+};
+
+function orderedByKnownRoute(names: string[], routeName: string): string[] {
+  const base = routeName.replace(/\s*\([^)]*\)\s*$/, "");
+  const known = KNOWN_NODE_ORDER[base];
+  if (!known) return names;
+  const ordered = known
+    .map((knownName) => names.find((name) => nodeMergeKey(name) === nodeMergeKey(knownName)))
+    .filter((name): name is string => name !== undefined);
+  const leftover = names.filter((name) => !ordered.includes(name));
+  return [...ordered, ...leftover];
+}
+
+/**
  * 등교/하교가 정류장을 일부만 공유하는 경우(예: 서울 교대역 — 등교는
  * 동천역·신갈을 거치고 하교는 대신 남부터미널에서 내린다) 정류장 목록을
  * 합집합으로 만들고, 각 회차는 자신이 실제로 서는 자리에만 시간을 채우고
@@ -91,16 +120,17 @@ function unionMergeNodes(a: BusRoute, b: BusRoute): BusRoute | undefined {
     b.node_info.some((nodeB) => nodeMergeKey(nodeB.name) === nodeMergeKey(nodeA.name)),
   );
   if (!shared) return undefined;
-  const names: string[] = [];
+  const collected: string[] = [];
   const seen = new Set<string>();
   for (const route of [a, b])
     for (const node of route.node_info) {
       const key = nodeMergeKey(node.name);
       if (!seen.has(key)) {
         seen.add(key);
-        names.push(node.name);
+        collected.push(node.name);
       }
     }
+  const names = orderedByKnownRoute(collected, a.route_name);
   const remap = (route: BusRoute) => {
     const indexByKey = new Map(
       route.node_info.map((node, index) => [nodeMergeKey(node.name), index]),

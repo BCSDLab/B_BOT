@@ -381,18 +381,22 @@ describe("버스 timetable 반영", () => {
               {
                 region: "서울",
                 route_type: "등교",
-                route_name: "서울 교대역",
+                route_name: "서울 교대역(주중)",
                 node_info: [
                   { name: "3호선 교대역 14번 출구(메가커피앞)" },
+                  { name: "동천역 환승정류장" },
                   { name: "죽전 정류장(간이)" },
+                  { name: "신갈 정류장(간이)" },
                   { name: "대학" },
                 ],
-                route_info: [{ name: "등교", arrival_time: ["07:20", "07:40", "08:50"] }],
+                route_info: [
+                  { name: "등교", arrival_time: ["07:20", "07:40", "07:42", "07:45", "08:50"] },
+                ],
               },
               {
                 region: "서울",
                 route_type: "하교",
-                route_name: "서울 교대역",
+                route_name: "서울 교대역(주중)",
                 node_info: [
                   { name: "대학" },
                   { name: "죽전 정류장(간이)" },
@@ -413,16 +417,28 @@ describe("버스 timetable 반영", () => {
 
     const body = JSON.parse(String((fetchMock.mock.calls[0] as [URL, RequestInit])[1].body));
     expect(body.commuting_bus_timetables).toHaveLength(1);
-    // "교대"가 "3호선 교대역 14번 출구"와 별개 정류장으로 중복 추가되지 않는다.
+    // "교대"가 "3호선 교대역 14번 출구"와 별개 정류장으로 중복 추가되지 않고,
+    // "남부터미널"은 실제 노선대로 교대와 죽전 사이에 놓인다(자동 순서로
+    // 만들면 맨 뒤로 밀려 잘못 보였다).
     expect(body.commuting_bus_timetables[0].node_info.map((n: { name: string }) => n.name)).toEqual([
       "3호선 교대역 14번 출구",
-      "죽전 정류장",
-      "대학",
       "남부터미널",
+      "동천역 환승정류장",
+      "죽전 정류장",
+      "신갈 정류장",
+      "대학",
     ]);
     expect(body.commuting_bus_timetables[0].route_info).toEqual([
-      { name: "등교", detail: null, arrival_time: ["07:20", "07:40", "08:50", null] },
-      { name: "하교", detail: null, arrival_time: ["하차", "하차", "18:10", "하차"] },
+      {
+        name: "등교",
+        detail: null,
+        arrival_time: ["07:20", null, "07:40", "07:42", "07:45", "08:50"],
+      },
+      {
+        name: "하교",
+        detail: null,
+        arrival_time: ["하차", "하차", null, "하차", null, "18:10"],
+      },
     ]);
   });
 
