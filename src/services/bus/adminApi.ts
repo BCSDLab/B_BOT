@@ -199,6 +199,18 @@ function mergeCommutingDirections(routes: BusRoute[]): BusRoute[] {
 }
 
 /**
+ * `/bus/route`(가장 빠른 교통편)의 `ShuttleBusRouteStrategy`는 정류장 이름에
+ * `BusStation.KOREATECH.queryName`("한기대")이 부분 문자열로 포함되는지로
+ * 캠퍼스 정류장을 찾는다. 공지문에는 이 정류장이 "대학"으로 나오지만
+ * "대학".includes("한기대")는 항상 false라 셔틀 노선이 이 조회에서 전부
+ * 빠진다. 자동화 이전 프로덕션 문서(`_id: 6a464b71...` "천안 계절학기 순환
+ * 셔틀")도 이 정류장을 "한기대"로 표기했었다 — 그 표기를 셔틀에서만 복원한다.
+ * commuting은 이 조회 대상이 아니라서(BusRouteType에 COMMUTING이 없다)
+ * 영향이 없어 "대학"을 그대로 둔다.
+ */
+const isCampusNode = (name: string) => splitParen(name).name === "대학";
+
+/**
  * Admin API가 정의한 필드만 남긴다. route_name과 정류장/회차 이름에서 괄호 안
  * 내용을 분리해 sub_name/detail로 보낸다. running_days는 shuttle 요청에만
  * 존재하는 필드다(KOIN_API_V2 #2397). commuting은 서버가 "주중"으로 자체
@@ -212,7 +224,11 @@ const toAdminRoute = (route: BusRoute, target: BusTarget) => {
     route_type: adminRouteType(route, target),
     route_name: routeName,
     sub_name: subName,
-    node_info: route.node_info.map((node) => splitParen(node.name)),
+    node_info: route.node_info.map((node) =>
+      target === "shuttle" && isCampusNode(node.name)
+        ? { name: "한기대", detail: null }
+        : splitParen(node.name),
+    ),
     route_info: route.route_info.map((trip) => ({
       ...splitParen(trip.name),
       arrival_time: trip.arrival_time,

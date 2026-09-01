@@ -103,6 +103,53 @@ describe("버스 timetable 반영", () => {
     expect(body.shuttle_bus_timetables[0].route_type).toBe("순환");
   });
 
+  it("shuttle의 캠퍼스 정류장 '대학'은 '한기대'로 보낸다", async () => {
+    const shuttleConversion: BusConversion = {
+      ...conversion,
+      payloads: [
+        {
+          target: "shuttle",
+          semester_type: "REGULAR",
+          body: {
+            shuttle_bus_timetables: [
+              {
+                region: "천안",
+                route_type: "셔틀",
+                route_name: "천안 셔틀",
+                node_info: [
+                  { name: "대학(본교)" },
+                  { name: "2캠퍼스(두정캠퍼스)" },
+                  { name: "대학(본교)" },
+                ],
+                route_info: [{ name: "1회", arrival_time: ["08:00", "08:30", "09:00"] }],
+              },
+            ],
+          },
+        },
+      ],
+    };
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await submitBusTimetables([shuttleConversion], auth);
+
+    const body = JSON.parse(String((fetchMock.mock.calls[0] as [URL, RequestInit])[1].body));
+    const route = body.shuttle_bus_timetables[0];
+    expect(route.node_info[0]).toEqual({ name: "한기대", detail: null });
+    expect(route.node_info[1]).toEqual({ name: "2캠퍼스", detail: "두정캠퍼스" });
+    expect(route.node_info[2]).toEqual({ name: "한기대", detail: null });
+  });
+
+  it("commuting의 캠퍼스 정류장은 '대학' 그대로 보낸다", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await submitBusTimetables([conversion], auth);
+
+    const body = JSON.parse(String((fetchMock.mock.calls[0] as [URL, RequestInit])[1].body));
+    expect(body.commuting_bus_timetables[0].node_info[1]).toEqual({ name: "대학", detail: "본교" });
+  });
+
   it("토·일요일에만 도는 셔틀 노선은 route_type을 주말로 보낸다", async () => {
     const weekendConversion: BusConversion = {
       ...conversion,
