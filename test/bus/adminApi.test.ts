@@ -42,7 +42,7 @@ const conversion: BusConversion = {
 };
 
 describe("버스 timetable 반영", () => {
-  it("KOIN 로그인 토큰으로 PUT 하고 running_days를 제거한다", async () => {
+  it("KOIN 로그인 토큰으로 PUT 하고 running_days를 포함한다", async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
 
@@ -58,15 +58,19 @@ describe("버스 timetable 반영", () => {
     const body = JSON.parse(String(init.body));
     expect(Object.keys(body)).toEqual(["commuting_bus_timetables"]);
     const route = body.commuting_bus_timetables[0];
-    // 검수 전용 필드는 전송하지 않는다.
-    expect(route.route_info[0]).not.toHaveProperty("running_days");
+    // route 레벨에는 running_days가 없다(회차별로만 붙는다).
     expect(route).not.toHaveProperty("running_days");
     // 괄호 안 내용을 sub_name/detail로 분리한다.
     expect(route.route_name).toBe("천안역");
     expect(route.sub_name).toBe("터미널 경유");
     expect(route.node_info[0]).toEqual({ name: "터미널", detail: null });
     expect(route.node_info[1]).toEqual({ name: "대학", detail: "본교" });
-    expect(route.route_info[0]).toEqual({ name: "1회", detail: null, arrival_time: ["08:10", "08:50"] });
+    expect(route.route_info[0]).toEqual({
+      name: "1회",
+      detail: null,
+      arrival_time: ["08:10", "08:50"],
+      running_days: ["MON", "TUE", "WED", "THU", "FRI"],
+    });
     // KOIN Admin API의 route_type은 ShuttleRouteType(순환/주중/주말)만 허용하고,
     // commuting 엔드포인트는 그중 "주중"만 통과시킨다. 내부 direction 라벨("등교")을
     // 그대로 보내면 "버스 노선 구분이 잘못되었습니다"로 거부된다.

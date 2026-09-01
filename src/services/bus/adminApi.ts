@@ -199,8 +199,9 @@ function mergeCommutingDirections(routes: BusRoute[]): BusRoute[] {
 }
 
 /**
- * Admin API가 정의한 필드만 남긴다. running_days 같은 검수 전용 필드는 보내지 않는다.
- * route_name과 정류장/회차 이름에서 괄호 안 내용을 분리해 sub_name/detail로 보낸다.
+ * Admin API가 정의한 필드만 남긴다. route_name과 정류장/회차 이름에서 괄호 안
+ * 내용을 분리해 sub_name/detail로 보낸다. running_days는 값이 있는 회차에만
+ * 붙인다.
  */
 const toAdminRoute = (route: BusRoute, target: BusTarget) => {
   const { name: routeName, detail: subName } = splitParen(route.route_name);
@@ -213,6 +214,7 @@ const toAdminRoute = (route: BusRoute, target: BusTarget) => {
     route_info: route.route_info.map((trip) => ({
       ...splitParen(trip.name),
       arrival_time: trip.arrival_time,
+      ...(trip.running_days ? { running_days: trip.running_days } : {}),
     })),
   };
 };
