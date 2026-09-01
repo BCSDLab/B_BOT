@@ -200,8 +200,10 @@ function mergeCommutingDirections(routes: BusRoute[]): BusRoute[] {
 
 /**
  * Admin API가 정의한 필드만 남긴다. route_name과 정류장/회차 이름에서 괄호 안
- * 내용을 분리해 sub_name/detail로 보낸다. running_days는 값이 있는 회차에만
- * 붙인다.
+ * 내용을 분리해 sub_name/detail로 보낸다. running_days는 shuttle 요청에만
+ * 존재하는 필드다(KOIN_API_V2 #2397). commuting은 서버가 "주중"으로 자체
+ * 도출하도록 고쳐져(#2399) 클라이언트가 보낼 필드 자체가 없으므로 붙이지
+ * 않는다.
  */
 const toAdminRoute = (route: BusRoute, target: BusTarget) => {
   const { name: routeName, detail: subName } = splitParen(route.route_name);
@@ -214,7 +216,7 @@ const toAdminRoute = (route: BusRoute, target: BusTarget) => {
     route_info: route.route_info.map((trip) => ({
       ...splitParen(trip.name),
       arrival_time: trip.arrival_time,
-      ...(trip.running_days ? { running_days: trip.running_days } : {}),
+      ...(target === "shuttle" && trip.running_days ? { running_days: trip.running_days } : {}),
     })),
   };
 };
