@@ -1,9 +1,9 @@
-import { getPRThreadInfo } from "~/helper/api/prThread";
+import { getPRThreadTs } from "~/helper/api/prThread";
 
 export default defineEventHandler(async (event) => {
-  const data = await getPRThreadInfo("https://github.com/BCSDLab/KOIN_WEB_RECODE/pull/122");
+  const ts = await getPRThreadTs(event.context.sqlPool, "https://github.com/BCSDLab/KOIN_WEB_RECODE/pull/122");
 
   return {
-    message: data,
+    message: ts,
   };
 });

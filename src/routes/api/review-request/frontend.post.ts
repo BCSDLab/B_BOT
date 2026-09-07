@@ -1,4 +1,4 @@
-import { postPRThreadInfo } from "~/helper/api/prThread";
+import { getPRThreadTs, savePRThread } from "~/helper/api/prThread";
 import CHANNEL_ID from "@/constant/CHANNEL_ID.json";
 
 interface RequestBody {
@@ -23,16 +23,25 @@ export default defineEventHandler(async (event) => {
   const writerMentionString = writerMember ? `<@${writerMember.slack_id}>` : writer;
   const mentionString = mentionList.map((member) => `<@${member.slack_id}>`).join(', ');
 
+  const threadTs = await getPRThreadTs(event.context.sqlPool, pullRequestLink);
+
   const result = await sendSlackBlock({
     client: event.context.slackWebClient,
     channel: CHANNEL_ID.frontend_github,
+    threadTs: threadTs ?? undefined,
     unfurl_links: true,
     blocks: [
       {
         type: 'section',
         text: {
           type: 'mrkdwn',
-          text: `
+          text: threadTs
+            ? `
+*리뷰가 다시 요청되었습니다! :blob-wave:*
+ • 리뷰하러 가기 >> <${pullRequestLink}|click>
+ • 담당자 : ${writerMentionString}
+ • 리뷰어 : ${mentionString}`
+            : `
 *리뷰어가 할당되었습니다! :blob-wave:*
  • 리뷰하러 가기 >> <${pullRequestLink}|click>
  • 담당자 : ${writerMentionString}
@@ -41,8 +50,9 @@ export default defineEventHandler(async (event) => {
       },
     ]
   });
-  if (result.ts) {
-    await postPRThreadInfo({
+  if (!threadTs && result.ts) {
+    await savePRThread({
+      pool: event.context.sqlPool,
       ts: result.ts,
       pullRequestLink,
       reviewers,
