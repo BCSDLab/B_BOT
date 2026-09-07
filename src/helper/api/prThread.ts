@@ -1,43 +1,31 @@
-import BASE_URL from "@/constant/BASE_URL.json";
-interface PRThreadInfo {
-  pullRequestLink: string;
+import type { Pool } from "pg";
+import { query } from "~/helper/adapter/postgres";
+
+export async function getPRThreadTs(pool: Pool, pullRequestLink: string): Promise<string | null> {
+  const result = await query(
+    pool,
+    `SELECT ts FROM pr_thread WHERE pr_link = $1 ORDER BY id DESC LIMIT 1`,
+    [pullRequestLink],
+  );
+  return result.rows[0]?.ts ?? null;
 }
 
-interface GetPRThreadInfoRequest {
-  pullRequestLink: string;
-}
-
-export const getPRThreadInfo = async (pullRequestLink :string) => {
-  return $fetch<PRThreadInfo>('b-bot/pull-request/thread', {
-    baseURL: BASE_URL.INTERAL_BASE_URL,
-    method: 'GET',
-    query: {
-      pullRequestLink,
-    }
-  });
-}
-
-interface PostPRThreadInfoRequest {
+interface SavePRThreadParams {
+  pool: Pool;
   pullRequestLink: string;
   reviewers: string[];
   writer: string;
   ts: string;
 }
 
-export const postPRThreadInfo = async ({
-  pullRequestLink,
-  reviewers,
-  writer,
-  ts,
-}: PostPRThreadInfoRequest) => {
-  return $fetch<PRThreadInfo>('b-bot/pull-request/thread', {
-    baseURL: BASE_URL.INTERAL_BASE_URL,
-    method: 'POST',
-    body: {
-      pullRequestLink,
-      reviewers,
-      writer,
-      ts,
-    }
-  });
+export async function savePRThread({ pool, pullRequestLink, reviewers, writer, ts }: SavePRThreadParams) {
+  await Promise.all(
+    reviewers.map((reviewer) =>
+      query(
+        pool,
+        `INSERT INTO pr_thread (pr_link, ts, reviewer, writer) VALUES ($1, $2, $3, $4)`,
+        [pullRequestLink, ts, reviewer, writer],
+      ),
+    ),
+  );
 }
