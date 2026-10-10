@@ -60,6 +60,22 @@ export async function saveMessage(
   return result.rows.length > 0;
 }
 
+export async function replaceMessage(
+  env: KoinEnv,
+  reportId: number,
+  message: { channelId: string; messageTs: string },
+  deliveryId: string,
+): Promise<void> {
+  await ensureDiningMessageSchema();
+  await query(
+    getPool(),
+    `UPDATE dining_report_message
+        SET channel_id = $3, message_ts = $4, last_delivery_id = $5, updated_at = now()
+      WHERE env = $1 AND report_id = $2`,
+    [env, reportId, message.channelId, message.messageTs, deliveryId],
+  );
+}
+
 export async function markDelivered(env: KoinEnv, reportId: number, deliveryId: string): Promise<void> {
   await ensureDiningMessageSchema();
   await query(
