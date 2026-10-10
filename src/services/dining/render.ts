@@ -11,6 +11,7 @@ export interface RenderedMessage {
 
 export interface RenderOptions {
   adminUrl?: string;
+  imageUnavailable?: boolean;
 }
 
 interface ManualProcessing {
@@ -139,11 +140,13 @@ export function renderReport(
         ].join("\n"),
       },
     },
-    {
-      type: "image",
-      image_url: report.image_url,
-      alt_text: `${report.dining.place} 품절 제보 사진`,
-    },
+    options.imageUnavailable
+      ? { type: "context", elements: [{ type: "mrkdwn", text: "사진을 불러오지 못했습니다." }] }
+      : {
+        type: "image",
+        image_url: report.image_url,
+        alt_text: `${report.dining.place} 품절 제보 사진`,
+      },
     {
       type: "section",
       text: {
