@@ -5,16 +5,20 @@ import { deliver } from "./deliver";
 import { claimDelivery, DiningApiError, reportDeliveryResult, resolveDiningAuth, type DiningApiAuth } from "./diningApi";
 import type { DeliveryJob, DeliveryOutcome } from "./types";
 
-const TARGET: Record<KoinEnv, { channelId: string; adminUrl?: string }> = {
+const TARGET: Record<KoinEnv, { channelId?: string; adminUrl?: string }> = {
   stage: {
-    channelId: CHANNEL_ID.코인_이벤트알림_stage,
+    channelId: CHANNEL_ID.코인_품절제보알림_stage,
     adminUrl: "https://admin.stage.koreatech.in/sold-out-report",
   },
   prod: {
-    channelId: CHANNEL_ID.코인_이벤트알림,
+    channelId: CHANNEL_ID.코인_품절제보알림,
     adminUrl: "https://admin.koreatech.in/sold-out-report",
   },
 };
+
+export function envOfChannel(channelId: string): KoinEnv | undefined {
+  return (Object.keys(TARGET) as KoinEnv[]).find((env) => TARGET[env].channelId === channelId);
+}
 
 const IDLE_MS = 5_000;
 const ALERT_AFTER_FAILURES = 6;
