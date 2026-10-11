@@ -92,6 +92,11 @@ export async function runDiningWorker(env: KoinEnv, signal: AbortSignal): Promis
     console.warn(`[dining:${env}] 주소나 서비스 토큰이 없어 워커를 시작하지 않습니다.`);
     return;
   }
+  const { channelId, adminUrl } = TARGET[env];
+  if (!channelId) {
+    console.warn(`[dining:${env}] 전송할 채널이 정해지지 않아 워커를 시작하지 않습니다.`);
+    return;
+  }
 
   const token = import.meta.env.SLACK_BOT_TOKEN;
   const slack = new WebClient(token, { retryConfig: { retries: 0 }, rejectRateLimitedCalls: true, timeout: 10_000 });
@@ -113,7 +118,7 @@ export async function runDiningWorker(env: KoinEnv, signal: AbortSignal): Promis
       continue;
     }
 
-    const outcome = await deliver(job, { env, ...TARGET[env], slack: slack.chat }).catch((error: unknown) => {
+    const outcome = await deliver(job, { env, channelId, adminUrl, slack: slack.chat }).catch((error: unknown) => {
       console.error(`[dining:${env}] 전송 실패 report=${job.report.report_id} delivery=${job.delivery_id}`, describeError(error));
       return "FAILED" as const;
     });
