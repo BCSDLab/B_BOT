@@ -151,7 +151,11 @@ export function renderReport(
       type: "section",
       text: {
         type: "mrkdwn",
-        text: done ? "이미 처리가 완료된 제보입니다." : "사진을 확인한 후 처리해주세요.",
+        text: !done
+          ? "사진을 확인한 후 처리해주세요."
+          : report.processing_type === "COOP_PREPROCESSED"
+            ? "영양사님이 품절 처리한 제보입니다."
+            : "이미 처리가 완료된 제보입니다.",
       },
     },
   ];

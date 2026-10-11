@@ -140,9 +140,15 @@ describe("품절 제보 메시지", () => {
       for (const report of [approvedAutomatically, coopPreprocessed]) {
         const text = json(report);
         expect(text).toContain("식단 품절 제보가 접수되었습니다");
-        expect(text).toContain("이미 처리가 완료된 제보입니다.");
         expect(render(report).blocks.some((block) => block.type === "image")).toBe(true);
       }
+      expect(json(approvedAutomatically)).toContain("이미 처리가 완료된 제보입니다.");
+    });
+
+    it("영양사님이 품절 처리한 제보는 따로 알린다", () => {
+      const text = json(coopPreprocessed);
+      expect(text).toContain("영양사님이 품절 처리한 제보입니다.");
+      expect(text).not.toContain("이미 처리가 완료된 제보입니다.");
     });
 
     it("버튼을 빼고 처리자를 지어내지 않는다", () => {
