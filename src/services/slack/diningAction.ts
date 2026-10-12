@@ -3,7 +3,7 @@ import type { WebClient } from "@slack/web-api";
 import { decideReport, type Decision } from "~/services/dining/decision";
 import { resolveDiningAuth } from "~/services/dining/diningApi";
 import { APPROVE_ACTION_ID, REJECT_ACTION_ID } from "~/services/dining/render";
-import { envOfChannel } from "~/services/dining/worker";
+import { envOfChannel, wakeDiningWorker } from "~/services/dining/worker";
 import type { BlockActionSetting } from "./type";
 
 async function handleDiningDecision(
@@ -32,7 +32,9 @@ async function handleDiningDecision(
     user_id: body.user.id,
     display_name: await displayName(client, body.user),
   };
-  await reply(await decideReport(decision, reportId, actor, auth));
+  const result = await decideReport(decision, reportId, actor, auth);
+  wakeDiningWorker(env);
+  await reply(result);
 }
 
 async function displayName(client: WebClient, user: BlockAction["user"]): Promise<string> {

@@ -94,3 +94,37 @@ describe("버튼이 눌린 채널로 환경 정하기", () => {
     expect(envOfChannel(CHANNEL_ID.코인_이벤트알림)).toBeUndefined();
   });
 });
+
+describe("승인·반려 뒤 워커 깨우기", () => {
+  it("쉬고 있는 워커는 깨우면 남은 대기 없이 돌아온다", async () => {
+    const { waitForWork, wakeDiningWorker } = await import("~/services/dining/worker");
+    const started = Date.now();
+    const waiting = waitForWork("stage", new AbortController().signal, 60_000);
+    wakeDiningWorker("stage");
+    await waiting;
+    expect(Date.now() - started).toBeLessThan(1_000);
+  });
+
+  it("일하는 중에 깨우면 다음 대기를 건너뛴다", async () => {
+    const { waitForWork, wakeDiningWorker } = await import("~/services/dining/worker");
+    wakeDiningWorker("prod");
+    const started = Date.now();
+    await waitForWork("prod", new AbortController().signal, 60_000);
+    expect(Date.now() - started).toBeLessThan(1_000);
+  });
+
+  it("깨우지 않으면 정해진 시간만큼 기다린다", async () => {
+    const { waitForWork } = await import("~/services/dining/worker");
+    const started = Date.now();
+    await waitForWork("stage", new AbortController().signal, 200);
+    expect(Date.now() - started).toBeGreaterThanOrEqual(190);
+  });
+
+  it("서버가 꺼지면 기다리지 않고 돌아온다", async () => {
+    const { waitForWork } = await import("~/services/dining/worker");
+    const controller = new AbortController();
+    const waiting = waitForWork("stage", controller.signal, 60_000);
+    controller.abort();
+    await expect(waiting).resolves.toBeUndefined();
+  });
+});

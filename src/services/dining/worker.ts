@@ -36,6 +36,35 @@ function describeError(error: unknown): string {
   return String(error);
 }
 
+const wakers = new Map<KoinEnv, () => void>();
+const pendingWakes = new Set<KoinEnv>();
+
+export function wakeDiningWorker(env: KoinEnv): void {
+  const wake = wakers.get(env);
+  if (wake) {
+    wake();
+  } else {
+    pendingWakes.add(env);
+  }
+}
+
+export function waitForWork(env: KoinEnv, signal: AbortSignal, ms = IDLE_MS): Promise<void> {
+  if (pendingWakes.delete(env) || signal.aborted) {
+    return Promise.resolve();
+  }
+  return new Promise((resolve) => {
+    const done = () => {
+      clearTimeout(timer);
+      signal.removeEventListener("abort", done);
+      wakers.delete(env);
+      resolve();
+    };
+    const timer = setTimeout(done, ms);
+    signal.addEventListener("abort", done, { once: true });
+    wakers.set(env, done);
+  });
+}
+
 function sleep(ms: number, signal?: AbortSignal): Promise<void> {
   return new Promise((resolve) => {
     const onAbort = () => {
@@ -118,7 +147,7 @@ export async function runDiningWorker(env: KoinEnv, signal: AbortSignal): Promis
       continue;
     }
     if (!job) {
-      await sleep(IDLE_MS, signal);
+      await waitForWork(env, signal);
       continue;
     }
 
