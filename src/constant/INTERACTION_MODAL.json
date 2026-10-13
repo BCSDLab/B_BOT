@@ -153,73 +153,10 @@
         },
         {
           "type": "section",
-          "block_id": "team",
-          "text": {
-            "type": "mrkdwn",
-            "text": "어떤 팀을 멘션할까요?"
-          },
-          "accessory": {
-            "action_id": "team_select",
-            "type": "static_select",
-            "initial_option": {
-              "text": {
-                "type": "plain_text",
-                "text": "전체"
-              },
-              "value": "all"
-            },
-            "options": [
-              {
-                "text": {
-                  "type": "plain_text",
-                  "text": "전체"
-                },
-                "value": "all"
-              },
-              {
-                "text": {
-                  "type": "plain_text",
-                  "text": "Business Team"
-                },
-                "value": "Business"
-              },
-              {
-                "text": {
-                  "type": "plain_text",
-                  "text": "Campus Team"
-                },
-                "value": "Campus"
-              },
-              {
-                "text": {
-                  "type": "plain_text",
-                  "text": "User Team"
-                },
-                "value": "User"
-              },
-              {
-                "text": {
-                  "type": "plain_text",
-                  "text": "트랙장"
-                },
-                "value": "TrackLeader"
-              },
-              {
-                "text": {
-                  "type": "plain_text",
-                  "text": "Branding Team"
-                },
-                "value": "Branding"
-              }
-            ]
-          }
-        },
-        {
-          "type": "section",
           "block_id": "member_type",
           "text": {
             "type": "mrkdwn",
-            "text": "비기너, 레귤러, 멘토 중 누굴 멘션할까요?"
+            "text": "레귤러, 멘토 중 누굴 멘션할까요?"
           },
           "accessory": {
             "action_id": "member_type_select",
@@ -252,13 +189,6 @@
                   "text": "Regular"
                 },
                 "value": "REGULAR"
-              },
-              {
-                "text": {
-                  "type": "plain_text",
-                  "text": "Beginner"
-                },
-                "value": "BEGINNER"
               }
             ]
           }

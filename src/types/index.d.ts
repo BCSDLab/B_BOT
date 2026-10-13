@@ -39,6 +39,9 @@ interface ImportMetaEnv {
   readonly COOP_LLM_PROVIDER?: "openai" | "anthropic";
   readonly NOTION_TOKEN?: string;
   readonly GDRIVE_FOLDER_IDS?: string;
+  /** 멤버 명단 원본(인터널). 예: https://internal.bcsdlab.com */
+  readonly INTERNAL_API_BASE_URL?: string;
+  readonly INTERNAL_SERVICE_TOKEN?: string;
 }
 interface ImportMeta {
   env: ImportMetaEnv;

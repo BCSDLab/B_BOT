@@ -1,35 +1,30 @@
-import { getPRThreadTs, savePRThread } from "~/helper/api/prThread";
+import { getPRThread, markPRThreadMerged } from "~/helper/api/prThread";
 import CHANNEL_ID from "@/constant/CHANNEL_ID.json";
 
 interface RequestBody {
   pullRequestLink: string,
-  reviewers: string[],
-  writer: string
 }
 
+// 각 저장소의 CHECK_PR_MERGED 워크플로는 링크만 보낸다. 리뷰어·작성자는 리뷰어 지정 때 남긴 pr_thread에서 찾는다.
 export default defineEventHandler(async (event) => {
-  const {
-    pullRequestLink,
-    reviewers,
-    writer
-  } = await readBody<RequestBody>(event);
+  const { pullRequestLink } = await readBody<RequestBody>(event);
+  const pool = event.context.sqlPool;
 
-  const userList: TrackMember[] = await getAllDistinctMembers(event.context.sqlPool);
-  const mentionList = userList.filter((member) => reviewers.some((reviewer) => member.name == reviewer && member.track_name === "FrontEnd"));
-  const writerMember = userList.find((member) => member.name === writer && member.track_name === "FrontEnd");
-  if (mentionList.length === 0) {
-    throw new Error('리뷰어를 찾을 수 없습니다!');
+  // 리뷰어 지정 알림이 없던 PR(봇 도입 전, 리뷰어 자동 지정 없는 저장소)은 스레드가 없다. 새 글을 띄우지 않는다.
+  const thread = await getPRThread(pool, pullRequestLink);
+  if (!thread) {
+    return "SKIPPED";
   }
-  const writerMentionString = writerMember ? `<@${writerMember.slack_id}>` : writer;
-  const mentionString = mentionList.map((member) => `<@${member.slack_id}>`).join(', ');
 
-  const threadTs = await getPRThreadTs(event.context.sqlPool, pullRequestLink);
+  const members = await getMembersOrEmpty();
+  const writerMentionString = thread.writer ? mentionByName(members, thread.writer, "FrontEnd") : "-";
+  const mentionString = thread.reviewers.map((reviewer) => mentionByName(members, reviewer, "FrontEnd")).join(', ');
 
-  const result = await sendSlackBlock({
+  await sendSlackBlock({
     client: event.context.slackWebClient,
     channel: CHANNEL_ID.frontend_github,
-    threadTs: threadTs ?? undefined,
-    unfurl_links: true,
+    threadTs: thread.ts,
+    unfurlLinks: true,
     blocks: [
       {
           type: 'section',
@@ -44,15 +39,7 @@ export default defineEventHandler(async (event) => {
       },
     ],
   });
-  if (!threadTs && result.ts) {
-    await savePRThread({
-      pool: event.context.sqlPool,
-      ts: result.ts,
-      pullRequestLink,
-      reviewers,
-      writer
-    })
-  }
+  await markPRThreadMerged(pool, pullRequestLink);
 
   return "OK";
 });

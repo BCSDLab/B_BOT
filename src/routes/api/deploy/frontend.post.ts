@@ -21,13 +21,8 @@ export default defineEventHandler(async (event) => {
     runUrl,
   } = await readBody<RequestBody>(event);
 
-  const userList: TrackMember[] = await getAllDistinctMembers(
-    event.context.sqlPool,
-  );
-  const actorMember = userList.find(
-    (member) => member.name === actor && member.track_name === "FrontEnd",
-  );
-  const actorMentionString = actorMember ? `<@${actorMember.slack_id}>` : actor;
+  const members = await getMembersOrEmpty();
+  const actorMentionString = mentionByName(members, actor, "FrontEnd");
 
   const isSuccess = status === "success";
   const icon = isSuccess ? ":white_check_mark:" : ":x:";
