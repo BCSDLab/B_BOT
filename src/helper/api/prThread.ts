@@ -14,6 +14,7 @@ export interface PRThread {
   ts: string;
   reviewers: string[];
   writer: string | null;
+  merged: boolean;
 }
 
 /**
@@ -23,10 +24,10 @@ export interface PRThread {
 export async function getPRThread(pool: Pool, pullRequestLink: string): Promise<PRThread | null> {
   const result = await query(
     pool,
-    `SELECT ts, reviewer, writer FROM pr_thread WHERE pr_link = $1 ORDER BY id DESC`,
+    `SELECT ts, reviewer, writer, status FROM pr_thread WHERE pr_link = $1 ORDER BY id DESC`,
     [pullRequestLink],
   );
-  const rows: { ts: string | null; reviewer: string | null; writer: string | null }[] = result.rows;
+  const rows: { ts: string | null; reviewer: string | null; writer: string | null; status: string | null }[] = result.rows;
   const ts = rows[0]?.ts;
   if (!ts) {
     return null;
@@ -36,6 +37,7 @@ export async function getPRThread(pool: Pool, pullRequestLink: string): Promise<
     ts,
     reviewers: sameThread.map((row) => row.reviewer).filter((reviewer): reviewer is string => Boolean(reviewer)),
     writer: sameThread[0].writer,
+    merged: sameThread.some((row) => row.status === 'merged'),
   };
 }
 

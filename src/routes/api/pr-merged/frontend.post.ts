@@ -15,6 +15,10 @@ export default defineEventHandler(async (event) => {
   if (!thread) {
     return "SKIPPED";
   }
+  // 워크플로 재실행으로 같은 PR이 다시 오면 답글을 또 달지 않는다.
+  if (thread.merged) {
+    return "ALREADY_MERGED";
+  }
 
   const members = await getMembersOrEmpty();
   const writerMentionString = thread.writer ? mentionByName(members, thread.writer, "FrontEnd") : "-";
@@ -24,7 +28,6 @@ export default defineEventHandler(async (event) => {
     client: event.context.slackWebClient,
     channel: CHANNEL_ID.frontend_github,
     threadTs: thread.ts,
-    unfurlLinks: true,
     blocks: [
       {
           type: 'section',

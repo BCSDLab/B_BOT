@@ -80,11 +80,11 @@ describe("filterMentionTargets", () => {
 describe("mentionByName", () => {
   it("동명이인은 활동 중인 멤버를 고르고, 없으면 이름을 그대로 쓴다", () => {
     const members = [
-      member({ name: "이현수", slack_id: "U_OLD", is_active: false }),
-      member({ name: "이현수", slack_id: "U_NOW", is_active: true }),
-      member({ name: "이현수", slack_id: "U_BACK", track_name: "BackEnd" }),
+      member({ name: "동명이", slack_id: "U_OLD", is_active: false }),
+      member({ name: "동명이", slack_id: "U_NOW", is_active: true }),
+      member({ name: "동명이", slack_id: "U_BACK", track_name: "BackEnd" }),
     ];
-    expect(mentionByName(members, "이현수", "FrontEnd")).toBe("<@U_NOW>");
+    expect(mentionByName(members, "동명이", "FrontEnd")).toBe("<@U_NOW>");
     expect(mentionByName(members, "김없음", "FrontEnd")).toBe("김없음");
   });
 });
@@ -136,14 +136,15 @@ describe("pr_thread", () => {
 
   it("가장 최근 스레드의 리뷰어·작성자를 모은다", async () => {
     const { pool } = poolReturning([
-      { ts: "2.0", reviewer: "박성주", writer: "이준영" },
-      { ts: "2.0", reviewer: "이지현", writer: "이준영" },
-      { ts: "1.0", reviewer: "옛리뷰어", writer: "이준영" },
+      { ts: "2.0", reviewer: "리뷰어가", writer: "작성자", status: "open" },
+      { ts: "2.0", reviewer: "리뷰어나", writer: "작성자", status: "merged" },
+      { ts: "1.0", reviewer: "이전리뷰어", writer: "작성자", status: "open" },
     ]);
     expect(await getPRThread(pool, "https://github.com/x/pull/1")).toEqual({
       ts: "2.0",
-      reviewers: ["박성주", "이지현"],
-      writer: "이준영",
+      reviewers: ["리뷰어가", "리뷰어나"],
+      writer: "작성자",
+      merged: true,
     });
   });
 

@@ -24,7 +24,6 @@ export default defineEventHandler(async (event) => {
     client: event.context.slackWebClient,
     channel: CHANNEL_ID.frontend_github,
     threadTs: threadTs ?? undefined,
-    unfurlLinks: true,
     blocks: [
       {
         type: 'section',

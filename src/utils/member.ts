@@ -58,7 +58,8 @@ const TRACK_BY_CODE: Record<string, Track> = {
 const CLIENT_TRACKS: Track[] = ['Android', 'FrontEnd', 'iOS'];
 
 const CACHE_TTL_MS = 60_000;
-const REQUEST_TIMEOUT_MS = 5_000;
+// 그룹 멘션은 view_submission 응답 전에 명단을 읽는다. Slack의 3초 ack 안에 끝나야 한다.
+const REQUEST_TIMEOUT_MS = 2_000;
 
 let cache: { at: number; members: BcsdMember[] } | null = null;
 
