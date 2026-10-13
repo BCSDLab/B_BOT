@@ -156,7 +156,7 @@
           "block_id": "member_type",
           "text": {
             "type": "mrkdwn",
-            "text": "레귤러, 멘토 중 누굴 멘션할까요?"
+            "text": "레귤러, 멘토, 트랙장 중 누굴 멘션할까요?"
           },
           "accessory": {
             "action_id": "member_type_select",
@@ -189,6 +189,13 @@
                   "text": "Regular"
                 },
                 "value": "REGULAR"
+              },
+              {
+                "text": {
+                  "type": "plain_text",
+                  "text": "트랙장"
+                },
+                "value": "TRACK_LEAD"
               }
             ]
           }

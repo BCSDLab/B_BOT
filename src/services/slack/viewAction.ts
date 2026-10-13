@@ -4,7 +4,7 @@ import type {
   MentionMetadata,
   ViewActionSetting,
 } from "./type";
-import type { ActiveStatus } from "@/utils/member";
+import type { ActiveStatus, MentionGroup } from "@/utils/member";
 import INTERACTION_MODAL from "@/constant/INTERACTION_MODAL.json";
 import CHANNEL_ID from "@/constant/CHANNEL_ID.json";
 
@@ -52,7 +52,7 @@ export const viewActions: ViewActionSetting[] = [
       },
     }) {
        const track = view['state']['values']['track']['track_select']['selected_option']?.value as Track;
-       const memberType = view['state']['values']['member_type']['member_type_select']['selected_option']?.value as MemberType;
+       const memberType = view['state']['values']['member_type']['member_type_select']['selected_option']?.value as MentionGroup;
        const isActive = view['state']['values']['is_active']['is_active_select']['selected_option']?.value as ActiveStatus;
 
        const { channel_id: channel, thread_ts: threadTs, user_id } = JSON.parse(view['private_metadata']) as GroupMentionMetadata;
@@ -78,7 +78,7 @@ export const viewActions: ViewActionSetting[] = [
 
       if (selectedMember.length > 0) {
         let trackText = `${track === 'all' ? '' : `${track}트랙`} `;
-        let memberTypeText = `${memberType === 'all' ? '' : `${memberType.toLowerCase()}`} `;
+        let memberTypeText = `${memberType === 'all' ? '' : memberType === 'TRACK_LEAD' ? '트랙장' : `${memberType.toLowerCase()}`} `;
         await sendSlackText({
           client,
           channel: channel,

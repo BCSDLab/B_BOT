@@ -20,6 +20,7 @@ const serviceMember = (overrides: Record<string, unknown>) => ({
   memberType: "REGULAR",
   clubActive: true,
   academicStatus: "ENROLLED",
+  positionCodes: [],
   ...overrides,
 });
 
@@ -27,15 +28,15 @@ describe("toBcsdMembers", () => {
   it("인터널 트랙 코드를 모달 값으로 바꾸고 Slack ID 없는 멤버는 뺀다", () => {
     const members = toBcsdMembers([
       serviceMember({ track: "IOS", slackId: "U1" }),
-      serviceMember({ track: "SECURITY", slackId: "U2", clubActive: false }),
-      serviceMember({ track: "UNKNOWN", slackId: "U3" }),
+      serviceMember({ track: "SECURITY", slackId: "U2", clubActive: false, positionCodes: ["SECURITY_LEAD"] }),
+      serviceMember({ track: "UNKNOWN", slackId: "U3", positionCodes: ["PRESIDENT", "GAME_EDUCATION_LEAD"] }),
       serviceMember({ slackId: null }),
     ] as never);
 
-    expect(members.map((m) => [m.slack_id, m.track_name, m.is_active])).toEqual([
-      ["U1", "iOS", true],
-      ["U2", "Security", false],
-      ["U3", null, true],
+    expect(members.map((m) => [m.slack_id, m.track_name, m.is_active, m.is_track_lead])).toEqual([
+      ["U1", "iOS", true, false],
+      ["U2", "Security", false, true],
+      ["U3", null, true, false],
     ]);
   });
 });
@@ -47,13 +48,14 @@ const member = (overrides: Partial<BcsdMember>): BcsdMember => ({
   track_name: "FrontEnd",
   member_type: "REGULAR",
   is_active: true,
+  is_track_lead: false,
   ...overrides,
 });
 
 describe("filterMentionTargets", () => {
   const members = [
     member({ slack_id: "U1", track_name: "FrontEnd" }),
-    member({ slack_id: "U2", track_name: "iOS", member_type: "MENTOR" }),
+    member({ slack_id: "U2", track_name: "iOS", member_type: "MENTOR", is_track_lead: true }),
     member({ slack_id: "U3", track_name: "BackEnd", is_active: false }),
     member({ slack_id: "U4", track_name: null }),
   ];
@@ -73,6 +75,23 @@ describe("filterMentionTargets", () => {
       "<@U1>",
       "<@U2>",
       "<@U4>",
+    ]);
+  });
+});
+
+describe("트랙장 멘션", () => {
+  it("직책이 트랙장인 멤버만 고르고 트랙과 함께 거를 수 있다", () => {
+    const members = [
+      member({ slack_id: "U1", track_name: "FrontEnd", is_track_lead: true }),
+      member({ slack_id: "U2", track_name: "BackEnd", is_track_lead: true }),
+      member({ slack_id: "U3", track_name: "FrontEnd" }),
+    ];
+    expect(filterMentionTargets(members, { track: "all", memberType: "TRACK_LEAD", isActive: "active" })).toEqual([
+      "<@U1>",
+      "<@U2>",
+    ]);
+    expect(filterMentionTargets(members, { track: "FrontEnd", memberType: "TRACK_LEAD", isActive: "all" })).toEqual([
+      "<@U1>",
     ]);
   });
 });
