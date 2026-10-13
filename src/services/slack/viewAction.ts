@@ -1,11 +1,10 @@
 import "@total-typescript/ts-reset/fetch";
-import type { Pool } from "pg";
 import type {
   GroupMentionMetadata,
   MentionMetadata,
   ViewActionSetting,
 } from "./type";
-import type { ActiveStatus } from "@/utils/member";
+import type { ActiveStatus, MentionGroup } from "@/utils/member";
 import INTERACTION_MODAL from "@/constant/INTERACTION_MODAL.json";
 import CHANNEL_ID from "@/constant/CHANNEL_ID.json";
 
@@ -51,31 +50,39 @@ export const viewActions: ViewActionSetting[] = [
       action: {
         view
       },
-      context,
     }) {
        const track = view['state']['values']['track']['track_select']['selected_option']?.value as Track;
-       const team = view['state']['values']['team']['team_select']['selected_option']?.value as Team;
-       const memberType = view['state']['values']['member_type']['member_type_select']['selected_option']?.value as MemberType;
+       const memberType = view['state']['values']['member_type']['member_type_select']['selected_option']?.value as MentionGroup;
        const isActive = view['state']['values']['is_active']['is_active_select']['selected_option']?.value as ActiveStatus;
 
        const { channel_id: channel, thread_ts: threadTs, user_id } = JSON.parse(view['private_metadata']) as GroupMentionMetadata;
-      const pool = (context.sqlPool as Pool);
-       const selectedMember = await getMentionTargetMembers({
-         pool,
-         team,
-         track,
-         memberType,
-         isActive,
-       });
 
-      if (selectedMember.length > 0) {
-        let trackText = `${track === 'all' ? '' : `${track}트랙`} `;
-        let teamText = `${team === 'all' ? '' : `${team}팀`} `;
-        let memberTypeText = `${memberType === 'all' ? '' : `${memberType.toLowerCase()}`} `;
+      let selectedMember: string[];
+      try {
+        selectedMember = await getMentionTargetMembers({
+          track,
+          memberType,
+          isActive,
+        });
+      } catch (error) {
+        // 명단을 못 읽은 것을 "해당 인원 없음"으로 보이면 안 된다.
+        console.error((error as Error).message);
         await sendSlackText({
           client,
           channel: channel,
-          text: `<@${user_id}>님의 ${teamText}${trackText}${memberTypeText}단체멘션!\n${selectedMember.join(', ')}\n확인 부탁드립니다 :dancing_toad:`,
+          text: '멤버 명단을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.',
+          threadTs,
+        });
+        return;
+      }
+
+      if (selectedMember.length > 0) {
+        let trackText = `${track === 'all' ? '' : `${track}트랙`} `;
+        let memberTypeText = `${memberType === 'all' ? '' : memberType === 'TRACK_LEAD' ? '트랙장' : `${memberType.toLowerCase()}`} `;
+        await sendSlackText({
+          client,
+          channel: channel,
+          text: `<@${user_id}>님의 ${trackText}${memberTypeText}단체멘션!\n${selectedMember.join(', ')}\n확인 부탁드립니다 :dancing_toad:`,
           threadTs,
         });
       } else {
