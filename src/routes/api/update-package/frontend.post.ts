@@ -1,33 +1,32 @@
 import CHANNEL_ID from "@/constant/CHANNEL_ID.json";
-
-const 패키지명 = {
-  "FRONT_KOIN_LIBRARY": "@bcsdlab/koin",
-  "FRONT_UTILS_LIBRARY": "@bcsdlab/utils",
-} as const;
+import { resolvePackageName } from "~/services/package/packageName";
 
 interface RequestBody {
   pullRequestLink: string;
   pullRequestTitle: string;
-  repositoryName: keyof typeof 패키지명;
+  packageName?: string;
+  /** @deprecated 예전 단일 패키지 저장소용. 새 워크플로는 packageName을 보낸다. */
+  repositoryName?: string;
   version: string;
 }
 
 export default defineEventHandler(async (event) => {
 
-  const { pullRequestLink, pullRequestTitle, repositoryName, version }  = await readBody<RequestBody>(event);
-  const packageName = 패키지명[repositoryName];
+  const { pullRequestLink, pullRequestTitle, packageName: requestedPackageName, repositoryName, version }  = await readBody<RequestBody>(event);
+  const packageName = resolvePackageName({ packageName: requestedPackageName, repositoryName });
 
   if (!packageName) {
+    const detail = `${requestedPackageName ?? repositoryName}, ${pullRequestLink}, ${pullRequestTitle}, ${version}`;
     await sendSlackText({
       client: event.context.slackWebClient,
       channel: CHANNEL_ID.트랙_front_end,
-      text: `패키지가 배포되었지만, 패키지 이름을 찾을 수 없어요., ${repositoryName}, ${packageName}, ${pullRequestLink}, ${pullRequestTitle}, ${version}`,
+      text: `패키지가 배포되었지만, 패키지 이름을 찾을 수 없어요., ${detail}`,
       unfurl_links: true,
     });
 
     throw createError({
       statusCode: 500,
-      statusMessage: `패키지가 배포되었지만, 패키지 이름을 찾을 수 없어요., ${repositoryName}, ${packageName}, ${pullRequestLink}, ${pullRequestTitle}, ${version}`
+      statusMessage: `패키지가 배포되었지만, 패키지 이름을 찾을 수 없어요., ${detail}`
     })
   }
 
