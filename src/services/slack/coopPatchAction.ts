@@ -9,6 +9,7 @@ import {
 } from "~/services/coop/reviewStore";
 import { notice } from "./notice";
 import type { BlockActionSetting } from "./type";
+import { updateSlack } from "~/utils/slackFunction";
 
 /** 생협 검토 중 올라온 수정 요청의 적용·취소. */
 export const coopPatchActions: BlockActionSetting[] = [

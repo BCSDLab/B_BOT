@@ -5,6 +5,7 @@ import INTERACTION_MODAL from "@/constant/INTERACTION_MODAL.json";
 import {
   command as googleMeetCommand,
 } from "./domain/googleMeet"
+import { sendSlackText } from "~/utils/slackFunction";
 
 export const commands: CommandSetting[] = [
   {

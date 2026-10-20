@@ -8,6 +8,7 @@ import { messages as lectureMessages } from "./domain/lecture";
 import { messages as coopMessages } from "./domain/coop";
 import { messages as busMessages } from "./domain/bus";
 import { answerStream, logQuery } from "~/services/rag";
+import { sendSlackBlock, sendSlackText } from "~/utils/slackFunction";
 
 
 const USER_TEXT_REGEX = /<@([A-Z0-9]+)\|.+>/g;

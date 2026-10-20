@@ -12,6 +12,7 @@ import { botUserId } from "~/utils/slackBot";
 import type { SlackFile } from "~/utils/slackFile";
 import { setFeedback } from "~/services/rag";
 import { assertSlackRequest } from "~/utils/slackRequest";
+import { sendSlackText } from "~/utils/slackFunction";
 
 type Body = {
   type: "event_callback";

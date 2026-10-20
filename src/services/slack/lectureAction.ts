@@ -19,6 +19,7 @@ import {
 } from "~/services/lecture/reviewStore";
 import { notice } from "./notice";
 import type { BlockActionSetting } from "./type";
+import { updateSlack } from "~/utils/slackFunction";
 
 /** 검토 결과에 대한 수정 적용·반영·취소. */
 export const lectureActions: BlockActionSetting[] = [

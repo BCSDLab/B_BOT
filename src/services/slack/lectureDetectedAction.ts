@@ -16,6 +16,7 @@ import { buildResultBlocks, convertToReview } from "~/services/lecture/pipeline"
 import { linkThread } from "~/services/lecture/reviewStore";
 import { notice } from "./notice";
 import type { BlockActionSetting } from "./type";
+import { updateSlack } from "~/utils/slackFunction";
 
 /**
  * 버튼이 달린 원본 메시지를 갈아끼운다.

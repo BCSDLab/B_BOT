@@ -4,9 +4,10 @@ import type {
   MentionMetadata,
   ViewActionSetting,
 } from "./type";
-import type { ActiveStatus, MentionGroup } from "@/utils/member";
 import INTERACTION_MODAL from "@/constant/INTERACTION_MODAL.json";
 import CHANNEL_ID from "@/constant/CHANNEL_ID.json";
+import { getMentionTargetMembers, type ActiveStatus, type MentionGroup } from "~/utils/member";
+import { sendSlackText } from "~/utils/slackFunction";
 
 export const viewActions: ViewActionSetting[] = [
   {
