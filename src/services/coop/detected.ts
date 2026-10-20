@@ -112,7 +112,7 @@ export function hasImageSignature(
 export async function downloadCoopNoticeImage(
   image: CoopNoticeImage,
 ): Promise<ArrayBuffer> {
-  const buffer = await downloadAttachment(image.url, "첨부 이미지");
+  const buffer = await downloadAttachment(image.url, "첨부 이미지를");
   if (!hasImageSignature(new Uint8Array(buffer), image.mimeType)) {
     throw new Error("이미지 파일 내용이 확장자와 일치하지 않습니다.");
   }

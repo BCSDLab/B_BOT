@@ -112,7 +112,8 @@ export function sortByLikelyName<T extends { name: string }>(files: T[], likelyN
  * 공지 첨부를 받는다. 슬랙 파일과 달리 봇 토큰을 붙이지 않는다 —
  * 학교 서버에 우리 토큰을 보낼 이유가 없다.
  */
-export async function downloadAttachment(url: string, label = "첨부 파일"): Promise<ArrayBuffer> {
+/** `label`은 조사까지 받는다("첨부 이미지를"). 받침에 따라 을/를이 갈린다. */
+export async function downloadAttachment(url: string, label = "첨부 파일을"): Promise<ArrayBuffer> {
   if (!isAllowedFileUrl(url)) {
     throw new Error("학교 주소가 아닌 곳에서는 파일을 받지 않습니다.");
   }
@@ -121,7 +122,7 @@ export async function downloadAttachment(url: string, label = "첨부 파일"): 
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   });
   if (!response.ok) {
-    throw new Error(`${label}을 받지 못했습니다 (HTTP ${response.status}).`);
+    throw new Error(`${label} 받지 못했습니다 (HTTP ${response.status}).`);
   }
   const declared = Number(response.headers.get("content-length") ?? 0);
   if (declared > MAX_BYTES) {
