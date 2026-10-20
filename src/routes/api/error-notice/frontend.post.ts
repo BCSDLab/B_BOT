@@ -1,5 +1,6 @@
 
 import CHANNEL_ID from "@/constant/CHANNEL_ID.json";
+import { kstDateKey } from "~/utils/kstDate";
 import { sendSlackBlock } from "~/utils/slackFunction";
 
 interface RequestBody {
@@ -28,7 +29,7 @@ export default defineEventHandler(async (event) => {
       channel = CHANNEL_ID.코인_오류_front_end_stage;
     }
     const storage = useStorage("kvStorage");
-    const key = `${FRONTEND_ERROR_PREFIX}_${(new Date()).toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' }).replaceAll('. ', '-').replace('.', '')}`;
+    const key = `${FRONTEND_ERROR_PREFIX}_${kstDateKey()}`;
     const errorString = JSON.stringify(error);
     const hasSameError = await storage.get<ErrorInfo[]>(`frontend-error-${key}`);
     const threadTs = hasSameError?.find((item) => item.url === url || item.error === errorString)?.ts ?? undefined;

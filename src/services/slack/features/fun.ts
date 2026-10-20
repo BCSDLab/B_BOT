@@ -2,6 +2,7 @@ import BASE_URL from "@/constant/BASE_URL.json";
 import CHANNEL_ID from "@/constant/CHANNEL_ID.json";
 import ICEBRAKING_QUESTIONS from "@/constant/ICEBRAKING_QUESTIONS.json";
 import type { MessageSetting } from "~/services/slack/types";
+import { kstDateKey } from "~/utils/kstDate";
 import { sendSlackBlock, sendSlackText } from "~/utils/slackFunction";
 
 /** `<@U123>` 또는 예전 형식 `<@U123|이름>`. 이름 부분은 `>` 앞에서 끊어야 멘션이 여럿일 때 하나로 뭉치지 않는다. */
@@ -158,7 +159,7 @@ export const messages: MessageSetting[] = [
 
       // 하루 단위(KST)로 사람마다 시도 횟수를 센다. 첫 시도엔 저장된 값이 없다.
       const storage = useStorage('kvStorage');
-      const key = `roulette:${new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' })}`;
+      const key = `roulette:${kstDateKey()}`;
       const attemptCounts = (await storage.getItem<Record<string, number>>(key)) ?? {};
       attemptCounts[userId] = (attemptCounts[userId] ?? 0) + 1;
       await storage.setItem(key, attemptCounts);
