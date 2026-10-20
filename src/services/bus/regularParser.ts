@@ -7,7 +7,6 @@ import type { ArrivalTime, BusRoute, BusTarget } from "./types";
 import { normalizeTime } from "./validation";
 import { sourceDays, WEEKDAYS, type Day } from "./days";
 import { clean, sourceRegion } from "./text";
-import { groupBy } from "~/utils/groupBy";
 
 const KOREAN_DAY: Record<Day, string> = {
   MON: "월요일",
@@ -617,7 +616,11 @@ function seoulGrids(
       const trips = mergeIdenticalTrips(rawTrips);
       const weekdayBase = seoulWeekdayBaseName(originStation);
       const additionalBase = originStation ? `서울 등교 추가 ${originStation}` : "서울 등교 추가";
-      const dayGroups = groupBy(trips, (trip) => dayLabelFromDays(trip.days));
+      const dayGroups = new Map<string, typeof trips>();
+      for (const trip of trips) {
+        const day = dayLabelFromDays(trip.days);
+        dayGroups.set(day, [...(dayGroups.get(day) ?? []), trip]);
+      }
       for (const [day, dayTrips] of dayGroups) {
         const base = day === "주중" ? weekdayBase : additionalBase;
         dayTrips.forEach((trip, index) => {
@@ -691,7 +694,11 @@ function seoulReturnRoutes(
     // 같은 문서로 합친다(프로덕션 실제 데이터 `_id: 69a5a710...`도 등교/하교가
     // 함께 "서울 교대역" 한 문서에 있다). 특정 요일에만 도는 추가 배차만
     // "서울 하교 추가"로 나눈다.
-    const dayGroups = groupBy(dispatches, (match) => dayGroupLabel(match[2]));
+    const dayGroups = new Map<string, RegExpMatchArray[]>();
+    for (const match of dispatches) {
+      const day = dayGroupLabel(match[2]);
+      dayGroups.set(day, [...(dayGroups.get(day) ?? []), match]);
+    }
     for (const [day, dayDispatches] of dayGroups) {
       const base = day === "주중" ? SEOUL_BASE_ROUTE_NAME : "서울 하교 추가";
       dayDispatches.forEach((match, index) => {
