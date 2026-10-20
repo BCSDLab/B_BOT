@@ -42,6 +42,8 @@ vi.mock("~/services/coop/pipeline", () => ({
     blockingCount: 0,
     infoCount: 0,
   })),
+}));
+vi.mock("~/services/slack/features/coop/blocks", () => ({
   buildRegularCoopResultBlocks: vi.fn(() => [{
     type: "section",
     text: { type: "mrkdwn", text: "변환 완료" },

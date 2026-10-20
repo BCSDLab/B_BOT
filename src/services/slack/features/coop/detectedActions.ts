@@ -11,11 +11,8 @@ import {
   type DetectedCoopTermName,
   type CoopNoticeImage,
 } from "~/services/coop/detected";
-import {
-  buildRegularCoopResultBlocks,
-  convertRegularRawCoopToReview,
-  extractCoopImage,
-} from "~/services/coop/pipeline";
+import { convertRegularRawCoopToReview, extractCoopImage } from "~/services/coop/pipeline";
+import { buildRegularCoopResultBlocks } from "~/services/slack/features/coop/blocks";
 import { linkCoopThread } from "~/services/coop/reviewStore";
 import { createCoopJob } from "~/services/coop/jobStore";
 import { labelOf, type KoinEnv } from "~/services/koin/target";

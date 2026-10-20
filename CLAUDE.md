@@ -19,6 +19,8 @@ B-BOT (삐봇) — BCSD Lab Slack 봇. 이 파일은 사람과 Claude Code가 �
 
 - **수신**: `src/routes/*.post.ts` (`event`/`slash`/`interaction`) — Nitro 파일 라우팅으로 `/event` 등에 매핑.
 - **Slack 핸들러**: `src/services/slack/features/<기능>`에 구현하고 `services/slack/registry/*`에 등록만 한다(registry엔 구현을 두지 않는다). 메시지 핸들러는 등록 순서대로 전부 돌므로 순서가 의미를 가진다 — `test/slack/registry.test.ts` 스냅샷이 고정한다.
+- **레이어 방향**: `routes`·`tasks` → `services/slack`(Slack 입출력·메시지 빌더) → `services/<도메인>` → `infra`. 도메인(bus·coop·lecture·koin 등)은 `@slack/*`를 import하지 않는다(예외: Slack 배달이 본업인 `dining`, 버전 갱신 알림을 보내는 `bus/versionSchedule`).
+- **공통 흐름**: 반영 버튼은 `services/slack/applyFlow.ts`, 공지 감지 버튼은 `services/slack/detectedFlow.ts`, `!수정`은 `features/editCommand.ts`(스레드 주인에게 분배)를 쓴다.
 - **주입**: `src/plugins/injectContext.ts`가 요청마다 `event.context`에 `slackWebClient`(@slack/web-api)와 `sqlPool`(pg)을 넣는다. 핸들러는 여기서 꺼내 쓴다.
 - **DB**: `src/infra/postgres.ts`의 공유 풀 `getPool()`과 `query`(모듈마다 풀을 새로 만들지 않는다). 첫 사용 때 만드는 테이블은 `ensureOnce`로 감싼다. **쿼리는 파라미터 바인딩**으로(직접 문자열 결합 금지). 봇 Postgres(pgvector)에는 PR 스레드·RAG·작업 기록만 둔다.
 - **멤버**: 원본은 **인터널**(`internal.bcsdlab.com`). `src/services/member/members.ts`가 서비스 API(`GET /v1/service/members`, `INTERNAL_SERVICE_TOKEN`)로 읽기만 한다(60초 캐시). 팀 구분은 폐지됐다. 봇 DB에 멤버 테이블을 다시 만들지 않는다.

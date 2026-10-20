@@ -38,6 +38,8 @@ vi.mock("~/services/koin/target", () => ({
 vi.mock("~/services/coop/pipeline", () => ({
   extractCoopImage: mocks.extractCoopImage,
   convertRegularRawCoopToReview: mocks.convertRegularRawCoopToReview,
+}));
+vi.mock("~/services/slack/features/coop/blocks", () => ({
   buildRegularCoopResultBlocks: vi.fn((outcome, target, actor) => [{ type: "section", text: { type: "mrkdwn", text: `결과 ${outcome.token} ${target.termName} <@${actor}>` } }]),
 }));
 vi.mock("~/services/coop/jobStore", () => ({ createCoopJob: mocks.createCoopJob }));

@@ -85,7 +85,7 @@ describe("명령어 충돌", () => {
     expect(matching).toHaveLength(0);
   });
 
-  it("!수정은 강의·버스 핸들러만 받는다", async () => {
+  it("!수정은 분배기 하나만 받는다", async () => {
     const { messageFunctionList } = await import("~/services/slack/registry/messages");
 
     const matching = messageFunctionList.filter((m) =>
@@ -94,8 +94,8 @@ describe("명령어 충돌", () => {
         : m.regex.test("!수정 유체역학 03 교수 우창규로"),
     );
 
-    // 강의와 버스가 같은 접두사를 쓰지만 각자 소속 스레드에서만 응답한다.
-    expect(matching.length).toBeGreaterThanOrEqual(1);
+    // 강의·생협·버스가 같은 접두사를 쓰므로 분배기가 스레드 주인에게만 넘긴다.
+    expect(matching).toHaveLength(1);
     expect(matching.every((m) => !m.acceptsFiles)).toBe(true);
   });
 });

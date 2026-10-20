@@ -1,4 +1,4 @@
-import type { KnownBlock } from "@slack/web-api";
+
 import { generateCoopStructured } from "./llm";
 import { displayHour, normalizeClock, normalizeDate, normalizeMealType, normalizePhone } from "./convert";
 import type { AdminOperationHour, RegularConversionResult } from "./types";
@@ -288,55 +288,4 @@ export function applyCoopPatches(
   }
   next.request = { coop_shops: next.shops.map((shop) => shop.admin) };
   return next;
-}
-
-/** 식당 · 요일 · 식사 순으로 적는다. 요일이 없으면 식사 구분도 적지 않는다. */
-function describePatchTarget(patch: CoopPatch): string {
-  if (!patch.shopName) return patch.field === "from_date" ? "운영 시작일" : "운영 종료일";
-  const dayOfWeek = patch.dayOfWeek === "FRIDAY" ? "금요일" : patch.dayOfWeek;
-  if (!dayOfWeek) return patch.shopName;
-  return [patch.shopName, dayOfWeek, patch.type].filter(Boolean).join(" · ");
-}
-
-export function buildCoopPatchBlocks(
-  plan: CoopPatchPlan,
-  patchToken: string,
-  requesterId: string,
-): KnownBlock[] {
-  const lines = plan.patches.map((patch) => {
-    return `*${describePatchTarget(patch)}*\n  이전: ${patch.before || "(비어 있음)"}\n  이후: ${patch.after || "(비움)"}`;
-  });
-  const blocks: KnownBlock[] = [{
-    type: "section",
-    text: { type: "mrkdwn", text: `*수정 ${plan.patches.length}건*\n\n${lines.join("\n\n")}` },
-  }];
-  if (plan.problems.length > 0) {
-    blocks.push({
-      type: "section",
-      text: { type: "mrkdwn", text: [":warning: *적용하지 않은 요청*", ...plan.problems.map((problem) => `• ${problem}`)].join("\n") },
-    });
-  }
-  blocks.push({
-    type: "actions",
-    elements: [
-      {
-        type: "button",
-        text: { type: "plain_text", text: "수정 적용", emoji: true },
-        style: "primary",
-        action_id: "coop:patch_apply",
-        value: JSON.stringify({ patchToken, requesterId }),
-      },
-      {
-        type: "button",
-        text: { type: "plain_text", text: "취소", emoji: true },
-        action_id: "coop:patch_cancel",
-        value: JSON.stringify({ patchToken, requesterId }),
-      },
-    ],
-  });
-  blocks.push({
-    type: "context",
-    elements: [{ type: "mrkdwn", text: "적용하면 검토 페이지와 요청 JSON이 함께 갱신됩니다. 링크는 그대로입니다." }],
-  });
-  return blocks;
 }

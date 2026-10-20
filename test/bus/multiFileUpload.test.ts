@@ -23,6 +23,8 @@ vi.mock("~/services/bus/jobStore", () => ({
 
 vi.mock("~/services/bus/pipeline", () => ({
   convertBusToReview: vi.fn(),
+}));
+vi.mock("~/services/slack/features/bus/blocks", () => ({
   buildReviewApprovalBlocks: vi.fn(),
   buildBusPatchBlocks: vi.fn(),
 }));

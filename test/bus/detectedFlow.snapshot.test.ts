@@ -34,6 +34,8 @@ vi.mock("~/services/koin/target", () => ({
 }));
 vi.mock("~/services/bus/pipeline", () => ({
   convertBusToReview: mocks.convertBusToReview,
+}));
+vi.mock("~/services/slack/features/bus/blocks", () => ({
   buildReviewApprovalBlocks: vi.fn((outcome, target, actor) => [{ type: "section", text: { type: "mrkdwn", text: `결과 ${outcome.token} ${target.fileName} <@${actor}>` } }]),
 }));
 vi.mock("~/services/bus/jobStore", () => ({ createBusJob: mocks.createBusJob }));

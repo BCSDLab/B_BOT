@@ -76,10 +76,13 @@ export interface CommandSetting {
   ) => Promise<void>;
 }
 
-interface MessageHandlerParams extends Message {
+export interface MessageHandlerParams extends Message {
   client: WebClient;
   [key: string]: any;
 }
+
+/** `!수정` 처리기가 받는 값. 스레드 주인을 가린 뒤라 부모 스레드가 항상 있다. */
+export type EditCommandParams = MessageHandlerParams & { parentTs: string };
 
 export interface MessageSetting {
   regex: string | RegExp;
