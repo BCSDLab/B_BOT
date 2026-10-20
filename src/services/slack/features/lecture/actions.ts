@@ -7,8 +7,8 @@ import {
 } from "~/services/lecture/adminApi";
 import { cancelJob, claimJob, findJob, finishJob } from "~/services/lecture/jobStore";
 import { assertPatchable } from "~/services/koin/jobLock";
-import { getKoinAdminAuth } from "~/services/koin/adminAuth";
-import { labelOf, resolveTargetByEnv } from "~/services/koin/target";
+import { labelOf } from "~/services/koin/target";
+import { handleApplyButton, type ApplyJob } from "~/services/slack/applyFlow";
 import { applyPatches, resolveAmbiguities } from "~/services/lecture/patch";
 import { buildPatchBlocks, buildStoredReview } from "~/services/lecture/pipeline";
 import {
@@ -17,8 +17,8 @@ import {
   loadReview,
   savePatchPlan,
   updateReview,
+  type StoredReview,
 } from "~/services/lecture/reviewStore";
-import { notice } from "~/services/slack/blocks";
 import type { BlockActionSetting } from "~/services/slack/types";
 import { updateSlack } from "~/utils/slackFunction";
 import { errorMessage } from "~/utils/errorMessage";
@@ -141,151 +141,78 @@ export const lectureActions: BlockActionSetting[] = [
   },
   {
     actionId: "lecture:apply",
-    async handler({ client, body, action }) {
-      if (action.type !== "button" || !body.channel) return;
-
-      const { token } = JSON.parse(action.value ?? "{}") as { token?: string };
-      const channel = body.channel.id;
-      const ts = body.message?.ts;
-      const actor = body.user.id;
-
-      if (!token) return;
-
-      // 반영 권한을 한 명만 갖게 한다. 두 번 들어가면 손으로 못 지운다.
-      // 프로세스 메모리가 아니라 DB에 둬서 재배포해도 풀리지 않는다.
-      const claim = await claimJob(token, actor);
-      if (!claim.ok) {
-        await client.chat.postEphemeral({
-          channel,
-          user: actor,
-          text: claim.reason ?? "지금은 반영할 수 없습니다.",
-        });
-        return;
-      }
-
-      // 실패 메시지에서도 규모를 말해야 해서 try 밖에 둔다.
-      let lectureCount = 0;
-
-      try {
-        const stored = await loadReview(token);
-        if (!stored) {
-          await finishJob(token, "FAILED", "검토 링크 만료");
-          await updateSlack({
-            client, channel, ts,
-            text: "검토 링크 만료",
-            blocks: [{ type: "section", text: { type: "mrkdwn",
-              text: ":x: 검토 링크가 만료됐습니다. 다시 변환해주세요." } }],
-          });
-          return;
-        }
-
-        lectureCount = stored.meta.lectureCount;
-
-        await updateSlack({
-          client, channel, ts,
-          text: "반영 중",
-          blocks: [{ type: "section", text: { type: "mrkdwn",
-            text: `:hourglass_flowing_sand: *반영 중…* ${stored.meta.lectureCount}건\n작업자: <@${actor}>` } }],
-        });
-
-        // 저장된 강의 목록에서 요청을 다시 만든다. 검토 화면이 보여준 것과
-        // 실제로 보내는 값이 갈라지지 않게 하려는 것이다.
-        const { request } = buildAdminRequest(stored.lectures, {
-          year: stored.meta.year,
-          term: toAdminTerm(stored.meta.termName),
-        });
-
-        // 변환할 때 정해진 환경으로 붙는다. 채널이 바뀌어도 대상은 바뀌지 않는다.
-        const resolved = resolveTargetByEnv(stored.meta.env);
-        if (!resolved.target) {
-          throw new Error(resolved.reason ?? "대상 환경을 찾지 못했습니다.");
-        }
-        const auth = await getKoinAdminAuth(resolved.target);
-        // 학기가 없으면 강의 생성이 404로 막힌다. 이미 있으면 서버가 무시한다.
-        await ensureSemester(request, auth);
-        await submitLectures(request, auth);
-        await finishJob(token, "APPLIED");
-
-        await updateSlack({
-          client, channel, ts,
-          text: "반영 완료",
-          blocks: [
-            { type: "section", text: { type: "mrkdwn",
-              text: `:white_check_mark: *${stored.meta.year} ${stored.meta.termName} 반영 완료*\n${labelOf(stored.meta.env)} · 강의 *${stored.meta.lectureCount}건*` } },
-            { type: "context", elements: [{ type: "mrkdwn",
-              text: `작업자: <@${actor}> · ${stored.meta.sourceFileName}` }] },
-          ],
-        });
-      } catch (error) {
-        const message = errorMessage(error);
-        // 실패로 되돌려 원인을 고친 뒤 다시 누를 수 있게 한다.
-        await finishJob(token, "FAILED", message);
-
-        // 강의 생성 도중에 났으면 서버가 어디까지 넣었는지 우리는 모른다.
-        // 지울 API가 없으니, 다시 누르기 전에 그 사실을 먼저 말한다.
-        const mayBePartial = error instanceof AdminApiError && error.stage === "lectures";
-
-        await updateSlack({
-          client, channel, ts,
-          text: "반영 실패",
-          blocks: [
-            { type: "section", text: { type: "mrkdwn", text: `:x: *반영 실패*\n${message}` } },
-            ...(mayBePartial
-              ? notice(
-                  ":warning: 강의 생성 중에 멈췄습니다. *일부가 이미 들어갔을 수 있습니다.*\n" +
-                    "지우는 API가 없으니, 다시 시도하기 전에 반영 상태를 확인해주세요.",
-                )
-              : []),
-            { type: "actions", elements: [
-              {
-                type: "button",
-                text: { type: "plain_text", text: "다시 시도", emoji: true },
-                action_id: "lecture:apply",
-                value: JSON.stringify({ token }),
-                ...(mayBePartial ? { confirm: {
-                  title: { type: "plain_text" as const, text: "다시 반영할까요?" },
-                  text: { type: "mrkdwn" as const, text:
-                    `*${lectureCount}건*을 다시 보냅니다.\n` +
-                    "앞선 시도에서 일부가 이미 들어갔다면 중복될 수 있고, 되돌릴 수 없습니다." },
-                  confirm: { type: "plain_text" as const, text: "그래도 반영" },
-                  deny: { type: "plain_text" as const, text: "취소" },
-                } } : {}),
-              },
-            ] },
-            { type: "context", elements: [{ type: "mrkdwn",
-              text: `작업자: <@${actor}> · 원인을 해결한 뒤 눌러주세요.` }] },
-          ],
-        });
-      }
+    async handler(press) {
+      await handleApplyButton(lectureApplyJob(), "apply", press);
     },
   },
   {
     actionId: "lecture:cancel",
-    async handler({ client, body, action }) {
-      if (action.type !== "button" || !body.channel) return;
-
-      const { token } = JSON.parse(action.value ?? "{}") as { token?: string };
-      const channel = body.channel.id;
-      const actor = body.user.id;
-
-      // 이미 반영됐거나 진행 중인 걸 취소한 것처럼 보이게 두면 안 된다.
-      if (token && !(await cancelJob(token, actor))) {
-        await client.chat.postEphemeral({
-          channel,
-          user: actor,
-          text: "이미 반영됐거나 진행 중이라 취소할 수 없습니다.",
-        });
-        return;
-      }
-
-      await updateSlack({
-        client,
-        channel,
-        ts: body.message?.ts,
-        text: "취소됨",
-        blocks: [{ type: "section", text: { type: "mrkdwn",
-          text: `:no_entry_sign: *반영을 취소했습니다.*\n<@${actor}>` } }],
-      });
+    async handler(press) {
+      await handleApplyButton(lectureApplyJob(), "cancel", press);
     },
   },
 ];
+
+/** 버튼을 누를 때마다 새로 만든다. 실패 안내에 반영하려던 규모와 단계를 써야 해서 들고 있는다. */
+function lectureApplyJob(): ApplyJob<StoredReview> {
+  let lectureCount = 0;
+  let submitting = false;
+  return {
+    texts: {
+      progress: "반영 중",
+      done: "반영 완료",
+      failed: "반영 실패",
+      expired: "검토 링크 만료",
+      expiredNotice: ":x: 검토 링크가 만료됐습니다. 다시 변환해주세요.",
+      cancelled: "취소됨",
+      cancelledTitle: "반영",
+    },
+    retryActionId: "lecture:apply",
+    claim: claimJob,
+    cancel: cancelJob,
+    load: loadReview,
+    expire: (token) => finishJob(token, "FAILED", "검토 링크 만료"),
+    env: (stored) => stored.meta.env,
+    fileName: (stored) => stored.meta.sourceFileName,
+    progress: (stored, actor) => `:hourglass_flowing_sand: *반영 중…* ${stored.meta.lectureCount}건\n작업자: <@${actor}>`,
+    async apply(stored, auth, token) {
+      lectureCount = stored.meta.lectureCount;
+      // 저장된 강의 목록에서 요청을 다시 만든다. 검토 화면이 보여준 것과
+      // 실제로 보내는 값이 갈라지지 않게 하려는 것이다.
+      const { request } = buildAdminRequest(stored.lectures, {
+        year: stored.meta.year,
+        term: toAdminTerm(stored.meta.termName),
+      });
+      // 학기가 없으면 강의 생성이 404로 막힌다. 이미 있으면 서버가 무시한다.
+      await ensureSemester(request, auth);
+      submitting = true;
+      await submitLectures(request, auth);
+      await finishJob(token, "APPLIED");
+      return (
+        `:white_check_mark: *${stored.meta.year} ${stored.meta.termName} 반영 완료*\n` +
+        `${labelOf(stored.meta.env)} · 강의 *${stored.meta.lectureCount}건*`
+      );
+    },
+    async fail(token, message, error) {
+      await finishJob(token, "FAILED", message);
+      // 강의 생성 도중에 났으면 서버가 어디까지 넣었는지 우리는 모른다. 시한 초과나
+      // 연결 끊김은 AdminApiError가 아니라 일반 Error로 오므로 단계로도 판단한다.
+      // 지울 API가 없으니, 다시 누르기 전에 그 사실을 먼저 말한다.
+      const mayBePartial = submitting || (error instanceof AdminApiError && error.stage === "lectures");
+      if (!mayBePartial) return {};
+      return {
+        warning:
+          ":warning: 강의 생성 중에 멈췄습니다. *일부가 이미 들어갔을 수 있습니다.*\n" +
+          "지우는 API가 없으니, 다시 시도하기 전에 반영 상태를 확인해주세요.",
+        confirm: {
+          title: "다시 반영할까요?",
+          text:
+            `*${lectureCount}건*을 다시 보냅니다.\n` +
+            "앞선 시도에서 일부가 이미 들어갔다면 중복될 수 있고, 되돌릴 수 없습니다.",
+          confirm: "그래도 반영",
+          deny: "취소",
+        },
+      };
+    },
+  };
+}

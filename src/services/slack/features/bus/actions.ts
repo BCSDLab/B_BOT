@@ -8,7 +8,6 @@ import {
   finishBusJob,
   setBusVersionSchedules,
 } from "~/services/bus/jobStore";
-import { getKoinAdminAuth } from "~/services/koin/adminAuth";
 import { assertPatchable } from "~/services/koin/jobLock";
 import { applyBusPatchesToConversions } from "~/services/bus/patch";
 import { buildStoredBusReview } from "~/services/bus/pipeline";
@@ -17,8 +16,10 @@ import {
   loadBusPatchPlan,
   loadBusReview,
   updateBusReview,
+  type StoredBusReview,
 } from "~/services/bus/reviewStore";
-import { labelOf, resolveTargetByEnv } from "~/services/koin/target";
+import { labelOf } from "~/services/koin/target";
+import { handleApplyButton, progressLine, type ApplyJob } from "~/services/slack/applyFlow";
 import { validateConversion } from "~/services/bus/validation";
 import { computeBusVersionSchedules, describeBusVersionSchedules } from "~/services/bus/versionSchedule";
 import { notice } from "~/services/slack/blocks";
@@ -29,125 +30,63 @@ import { errorMessage } from "~/utils/errorMessage";
 export const BUS_APPLY_ACTION_IDS = ["bus:apply", "bus:cancel"] as const;
 export const BUS_PATCH_ACTION_IDS = ["bus:patch_apply", "bus:patch_cancel"] as const;
 
+/** 버튼을 누를 때마다 새로 만든다. 어디까지 반영했는지를 이 시도만 들고 있는다. */
+function busApplyJob(): ApplyJob<StoredBusReview> {
+  const appliedPayloads: string[] = [];
+  return {
+    texts: {
+      progress: "버스 시간표 반영 중",
+      done: "버스 시간표 반영 완료",
+      failed: "버스 시간표 반영 실패",
+      expired: "버스 검토 링크 만료",
+      expiredNotice: ":x: 버스 검토 링크가 만료됐습니다. 파일을 다시 올려주세요.",
+      cancelled: "버스 시간표 반영 취소됨",
+      cancelledTitle: "버스 시간표 반영",
+    },
+    retryActionId: "bus:apply",
+    claim: claimBusJob,
+    cancel: cancelBusJob,
+    load: loadBusReview,
+    expire: (token) => finishBusJob(token, "FAILED", "검토 링크 만료"),
+    env: (stored) => stored.meta.env,
+    fileName: (stored) => stored.meta.sourceFileName,
+    progress: (stored, actor) =>
+      `:hourglass_flowing_sand: *버스 시간표 반영 중…* ${stored.meta.routeCount}개\n${progressLine(stored.meta.env, actor)}`,
+    async apply(stored, auth, token) {
+      // 예약 계산은 순수 함수라 여기서 먼저 검증한다. PUT이 끝난 뒤에 실패하면
+      // 이미 반영된 시간표를 FAILED로 잘못 표시하게 된다.
+      const versionSchedules = computeBusVersionSchedules(stored.conversions);
+      await submitBusTimetables(stored.conversions, auth, ({ target, semesterType }) => {
+        appliedPayloads.push(`${target}/${semesterType}`);
+      });
+      await finishBusJob(token, "APPLIED");
+      // 시간표는 지금 반영됐지만, 사이트 버전 문구는 적용 전날 00:05에 바뀌어야 한다.
+      await setBusVersionSchedules(token, versionSchedules);
+      return (
+        `:white_check_mark: *버스 시간표 반영 완료*\n` +
+        `${labelOf(stored.meta.env)} · 노선 *${stored.meta.routeCount}개*\n` +
+        `버전 문구 갱신 예약:\n${describeBusVersionSchedules(versionSchedules)}`
+      );
+    },
+    async fail(token, message) {
+      // 각 PUT은 대상×학기 하나를 통째로 덮어쓴다. 중간에 실패해도 앞선 PUT은 이미
+      // 반영된 상태로 남으므로, 재시도가 안전하다는 것과 어디까지 갔는지를 함께 알린다.
+      const detail = appliedPayloads.length > 0
+        ? `\n:warning: 먼저 반영된 항목: ${appliedPayloads.join(", ")} · 재시도하면 같은 데이터로 다시 덮어씁니다.`
+        : "";
+      await finishBusJob(token, "FAILED", `${message}${detail}`);
+      return { detail };
+    },
+  };
+}
+
 export async function handleBusApplyAction(
   client: WebClient,
   body: BlockAction,
   action: BlockAction["actions"][number],
 ) {
-  if (action.type !== "button" || !body.channel) return;
-  const { token } = JSON.parse(action.value ?? "{}") as { token?: string };
-  if (!token) return;
-
-  const channel = body.channel.id;
-  const ts = body.message?.ts;
-  const actor = body.user.id;
-  const appliedPayloads: string[] = [];
-
-  if (action.action_id === "bus:cancel") {
-    if (!(await cancelBusJob(token, actor))) {
-      await client.chat.postEphemeral({
-        channel,
-        user: actor,
-        text: "이미 반영됐거나 진행 중이라 취소할 수 없습니다.",
-      });
-      return;
-    }
-    await updateSlack({
-      client,
-      channel,
-      ts,
-      text: "버스 시간표 반영 취소됨",
-      blocks: notice(`:no_entry_sign: *버스 시간표 반영을 취소했습니다.*\n<@${actor}>`),
-    });
-    return;
-  }
-
-  const claim = await claimBusJob(token, actor);
-  if (!claim.ok) {
-    await client.chat.postEphemeral({
-      channel,
-      user: actor,
-      text: claim.reason ?? "지금은 반영할 수 없습니다.",
-    });
-    return;
-  }
-
-  try {
-    const stored = await loadBusReview(token);
-    if (!stored) {
-      await finishBusJob(token, "FAILED", "검토 링크 만료");
-      await updateSlack({
-        client,
-        channel,
-        ts,
-        text: "버스 검토 링크 만료",
-        blocks: notice(":x: 버스 검토 링크가 만료됐습니다. 파일을 다시 올려주세요."),
-      });
-      return;
-    }
-
-    await updateSlack({
-      client,
-      channel,
-      ts,
-      text: "버스 시간표 반영 중",
-      blocks: notice(
-        `:hourglass_flowing_sand: *버스 시간표 반영 중…* ${stored.meta.routeCount}개\n` +
-          `${labelOf(stored.meta.env)} · 작업자: <@${actor}>`,
-      ),
-    });
-
-    const resolved = resolveTargetByEnv(stored.meta.env);
-    if (!resolved.target) {
-      throw new Error(resolved.reason ?? "대상 환경을 찾지 못했습니다.");
-    }
-    const auth = await getKoinAdminAuth(resolved.target);
-    // 예약 계산은 순수 함수라 여기서 먼저 검증한다. PUT이 끝난 뒤에 실패하면
-    // 이미 반영된 시간표를 FAILED로 잘못 표시하게 된다.
-    const versionSchedules = computeBusVersionSchedules(stored.conversions);
-    await submitBusTimetables(stored.conversions, auth, ({ target, semesterType }) => {
-      appliedPayloads.push(`${target}/${semesterType}`);
-    });
-    await finishBusJob(token, "APPLIED");
-    // 시간표는 지금 반영됐지만, 사이트 버전 문구는 적용 전날 00:05에 바뀌어야 한다.
-    await setBusVersionSchedules(token, versionSchedules);
-
-    await updateSlack({ client, channel, ts, text: "버스 시간표 반영 완료", blocks: [
-      ...notice(
-        `:white_check_mark: *버스 시간표 반영 완료*\n` +
-          `${labelOf(stored.meta.env)} · 노선 *${stored.meta.routeCount}개*\n` +
-          `버전 문구 갱신 예약:\n${describeBusVersionSchedules(versionSchedules)}`,
-      ),
-      {
-        type: "context",
-        elements: [{ type: "mrkdwn", text: `작업자: <@${actor}> · ${stored.meta.sourceFileName}` }],
-      },
-    ] });
-  } catch (error) {
-    const message = errorMessage(error);
-    // 각 PUT은 대상×학기 하나를 통째로 덮어쓴다. 중간에 실패해도 앞선 PUT은 이미
-    // 반영된 상태로 남으므로, 재시도가 안전하다는 것과 어디까지 갔는지를 함께 알린다.
-    const partial = appliedPayloads.length > 0
-      ? `\n:warning: 먼저 반영된 항목: ${appliedPayloads.join(", ")} · 재시도하면 같은 데이터로 다시 덮어씁니다.`
-      : "";
-    await finishBusJob(token, "FAILED", `${message}${partial}`);
-    await updateSlack({ client, channel, ts, text: "버스 시간표 반영 실패", blocks: [
-      ...notice(`:x: *버스 시간표 반영 실패*\n${message}${partial}`),
-      {
-        type: "actions",
-        elements: [{
-          type: "button",
-          text: { type: "plain_text", text: "다시 시도", emoji: true },
-          action_id: "bus:apply",
-          value: JSON.stringify({ token }),
-        }],
-      },
-      {
-        type: "context",
-        elements: [{ type: "mrkdwn", text: `작업자: <@${actor}> · 원인을 해결한 뒤 눌러주세요.` }],
-      },
-    ] });
-  }
+  const mode = action.action_id === "bus:cancel" ? "cancel" : "apply";
+  await handleApplyButton(busApplyJob(), mode, { client, body, action });
 }
 
 export async function handleBusPatchAction(
