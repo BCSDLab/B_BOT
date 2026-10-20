@@ -115,6 +115,15 @@ describe("강의 반영 Slack 액션", () => {
     expect(await press("lecture:apply")).toMatchSnapshot();
   });
 
+  it("강의 생성이 시한 초과로 끊겨도 일부 반영 경고와 확인 창을 단다", async () => {
+    mocks.submitLectures.mockRejectedValue(
+      new Error("코인 Admin API가 120초 안에 응답하지 않았습니다 — POST /admin/lectures"),
+    );
+    const result = await press("lecture:apply");
+    expect(JSON.stringify(result.updates.at(-1))).toContain("일부가 이미 들어갔을 수 있습니다");
+    expect(result).toMatchSnapshot();
+  });
+
   it("취소", async () => {
     expect(await press("lecture:cancel")).toMatchSnapshot();
   });

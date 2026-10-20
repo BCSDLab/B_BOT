@@ -153,9 +153,10 @@ export const lectureActions: BlockActionSetting[] = [
   },
 ];
 
-/** 버튼을 누를 때마다 새로 만든다. 실패 안내에 반영하려던 규모를 써야 해서 들고 있는다. */
+/** 버튼을 누를 때마다 새로 만든다. 실패 안내에 반영하려던 규모와 단계를 써야 해서 들고 있는다. */
 function lectureApplyJob(): ApplyJob<StoredReview> {
   let lectureCount = 0;
+  let submitting = false;
   return {
     texts: {
       progress: "반영 중",
@@ -184,6 +185,7 @@ function lectureApplyJob(): ApplyJob<StoredReview> {
       });
       // 학기가 없으면 강의 생성이 404로 막힌다. 이미 있으면 서버가 무시한다.
       await ensureSemester(request, auth);
+      submitting = true;
       await submitLectures(request, auth);
       await finishJob(token, "APPLIED");
       return (
@@ -193,9 +195,11 @@ function lectureApplyJob(): ApplyJob<StoredReview> {
     },
     async fail(token, message, error) {
       await finishJob(token, "FAILED", message);
-      // 강의 생성 도중에 났으면 서버가 어디까지 넣었는지 우리는 모른다.
+      // 강의 생성 도중에 났으면 서버가 어디까지 넣었는지 우리는 모른다. 시한 초과나
+      // 연결 끊김은 AdminApiError가 아니라 일반 Error로 오므로 단계로도 판단한다.
       // 지울 API가 없으니, 다시 누르기 전에 그 사실을 먼저 말한다.
-      if (!(error instanceof AdminApiError && error.stage === "lectures")) return {};
+      const mayBePartial = submitting || (error instanceof AdminApiError && error.stage === "lectures");
+      if (!mayBePartial) return {};
       return {
         warning:
           ":warning: 강의 생성 중에 멈췄습니다. *일부가 이미 들어갔을 수 있습니다.*\n" +
