@@ -26,7 +26,8 @@ import {
 import { savePendingCoopVacation } from "~/services/coop/vacationStore";
 import { resolveExtractedCoopSemester } from "~/services/coop/vision";
 import { acquireDetectLock, releaseDetectLock } from "~/services/koin/detectLock";
-import { koreatechArticleUrl, MAX_CHOICES, notice, replaceOriginal, shorten } from "./blocks";
+import { MAX_CHOICES, notice, replaceOriginal, shorten } from "./blocks";
+import { koreatechArticleUrl } from "~/services/koin/article";
 import type { BlockActionSetting } from "./type";
 import { errorMessage } from "~/utils/errorMessage";
 

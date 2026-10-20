@@ -1,23 +1,17 @@
 // Google Drive(Docs) 커넥터: 봇 Google 계정(Meet과 동일 OAuth, drive.readonly 스코프 추가)으로
 // Google Docs를 마크다운 export → 청킹 → 임베딩 → pgvector. 스프레드시트·슬라이드 등은 제외(Docs만).
 // 범위: GDRIVE_FOLDER_IDS(쉼표구분) 지정 시 그 폴더들 재귀, 없으면 계정이 접근 가능한 전체 Docs.
-import { createPool, query } from "~/helper/adapter/postgres";
+import { getPool, query } from "~/helper/adapter/postgres";
 import { embed } from "~/helper/adapter/ollama";
 import { chunk } from "./chunk";
 import { classifyDocType } from "./classify";
 import { auth } from "google-auth-library";
 import { GOOGLE_MEET_KEY } from "~/services/google/googleMeet";
-import type { Pool } from "pg";
 
 const DRIVE = "https://www.googleapis.com/drive/v3";
 const DOC_MIME = "application/vnd.google-apps.document";
 const FOLDER_MIME = "application/vnd.google-apps.folder";
 const MAX_SCAN = 5000;
-
-let _pool: Pool | undefined;
-function getPool(): Pool {
-  return (_pool ??= createPool());
-}
 
 // 이미 한 번 색인됐는지(커서 존재). 배포 시점 최초 1회 자동 색인 가드.
 export async function isGdriveIndexed(): Promise<boolean> {

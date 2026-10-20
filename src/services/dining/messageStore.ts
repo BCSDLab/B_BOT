@@ -1,5 +1,4 @@
-import { query } from "~/helper/adapter/postgres";
-import { getPool } from "~/services/koin/jobLock";
+import { ensureOnce, getPool, query } from "~/helper/adapter/postgres";
 import type { KoinEnv } from "~/services/koin/target";
 
 export interface DiningReportMessage {
@@ -12,25 +11,21 @@ export interface DiningReportMessage {
   updated_at: string;
 }
 
-let schemaReady: Promise<void> | undefined;
-
-export function ensureDiningMessageSchema(): Promise<void> {
-  return (schemaReady ??= (async () => {
-    await query(
-      getPool(),
-      `CREATE TABLE IF NOT EXISTS dining_report_message (
-         env              TEXT NOT NULL,
-         report_id        INTEGER NOT NULL,
-         channel_id       TEXT NOT NULL,
-         message_ts       TEXT NOT NULL,
-         last_delivery_id TEXT NOT NULL,
-         created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
-         updated_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
-         PRIMARY KEY (env, report_id)
-       )`,
-    );
-  })());
-}
+export const ensureDiningMessageSchema = ensureOnce(async () => {
+  await query(
+    getPool(),
+    `CREATE TABLE IF NOT EXISTS dining_report_message (
+       env              TEXT NOT NULL,
+       report_id        INTEGER NOT NULL,
+       channel_id       TEXT NOT NULL,
+       message_ts       TEXT NOT NULL,
+       last_delivery_id TEXT NOT NULL,
+       created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+       updated_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+       PRIMARY KEY (env, report_id)
+     )`,
+  );
+});
 
 export async function findMessage(env: KoinEnv, reportId: number): Promise<DiningReportMessage | undefined> {
   await ensureDiningMessageSchema();

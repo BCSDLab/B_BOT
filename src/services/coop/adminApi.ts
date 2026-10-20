@@ -2,6 +2,7 @@ export type { KoinAdminAuth as CoopAdminAuth } from "~/services/koin/adminAuth";
 import type { KoinAdminAuth as CoopAdminAuth } from "~/services/koin/adminAuth";
 import type { AdminUpdateSemesterRequest } from "./types";
 import { normalizeMealType } from "./convert";
+import { adminFetch, errorSnippet } from "~/services/koin/adminHttp";
 
 export interface CoopSemesterCreateRequest {
   semester: string;
@@ -32,13 +33,6 @@ export class CoopAdminApiError extends Error {
   }
 }
 
-const headers = (accessToken: string) => ({
-  "Content-Type": "application/json",
-  Authorization: `Bearer ${accessToken}`,
-});
-
-const apiUrl = (baseUrl: string, path: string) => `${baseUrl.replace(/\/$/, "")}${path}`;
-
 /** 기존 검수 데이터까지 포함해 Admin API에는 표준 식사 타입과 한글 요일만 전송한다. */
 export function normalizeCoopTimetableRequest(
   request: AdminUpdateSemesterRequest,
@@ -54,10 +48,6 @@ export function normalizeCoopTimetableRequest(
       })),
     })),
   };
-}
-
-async function errorBody(response: Response): Promise<string> {
-  return (await response.text().catch(() => "")).slice(0, 300);
 }
 
 function errorCode(body: string): string | undefined {
@@ -78,15 +68,11 @@ export async function createCoopSemester(
   request: CoopSemesterCreateRequest,
   auth: CoopAdminAuth,
 ): Promise<void> {
-  const response = await fetch(apiUrl(auth.baseUrl, "/admin/coopshop/semesters"), {
-    method: "POST",
-    headers: headers(auth.accessToken),
-    body: JSON.stringify(request),
-  });
+  const response = await adminFetch(auth, "/admin/coopshop/semesters", { method: "POST", body: request });
 
   if (response.ok) return;
 
-  const body = await errorBody(response);
+  const body = await errorSnippet(response);
   if (response.status === 409 && errorCode(body) === "DUPLICATE_SEMESTER") return;
 
   throw new CoopAdminApiError(
@@ -97,13 +83,10 @@ export async function createCoopSemester(
 }
 
 export async function getCoopSemesters(auth: CoopAdminAuth): Promise<CoopSemesterResponse[]> {
-  const response = await fetch(apiUrl(auth.baseUrl, "/admin/coopshop/semesters"), {
-    method: "GET",
-    headers: headers(auth.accessToken),
-  });
+  const response = await adminFetch(auth, "/admin/coopshop/semesters", { method: "GET" });
 
   if (!response.ok) {
-    const body = await errorBody(response);
+    const body = await errorSnippet(response);
     throw new CoopAdminApiError(
       `생협 학기 조회 실패 — GET /admin/coopshop/semesters (HTTP ${response.status})\n${body}`,
       "semester_lookup",
@@ -120,18 +103,14 @@ export async function updateCoopTimetable(
   auth: CoopAdminAuth,
 ): Promise<void> {
   const normalized = normalizeCoopTimetableRequest(request);
-  const response = await fetch(
-    apiUrl(auth.baseUrl, `/admin/coopshop/timetable/${semesterId}`),
-    {
-      method: "PUT",
-      headers: headers(auth.accessToken),
-      body: JSON.stringify(normalized),
-    },
-  );
+  const response = await adminFetch(auth, `/admin/coopshop/timetable/${semesterId}`, {
+    method: "PUT",
+    body: normalized,
+  });
 
   if (response.ok) return;
 
-  const body = await errorBody(response);
+  const body = await errorSnippet(response);
   throw new CoopAdminApiError(
     `생협 시간표 업데이트 실패 — PUT /admin/coopshop/timetable/${semesterId} (HTTP ${response.status})\n${body}`,
     "timetable",

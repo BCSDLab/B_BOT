@@ -1,15 +1,9 @@
 // 지식 소스 색인: 문서 upsert(소스·프로젝트 단위 갱신) + GitHub README 커넥터.
-import { createPool, query } from "~/helper/adapter/postgres";
+import { getPool, query } from "~/helper/adapter/postgres";
 import { embed } from "~/helper/adapter/ollama";
 import { chunk } from "./chunk";
 import { classifyDocType } from "./classify";
-import type { Pool } from "pg";
 import RAG_REPOS from "@/constant/RAG_REPOS.json";
-
-let _pool: Pool | undefined;
-function getPool(): Pool {
-  return (_pool ??= createPool());
-}
 
 // (source, project) 단위로 기존 청크 삭제 후 새로 적재 → 재동기화 시 중복/stale 방지.
 // prefix: 각 청크 앞에 붙는 식별 문구(예: "프로젝트 X — 설명"). 검색 라우팅·LLM 맥락에 사용.

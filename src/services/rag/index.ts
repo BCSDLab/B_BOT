@@ -1,8 +1,7 @@
 // RAG: 질문 → 임베딩 → (레포 라우팅) → pgvector top-k 검색 → 컨텍스트 → 소형 LLM 생성 → 답+출처
 import { createHash } from "node:crypto";
-import { createPool, query } from "~/helper/adapter/postgres";
+import { getPool, query } from "~/helper/adapter/postgres";
 import { embed, generateStream } from "~/helper/adapter/ollama";
-import type { Pool } from "pg";
 import RAG_REPOS from "@/constant/RAG_REPOS.json";
 import { TYPE_WEIGHT, type DocType } from "./classify";
 
@@ -16,12 +15,6 @@ const NUM_PREDICT = 280; // 답변이 중간에 잘리지 않도록(스트리밍
 // (그래야 소형 모델이 다른 레포 청크를 아예 못 봐서 섞임/오귀속이 원천 차단됨)
 const ROUTE_MIN_SCORE = 0.5; // 1위 레포와의 최소 유사도
 const ROUTE_MIN_MARGIN = 0.03; // 1위-2위 유사도 차(모호하면 폴백)
-
-// 봇 메시지 핸들러엔 pool이 주입되지 않으므로 RAG 전용 싱글톤 풀 사용.
-let _pool: Pool | undefined;
-function getPool(): Pool {
-  return (_pool ??= createPool());
-}
 
 // 레포 식별 문구("이름 + 설명")를 한 번 임베딩해 캐시 → 질문과의 유사도로 라우팅.
 let _repoVecs: Array<{ project: string; vec: number[] }> | undefined;

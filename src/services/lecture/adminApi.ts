@@ -1,6 +1,9 @@
 export type { KoinAdminAuth } from "~/services/koin/adminAuth";
 import type { KoinAdminAuth } from "~/services/koin/adminAuth";
 import type { Lecture, LectureInfo } from "./types";
+import { adminFetch, errorSnippet } from "~/services/koin/adminHttp";
+
+const LECTURE_SUBMIT_TIMEOUT_MS = 120_000;
 
 /** POST /admin/lectures의 term enum. */
 export type AdminTerm = "FIRST" | "SECOND" | "SUMMER" | "WINTER";
@@ -226,22 +229,17 @@ export class AdminApiError extends Error {
  */
 export async function ensureSemester(
   { year, term }: Pick<AdminLectureCreateRequest, "year" | "term">,
-  { baseUrl, accessToken }: KoinAdminAuth,
+  auth: KoinAdminAuth,
 ): Promise<void> {
-  const response = await fetch(`${baseUrl.replace(/\/$/, "")}/admin/semesters`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
-    body: JSON.stringify({ year, term }),
-  });
+  const response = await adminFetch(auth, "/admin/semesters", { method: "POST", body: { year, term } });
 
   if (response.ok) {
     return;
   }
 
-  const body = await response.text().catch(() => "");
   throw new AdminApiError(
     `학기 생성 실패 — POST /admin/semesters (HTTP ${response.status})\n` +
-      `${year} ${term}\n${body.slice(0, 300)}`,
+      `${year} ${term}\n${await errorSnippet(response)}`,
     "semester",
     response.status,
   );
@@ -256,12 +254,14 @@ export async function ensureSemester(
  */
 export async function submitLectures(
   request: AdminLectureCreateRequest,
-  { baseUrl, accessToken }: KoinAdminAuth,
+  auth: KoinAdminAuth,
 ): Promise<void> {
-  const response = await fetch(`${baseUrl.replace(/\/$/, "")}/admin/lectures`, {
+  // 강의는 한 번에 수백 건이라 서버 처리가 길다. 중간에 끊으면 서버만 반영하고
+  // 우리는 실패로 남길 수 있어 시한을 넉넉히 둔다.
+  const response = await adminFetch(auth, "/admin/lectures", {
     method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
-    body: JSON.stringify(request),
+    body: request,
+    timeoutMs: LECTURE_SUBMIT_TIMEOUT_MS,
   });
 
   if (response.ok) {
@@ -269,7 +269,7 @@ export async function submitLectures(
   }
 
   // 어느 쪽이 문제인지 사람이 바로 알 수 있게 상태별로 다른 말을 한다.
-  const body = await response.text().catch(() => "");
+  const body = await errorSnippet(response);
   const reason =
     {
       401: "인증이 만료됐습니다. KOIN_ADMIN_TOKEN을 갱신해주세요.",
@@ -283,7 +283,7 @@ export async function submitLectures(
   throw new AdminApiError(
     `강의 생성 실패 — POST /admin/lectures\n${reason}\n` +
       `${request.year} ${request.term} · ${request.lectures.length}건 · ${Math.round(size / 1024)}KB\n` +
-      `${body.slice(0, 300)}`,
+      `${body}`,
     "lectures",
     response.status,
   );

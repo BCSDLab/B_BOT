@@ -1,4 +1,4 @@
-import { generateStructured } from "~/services/lecture/llm";
+import { generateStructured } from "./llm";
 import { sourceDays, type Day } from "./days";
 import type {
   BusConversion,
