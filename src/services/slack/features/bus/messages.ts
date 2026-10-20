@@ -14,7 +14,7 @@ import {
 import { resolveTarget } from "~/services/koin/target";
 import { downloadSlackSpreadsheet, findSpreadsheetFiles } from "~/utils/slackFile";
 import { readThreadContext, threadRootOf } from "~/utils/slackThread";
-import type { MessageSetting } from "~/services/slack/types";
+import type { EditCommandParams, MessageSetting } from "~/services/slack/types";
 import { errorMessage } from "~/utils/errorMessage";
 
 const COMMAND = /^!버스반영/;
@@ -204,30 +204,64 @@ export const messages: MessageSetting[] = [
  */
 const EDIT_COMMAND = /^!수정/;
 
-messages.push({
-  regex: EDIT_COMMAND,
-  async handler({ client, channel, ts, text, user, parentTs }) {
-    const request = text.replace(EDIT_COMMAND, "").trim();
-    const token = parentTs ? await findBusTokenByThread(channel, parentTs) : null;
-    const stored = token ? await loadBusReview(token) : null;
+/** 버스 검토 스레드의 `!수정`. 스레드 주인은 `features/editCommand.ts`가 가린다. */
+export async function handleBusEdit(
+  { client, channel, ts, text, user, parentTs }: EditCommandParams,
+  token: string,
+): Promise<void> {
+  const request = text.replace(EDIT_COMMAND, "").trim();
+  const stored = await loadBusReview(token);
+  // 검토가 만료된 버스 스레드에서는 조용히 빠진다(기존 동작).
+  if (!stored) return;
 
-    // 강의·생협 검수 스레드의 `!수정`은 그쪽 도메인이 처리한다. 여기서는 조용히 빠진다.
-    // stored가 있다는 건 token과 parentTs가 이미 있었다는 뜻이라, 아래부턴 단정 없이 쓴다.
-    if (!parentTs || !token || !stored) return;
+  if (request === "") {
+    await client.chat.postMessage({
+      channel,
+      thread_ts: parentTs,
+      text: "무엇을 바꿀지 적어주세요.",
+      blocks: [
+        {
+          type: "section",
+          text: {
+            type: "mrkdwn",
+            text: [
+              ":pencil: *무엇을 바꿀지 함께 적어주세요.*",
+              "예) `!수정 천안역 1회 터미널 시간을 08:05로 바꿔줘`",
+            ].join("\n"),
+          },
+        },
+      ],
+    });
+    return;
+  }
 
-    if (request === "") {
-      await client.chat.postMessage({
+  const placeholder = await client.chat.postMessage({
+    channel,
+    thread_ts: parentTs,
+    text: "수정 요청 확인 중",
+    blocks: [
+      { type: "section", text: { type: "mrkdwn", text: ":mag: 수정 요청을 확인하는 중…" } },
+    ],
+  });
+  const messageTs = placeholder.ts as string;
+
+  try {
+    const context = await readThreadContext(client, channel, parentTs, ts);
+    const plan = await planBusPatches(request, stored.conversions, context);
+
+    if (plan.patches.length === 0) {
+      await client.chat.update({
         channel,
-        thread_ts: parentTs,
-        text: "무엇을 바꿀지 적어주세요.",
+        ts: messageTs,
+        text: "수정할 내용을 찾지 못했습니다",
         blocks: [
           {
             type: "section",
             text: {
               type: "mrkdwn",
               text: [
-                ":pencil: *무엇을 바꿀지 함께 적어주세요.*",
-                "예) `!수정 천안역 1회 터미널 시간을 08:05로 바꿔줘`",
+                ":grey_question: *수정할 내용을 찾지 못했습니다.*",
+                ...plan.problems.map((problem) => `• ${problem}`),
               ].join("\n"),
             },
           },
@@ -236,67 +270,31 @@ messages.push({
       return;
     }
 
-    const placeholder = await client.chat.postMessage({
+    const patchToken = await saveBusPatchPlan(token, {
+      patches: plan.patches,
+      problems: plan.problems,
+      request,
+    });
+    await client.chat.update({
       channel,
-      thread_ts: parentTs,
-      text: "수정 요청 확인 중",
+      ts: messageTs,
+      text: `수정 ${plan.patches.length}건 확인`,
+      blocks: buildBusPatchBlocks(plan, patchToken, user),
+    });
+  } catch (error) {
+    await client.chat.update({
+      channel,
+      ts: messageTs,
+      text: "수정 요청 처리 실패",
       blocks: [
-        { type: "section", text: { type: "mrkdwn", text: ":mag: 수정 요청을 확인하는 중…" } },
+        {
+          type: "section",
+          text: {
+            type: "mrkdwn",
+            text: `:x: *수정 요청을 처리하지 못했습니다*\n${errorMessage(error)}`,
+          },
+        },
       ],
     });
-    const messageTs = placeholder.ts as string;
-
-    try {
-      const context = await readThreadContext(client, channel, parentTs, ts);
-      const plan = await planBusPatches(request, stored.conversions, context);
-
-      if (plan.patches.length === 0) {
-        await client.chat.update({
-          channel,
-          ts: messageTs,
-          text: "수정할 내용을 찾지 못했습니다",
-          blocks: [
-            {
-              type: "section",
-              text: {
-                type: "mrkdwn",
-                text: [
-                  ":grey_question: *수정할 내용을 찾지 못했습니다.*",
-                  ...plan.problems.map((problem) => `• ${problem}`),
-                ].join("\n"),
-              },
-            },
-          ],
-        });
-        return;
-      }
-
-      const patchToken = await saveBusPatchPlan(token, {
-        patches: plan.patches,
-        problems: plan.problems,
-        request,
-      });
-      await client.chat.update({
-        channel,
-        ts: messageTs,
-        text: `수정 ${plan.patches.length}건 확인`,
-        blocks: buildBusPatchBlocks(plan, patchToken, user),
-      });
-    } catch (error) {
-      await client.chat.update({
-        channel,
-        ts: messageTs,
-        text: "수정 요청 처리 실패",
-        blocks: [
-          {
-            type: "section",
-            text: {
-              type: "mrkdwn",
-              text: `:x: *수정 요청을 처리하지 못했습니다*\n${errorMessage(error)}`,
-            },
-          },
-        ],
-      });
-    }
-  },
-});
+  }
+}

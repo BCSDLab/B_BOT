@@ -3,12 +3,15 @@ import { buildRegularCoopResultBlocks } from "~/services/coop/pipeline";
 import { messages as coopMessages } from "~/services/slack/features/coop/messages";
 
 describe("생협 검수 스레드 수정 안내", () => {
-  it("생협 메시지에서 !수정 명령을 받는다", () => {
-    const matching = coopMessages.filter((message) =>
+  it("!수정은 분배기 하나만 받고 생협 스레드면 생협에 넘긴다", async () => {
+    // 어느 도메인 스레드인지에 따른 실제 분배는 test/slack/editRouting.test.ts가 본다.
+    const { messageFunctionList } = await import("~/services/slack/registry/messages");
+    const matching = messageFunctionList.filter((message) =>
       typeof message.regex === "string"
         ? "!수정 복지관식당 토요일을 미운영으로 바꿔줘".includes(message.regex)
         : message.regex.test("!수정 복지관식당 토요일을 미운영으로 바꿔줘"));
     expect(matching).toHaveLength(1);
+    expect(coopMessages.some((message) => String(message.regex) === "/^!수정/")).toBe(false);
   });
 
   it("변환 완료 메시지에 수정 예시를 보여준다", () => {
