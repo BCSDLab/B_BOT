@@ -590,53 +590,6 @@ interface RepliesResponse {
       */
     }
   },
-  {
-    regex: /^!삐봇qhdks123!$/,
-    async handler({
-      client,
-      channel,
-      ts,
-    }) {
-      const now = new Date();
-
-      // 원하는 시간 시간, 분, 초 로 설정 (24시간 기준)
-      let scheduledDate = new Date(
-        now.getFullYear(),
-        now.getMonth(),
-        now.getDate(),
-        0, 0, 0
-      );
-
-      // 오늘 설정 시간이 이미 지난 경우, 내일 설정 시간으로 설정
-      if (now > scheduledDate) {
-        scheduledDate.setDate(scheduledDate.getDate() + 1);
-      }
-
-      const scheduledTime = Math.floor(scheduledDate.getTime() / 1000);
-
-      // 예약 완료 메시지를 원본 메시지의 스레드에 전송
-
-      // 메시지 예약 전송
-      await client.chat.scheduleMessage({
-        channel: 'C4A8YJ66P', // 예약할 채널 ID
-        // 전송할 메시지 내용
-        text: `2025년 새해가 밝았습니다!
-다들 올해 원하는 목표 꼭 이루시길 바랍니다.
-새해 복 많이 받으시고, 행복한 한 해 되세요. :tada:`,
-        post_at: scheduledTime, // 메시지 전송 시간 (Unix 타임스탬프)
-      });
-
-      const formattedTime = scheduledDate.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false });
-
-      await sendSlackText({
-        client,
-        channel: channel,
-        text: `예약메시지 설정이 완료되었습니다.
-메시지는 ${formattedTime}에 발송됩니다.`,
-        threadTs: ts
-      });
-    }
-  },
   ...googleMeetMessages,
   ...lectureMessages,
   ...coopMessages,
