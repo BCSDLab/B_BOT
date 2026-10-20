@@ -7,7 +7,7 @@ import {
   loadCoopReview,
   updateCoopReview,
 } from "~/services/coop/reviewStore";
-import { notice } from "./notice";
+import { notice } from "./blocks";
 import type { BlockActionSetting } from "./type";
 import { updateSlack } from "~/utils/slackFunction";
 

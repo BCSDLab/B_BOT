@@ -1,5 +1,5 @@
 import type { BlockAction } from "@slack/bolt";
-import type { KnownBlock, WebClient } from "@slack/web-api";
+import type { WebClient } from "@slack/web-api";
 import {
   collectBusSpreadsheets,
   downloadBusNoticeFile,
@@ -15,35 +15,8 @@ import { linkBusThread } from "~/services/bus/reviewStore";
 import { acquireDetectLock, releaseDetectLock } from "~/services/koin/detectLock";
 import { labelOf, resolveTarget } from "~/services/koin/target";
 import type { KoinEnv } from "~/services/koin/target";
+import { koreatechArticleUrl, MAX_CHOICES, notice, replaceOriginal, shorten } from "./blocks";
 import type { BlockActionSetting } from "./type";
-
-const ARTICLE_URL = (articleId: number) => `https://koreatech.in/articles/${articleId}`;
-
-const section = (text: string): KnownBlock[] => [
-  { type: "section", text: { type: "mrkdwn", text } },
-];
-
-/** 배치가 웹훅으로 올린 메시지일 수 있어 response_url로 바꾼다(coop/lecture와 동일). */
-async function replaceOriginal(
-  responseUrl: string | undefined,
-  text: string,
-  blocks: KnownBlock[],
-) {
-  if (!responseUrl) return;
-  await fetch(responseUrl, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ replace_original: true, text, blocks }),
-  });
-}
-
-/** 버튼이 너무 많으면 읽히지 않는다. 넘치면 파일을 직접 올리는 편이 낫다(lecture와 동일). */
-const MAX_CHOICES = 4;
-
-/** 버튼 글자가 길면 잘려서 무엇인지 알 수 없다. */
-function shorten(name: string): string {
-  return name.length > 28 ? `${name.slice(0, 27)}…` : name;
-}
 
 /**
  * 고른 파일을 내려받아 변환하고 검토 링크까지 올린다.
@@ -74,7 +47,7 @@ async function runConversion({
     channel,
     ts,
     text: "버스 시간표 변환 중",
-    blocks: section(
+    blocks: notice(
       `:hourglass_flowing_sand: *버스 시간표* 변환 중…\n${label} · ${file.name}`,
     ),
   });
@@ -111,7 +84,7 @@ async function runConversion({
       channel,
       ts,
       text: "버스 시간표 변환 실패",
-      blocks: section(
+      blocks: notice(
         `:x: *변환 실패*\n${
           error instanceof Error ? error.message : "알 수 없는 오류입니다"
         }\n${file.name} · 요청: <@${actor}>`,
@@ -152,16 +125,16 @@ export async function handleBusDetectedAction(
     // 락을 잡기 전이라 풀 것도 없다.
     const { token } = JSON.parse(action.value ?? "{}") as { token?: string };
     if (token) {
-      const notice = await loadBusDetected(token);
+      const detected = await loadBusDetected(token);
       await dropBusDetected(token);
-      if (notice) {
-        await releaseDetectLock("bus", channel, notice.articleId);
+      if (detected) {
+        await releaseDetectLock("bus", channel, detected.articleId);
       }
     }
     await replaceOriginal(
       body.response_url,
       "버스 공지를 넘어갑니다.",
-      section(`:no_entry_sign: *이 버스 공지는 넘어갑니다.*\n<@${actor}>`),
+      notice(`:no_entry_sign: *이 버스 공지는 넘어갑니다.*\n<@${actor}>`),
     );
     return;
   }
@@ -175,14 +148,14 @@ export async function handleBusDetectedAction(
     const ts = body.message?.ts;
     if (!token || !ts) return;
 
-    const notice = await loadBusDetected(token);
-    const file = notice?.files[fileIndex];
-    if (!notice || !file) {
+    const detected = await loadBusDetected(token);
+    const file = detected?.files[fileIndex];
+    if (!detected || !file) {
       await client.chat.update({
         channel,
         ts,
         text: "만료됨",
-        blocks: section(":x: 이미 처리했거나 만료된 알림입니다."),
+        blocks: notice(":x: 이미 처리했거나 만료된 알림입니다."),
       });
       return;
     }
@@ -194,10 +167,10 @@ export async function handleBusDetectedAction(
       channel,
       ts,
       actor,
-      env: notice.target,
-      label: labelOf(notice.target),
+      env: detected.target,
+      label: labelOf(detected.target),
       file,
-      articleId: notice.articleId,
+      articleId: detected.articleId,
     });
     return;
   }
@@ -213,7 +186,7 @@ export async function handleBusDetectedAction(
     await replaceOriginal(
       body.response_url,
       "버스 반영 대상 채널이 아닙니다.",
-      section(`:x: ${resolved.reason ?? "반영 대상을 찾지 못했습니다."}`),
+      notice(`:x: ${resolved.reason ?? "반영 대상을 찾지 못했습니다."}`),
     );
     return;
   }
@@ -237,13 +210,13 @@ export async function handleBusDetectedAction(
   await replaceOriginal(
     body.response_url,
     "버스 시간표 업데이트를 진행합니다.",
-    section(`:white_check_mark: *버스 시간표 업데이트를 진행합니다.* · ${target.label}\n<@${actor}>`),
+    notice(`:white_check_mark: *버스 시간표 업데이트를 진행합니다.* · ${target.label}\n<@${actor}>`),
   );
 
   const posted = await client.chat.postMessage({
     channel,
     text: "버스 게시글 확인 중",
-    blocks: section(":hourglass_flowing_sand: 버스 게시글을 확인하고 있습니다…"),
+    blocks: notice(":hourglass_flowing_sand: 버스 게시글을 확인하고 있습니다…"),
   });
   const ts = posted.ts;
   if (!ts) {
@@ -252,7 +225,7 @@ export async function handleBusDetectedAction(
     throw new Error("메시지를 올리지 못해 진행할 수 없습니다.");
   }
   const say = (text: string, mrkdwn: string) =>
-    client.chat.update({ channel, ts, text, blocks: section(mrkdwn) });
+    client.chat.update({ channel, ts, text, blocks: notice(mrkdwn) });
 
   let article: Awaited<ReturnType<typeof fetchBusArticle>>;
   try {
@@ -266,7 +239,7 @@ export async function handleBusDetectedAction(
     return;
   }
 
-  const articleUrl = article.url || ARTICLE_URL(articleId);
+  const articleUrl = article.url || koreatechArticleUrl(articleId);
   const files = collectBusSpreadsheets(article.attachments);
   if (files.length === 0) {
     await releaseDetectLock("bus", channel, articleId);
@@ -296,7 +269,7 @@ export async function handleBusDetectedAction(
       ts,
       text: "변환할 파일을 골라주세요",
       blocks: [
-        ...section(
+        ...notice(
           [
             `:page_facing_up: *버스 시간표* · ${target.label}`,
             `시간표 첨부가 *${files.length}개* 입니다. 변환할 파일을 골라주세요.`,
