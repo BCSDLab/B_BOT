@@ -44,7 +44,7 @@ export const messages: MessageSetting[] = [
   },
 ];
 
-export const command: CommandSetting[] = [
+export const commands: CommandSetting[] = [
   {
     command: "/회의생성",
     async handler({

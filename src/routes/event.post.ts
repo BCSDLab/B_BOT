@@ -4,7 +4,7 @@ import type {
   SlackEvent,
   WebClient,
 } from "@slack/web-api";
-import { messageFunctionList } from "~/services/slack/message";
+import { messageFunctionList } from "~/services/slack/registry/messages";
 import { matchesText, readUserMessage, type IncomingMessage } from "~/services/slack/incomingMessage";
 import { botUserId } from "~/utils/slackBot";
 import { setFeedback } from "~/services/rag";

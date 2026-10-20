@@ -46,7 +46,7 @@ describe("첨부 파일 고르기", () => {
 
 describe("파일 첨부 메시지 처리 범위", () => {
   it("강의와 버스 반영 명령어만 파일을 받겠다고 선언한다", async () => {
-    const { messageFunctionList } = await import("~/services/slack/message");
+    const { messageFunctionList } = await import("~/services/slack/registry/messages");
     const accepting = messageFunctionList.filter((m) => m.acceptsFiles);
 
     // 파일 첨부 메시지가 기존 명령어(!질문 등)에 흘러들어가면 없던 동작이 생긴다.
@@ -60,7 +60,7 @@ describe("파일 첨부 메시지 처리 범위", () => {
 
 describe("명령어 충돌", () => {
   it("!강의반영이 수정 핸들러에 걸리지 않는다", async () => {
-    const { messageFunctionList } = await import("~/services/slack/message");
+    const { messageFunctionList } = await import("~/services/slack/registry/messages");
 
     // 스레드에서 !강의반영을 치면 두 핸들러가 모두 반응하던 문제.
     const matching = messageFunctionList.filter((m) =>
@@ -73,7 +73,7 @@ describe("명령어 충돌", () => {
   });
 
   it("스레드 잡담에는 아무 핸들러도 걸리지 않는다", async () => {
-    const { messageFunctionList } = await import("~/services/slack/message");
+    const { messageFunctionList } = await import("~/services/slack/registry/messages");
 
     // 접두사가 없으면 봇이 끼어들지 않아야 한다.
     const matching = messageFunctionList.filter((m) =>
@@ -86,7 +86,7 @@ describe("명령어 충돌", () => {
   });
 
   it("!수정은 강의·버스 핸들러만 받는다", async () => {
-    const { messageFunctionList } = await import("~/services/slack/message");
+    const { messageFunctionList } = await import("~/services/slack/registry/messages");
 
     const matching = messageFunctionList.filter((m) =>
       typeof m.regex === "string"

@@ -1,4 +1,4 @@
-import { commands } from "~/services/slack/command";
+import { commands } from "~/services/slack/registry/commands";
 import type { Command } from "~/services/slack/types";
 import { assertSlackRequest } from "~/utils/slackRequest";
 

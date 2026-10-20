@@ -6,8 +6,8 @@ import type {
   ViewSubmitAction,
 } from '@slack/bolt';
 import { blockActions } from '~/services/slack/registry/blockActions';
-import { shortcuts } from '~/services/slack/shortcut';
-import { viewActions } from '~/services/slack/viewAction';
+import { shortcuts } from '~/services/slack/registry/shortcuts';
+import { viewActions } from '~/services/slack/registry/viewActions';
 import { assertSlackRequest } from "~/utils/slackRequest";
 import { errorMessage } from "~/utils/errorMessage";
 

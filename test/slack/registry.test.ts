@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { blockActions } from "~/services/slack/registry/blockActions";
-import { commands } from "~/services/slack/command";
-import { messageFunctionList } from "~/services/slack/message";
-import { shortcuts } from "~/services/slack/shortcut";
-import { viewActions } from "~/services/slack/viewAction";
+import { commands } from "~/services/slack/registry/commands";
+import { messageFunctionList } from "~/services/slack/registry/messages";
+import { shortcuts } from "~/services/slack/registry/shortcuts";
+import { viewActions } from "~/services/slack/registry/viewActions";
 
 /**
  * 등록표의 내용과 **순서**를 고정한다.
