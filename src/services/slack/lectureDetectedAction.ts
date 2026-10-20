@@ -15,6 +15,7 @@ import type { KoinEnv } from "~/services/koin/target";
 import { buildResultBlocks, convertToReview } from "~/services/lecture/pipeline";
 import { linkThread } from "~/services/lecture/reviewStore";
 import { MAX_CHOICES, notice, replaceOriginal, shorten } from "./blocks";
+import { koreatechArticleUrl } from "~/services/koin/article";
 import type { BlockActionSetting } from "./type";
 import { updateSlack } from "~/utils/slackFunction";
 import { errorMessage } from "~/utils/errorMessage";
@@ -162,12 +163,13 @@ export const lectureDetectedActions: BlockActionSetting[] = [
         return;
       }
 
+      const articleUrl = article.url || koreatechArticleUrl(articleId);
       const files = collectExcelAttachments(article.attachments);
       if (files.length === 0) {
         await releaseDetectLock("lecture", channel, articleId);
         await say("첨부 없음", [
           ":grey_question: *엑셀 첨부를 찾지 못했습니다.*",
-          `<${article.url ?? ""}|${article.title ?? `게시글 ${articleId}`}>`,
+          `<${articleUrl}|${article.title ?? `게시글 ${articleId}`}>`,
           "파일을 직접 올리고 `!강의반영 2026 여름학기`로 실행해주세요.",
         ].join("\n"));
         return;
@@ -191,7 +193,7 @@ export const lectureDetectedActions: BlockActionSetting[] = [
           target: env,
           articleId,
           articleTitle: article.title ?? `게시글 ${articleId}`,
-          articleUrl: article.url ?? "",
+          articleUrl,
           files,
           ...semester,
         });
