@@ -139,6 +139,18 @@ const DAY_CHARS = "월화수목금토일";
 /** `9`, `09A`, `9~10`, `월9A~10B` 등 사람이 말하는 여러 형태. */
 const LOOSE_PERIOD = /^(\d{1,2})([AB])?(?:~(\d{1,2})([AB])?)?$/i;
 
+/** `9A`처럼 반쪽을 콕 집었으면 그대로 두고, `9`라고만 했으면 9교시 전체로 본다. */
+function periodTail(
+  start: string,
+  startHalf: string | undefined,
+  end: string | undefined,
+  endHalf: string | undefined,
+): string | null {
+  if (end) return `${end.padStart(2, "0")}${(endHalf ?? "B").toUpperCase()}`;
+  if (startHalf) return null;
+  return `${start.padStart(2, "0")}B`;
+}
+
 /**
  * 사람이 말한 강의시간을 엑셀 표기로 맞춘다.
  *
@@ -164,12 +176,7 @@ export function normalizePeriodInput(value: string, current: string): string {
 
       const [, start, startHalf, end, endHalf] = matched;
       const head = `${start.padStart(2, "0")}${(startHalf ?? "A").toUpperCase()}`;
-      // `9A`처럼 반쪽을 콕 집었으면 그대로 두고, `9`라고만 했으면 9교시 전체로 본다.
-      const tail = end
-        ? `${end.padStart(2, "0")}${(endHalf ?? "B").toUpperCase()}`
-        : startHalf
-          ? null
-          : `${start.padStart(2, "0")}B`;
+      const tail = periodTail(start, startHalf, end, endHalf);
 
       return `${day}${head}${tail ? `~${tail}` : ""}`;
     })

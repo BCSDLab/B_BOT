@@ -102,6 +102,14 @@ export function cleanFileName(raw: string): string {
   return raw.replace(/\s*\(\s*[\d.]+\s*[KMG]?B\s*\)\s*$/i, "").trim();
 }
 
+/** 위에서부터 처음 맞는 규칙을 쓴다. 계절학기 표기를 학기 번호보다 먼저 본다. */
+const TERM_RULES = [
+  [/하계|여름/, "여름학기"],
+  [/동계|겨울/, "겨울학기"],
+  [/1\s*학기/, "1학기"],
+  [/2\s*학기/, "2학기"],
+] as const;
+
 /**
  * 공지 제목에서 학기를 읽는다.
  *
@@ -114,16 +122,7 @@ export function guessSemester(title: string): { year: number; term: string } | n
     return null;
   }
 
-  const term = /하계|여름/.test(title)
-    ? "여름학기"
-    : /동계|겨울/.test(title)
-      ? "겨울학기"
-      : /1\s*학기/.test(title)
-        ? "1학기"
-        : /2\s*학기/.test(title)
-          ? "2학기"
-          : null;
-
+  const term = TERM_RULES.find(([pattern]) => pattern.test(title))?.[1];
   return term ? { year, term } : null;
 }
 

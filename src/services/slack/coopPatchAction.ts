@@ -11,6 +11,10 @@ import { notice } from "./notice";
 import type { BlockActionSetting } from "./type";
 import { updateSlack } from "~/utils/slackFunction";
 
+function vacationSeason(termName: string): "하계" | "동계" {
+  return termName.startsWith("하계") ? "하계" : "동계";
+}
+
 /** 생협 검토 중 올라온 수정 요청의 적용·취소. */
 export const coopPatchActions: BlockActionSetting[] = [
   {
@@ -60,7 +64,7 @@ export const coopPatchActions: BlockActionSetting[] = [
         const html = periods
           ? renderVacationCoopReview({
             year: stored.meta.year,
-            season: stored.meta.termName.startsWith("하계") ? "하계" : "동계",
+            season: vacationSeason(stored.meta.termName),
             vacationStartDate: periods[1].conversion.fromDate,
             seasonal: periods[0].conversion,
             vacation: periods[1].conversion,

@@ -127,6 +127,16 @@ function parseHours(value: string): { openTime: string; closeTime: string } | nu
   return openTime && closeTime ? { openTime, closeTime } : null;
 }
 
+/** 식사 구분을 알면 그걸로 찾고, 모르면 그날 하나뿐인 시간이나 구분 없는 시간을 쓴다. */
+function findExistingHour(
+  sameDay: AdminOperationHour[],
+  resolvedType: string,
+): AdminOperationHour | undefined {
+  if (resolvedType) return sameDay.find((hour) => normalizeMealType(hour.type ?? "") === resolvedType);
+  if (sameDay.length === 1) return sameDay[0];
+  return sameDay.find((hour) => !hour.type);
+}
+
 export function resolveCoopPatch(
   raw: RawCoopPatch,
   result: RegularConversionResult,
@@ -199,11 +209,7 @@ export function resolveCoopPatch(
     .filter((type): type is string => Boolean(type)))];
   const resolvedType = normalizeMealType(raw.type) || (knownTypes.length === 1 ? knownTypes[0] : "");
   const sameDay = shop.admin.operation_hours.filter((hour) => hour.day_of_week === dayOfWeek);
-  const existing = resolvedType
-    ? sameDay.find((hour) => normalizeMealType(hour.type ?? "") === resolvedType)
-    : sameDay.length === 1
-      ? sameDay[0]
-      : sameDay.find((hour) => !hour.type);
+  const existing = findExistingHour(sameDay, resolvedType);
   if (!resolvedType && (sameDay.length > 1 || knownTypes.length > 1) && !existing) {
     problems.push(`${name} ${dayOfWeek}: 아침/점심/저녁 중 어떤 시간인지 적어주세요.`);
     return null;
@@ -295,17 +301,21 @@ export function applyCoopPatches(
   return next;
 }
 
+/** 식당 · 요일 · 식사 순으로 적는다. 요일이 없으면 식사 구분도 적지 않는다. */
+function describePatchTarget(patch: CoopPatch): string {
+  if (!patch.shopName) return patch.field === "from_date" ? "운영 시작일" : "운영 종료일";
+  const dayOfWeek = patch.dayOfWeek === "FRIDAY" ? "금요일" : patch.dayOfWeek;
+  if (!dayOfWeek) return patch.shopName;
+  return [patch.shopName, dayOfWeek, patch.type].filter(Boolean).join(" · ");
+}
+
 export function buildCoopPatchBlocks(
   plan: CoopPatchPlan,
   patchToken: string,
   requesterId: string,
 ): KnownBlock[] {
   const lines = plan.patches.map((patch) => {
-    const displayDayOfWeek = patch.dayOfWeek === "FRIDAY" ? "금요일" : patch.dayOfWeek;
-    const where = patch.shopName
-      ? `${patch.shopName}${displayDayOfWeek ? ` · ${displayDayOfWeek}${patch.type ? ` · ${patch.type}` : ""}` : ""}`
-      : patch.field === "from_date" ? "운영 시작일" : "운영 종료일";
-    return `*${where}*\n  이전: ${patch.before || "(비어 있음)"}\n  이후: ${patch.after || "(비움)"}`;
+    return `*${describePatchTarget(patch)}*\n  이전: ${patch.before || "(비어 있음)"}\n  이후: ${patch.after || "(비움)"}`;
   });
   const blocks: KnownBlock[] = [{
     type: "section",

@@ -149,6 +149,18 @@ function hint(lecture: Lecture, timeFormat: TimeFormat): string {
     : "이 강의는 원래 강의시간이 없어 요일을 물려받을 수 없습니다. `수09A~10B`처럼 요일을 함께 적어주세요.";
 }
 
+/** 계절학기(range)는 `9~12`도 시각 범위로 읽고, 정규학기는 시각 한 점으로 읽는다. */
+function parseClockInput(
+  value: string,
+  current: string,
+  timeFormat: TimeFormat,
+): Lecture["lecture_infos"] | null {
+  if (timeFormat === "range") {
+    return tryParse(() => parseRangeFormat(normalizeRangeInput(value), SEASONAL_DAYS));
+  }
+  return readAsClock(value, current);
+}
+
 function tryParse(read: () => Lecture["lecture_infos"]): Lecture["lecture_infos"] | null {
   try {
     return read();
@@ -255,9 +267,7 @@ export async function planPatches(
 
       const parsed =
         signal === "clock"
-          ? timeFormat === "range"
-            ? tryParse(() => parseRangeFormat(normalizeRangeInput(item.value), SEASONAL_DAYS))
-            : readAsClock(item.value, lecture.raw_class_time)
+          ? parseClockInput(item.value, lecture.raw_class_time, timeFormat)
           : tryParse(() => parsePeriodFormat(normalized));
 
       if (!parsed) {

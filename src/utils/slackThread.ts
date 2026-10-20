@@ -51,11 +51,12 @@ export async function readThreadContext(
     const lines = (replies.messages ?? [])
       .filter((m) => m.ts !== excludeTs)
       .slice(-MAX_MESSAGES)
-      .map((m) => {
+      .flatMap((m) => {
         const body = flatten(m);
-        return body ? `${m.bot_id ? "봇" : "사용자"}: ${body}` : "";
+        if (!body) return [];
+        const speaker = m.bot_id ? "봇" : "사용자";
+        return [`${speaker}: ${body}`];
       })
-      .filter(Boolean)
       .join("\n");
 
     return lines.slice(-MAX_CHARS);

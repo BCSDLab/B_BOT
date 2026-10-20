@@ -283,6 +283,12 @@ function findStop(nodes: BusRoute["node_info"], name: string): StopMatch {
   return { kind: "none" };
 }
 
+/** 회차를 지정했으면 이름으로 찾고, 안 했으면 회차가 하나뿐일 때만 그걸 쓴다. */
+function pickTrip<T extends { name: string }>(trips: T[], name: string | undefined): T | undefined {
+  if (name) return trips.find((trip) => clean(trip.name) === clean(name));
+  return trips.length === 1 ? trips[0] : undefined;
+}
+
 export function resolvePatch(
   raw: RawPatch,
   conversions: BusConversion[],
@@ -383,11 +389,7 @@ export function resolvePatch(
   const where = describeRoute(route);
 
   const trips = route.route_info;
-  const trip = raw.trip
-    ? trips.find((t) => clean(t.name) === clean(raw.trip))
-    : trips.length === 1
-      ? trips[0]
-      : undefined;
+  const trip = pickTrip(trips, raw.trip);
 
   if (raw.field === "route_name") {
     const after = clean(raw.value);

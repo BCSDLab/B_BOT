@@ -127,6 +127,18 @@ function values(sheet: AnalysedSheet) {
   );
 }
 
+function seoulWeekdayBaseName(originStation: string | undefined): string {
+  if (originStation === "교대역") return SEOUL_BASE_ROUTE_NAME;
+  return originStation ? `서울 ${originStation}` : "서울";
+}
+
+/** 한 칸에 여러 회차가 `/`로 들어 있으면 회차마다 이름을 따로 붙인다. */
+function splitTripName(name: string, count: number, index: number): string {
+  if (count === 1) return name;
+  if (/추가/.test(name)) return `목·금 추가${index + 1}`;
+  return `${name.replace(/\s*\(\d+대\)\s*$/, "")} ${index + 1}회`;
+}
+
 function splitColumnTrip(
   name: string,
   columnValues: Array<ArrivalTime | undefined>,
@@ -140,12 +152,7 @@ function splitColumnTrip(
   const count = Math.max(...parts.map((part) => part.length));
   const days = sourceDays(`${heading} ${name}`);
   return Array.from({ length: count }, (_, index) => ({
-    name:
-      count === 1
-        ? name
-        : /추가/.test(name)
-          ? `목·금 추가${index + 1}`
-          : `${name.replace(/\s*\(\d+대\)\s*$/, "")} ${index + 1}회`,
+    name: splitTripName(name, count, index),
     ...(days ? { running_days: days } : {}),
     arrival_time: parts.map((part) => part[index] ?? null),
   }));
@@ -616,8 +623,7 @@ function seoulGrids(
       // API가 route_info[].running_days를 받지 않으므로(name/detail/
       // arrival_time만 있다) route_name 뒤 괄호(→ sub_name)로 담는다.
       const trips = mergeIdenticalTrips(rawTrips);
-      const weekdayBase =
-        originStation === "교대역" ? SEOUL_BASE_ROUTE_NAME : originStation ? `서울 ${originStation}` : "서울";
+      const weekdayBase = seoulWeekdayBaseName(originStation);
       const additionalBase = originStation ? `서울 등교 추가 ${originStation}` : "서울 등교 추가";
       const dayGroups = new Map<string, typeof trips>();
       for (const trip of trips) {
