@@ -12,7 +12,8 @@ import { errorMessage } from "~/utils/errorMessage";
 import { sendSlackBlock, sendSlackText } from "~/utils/slackFunction";
 
 
-const USER_TEXT_REGEX = /<@([A-Z0-9]+)\|.+>/g;
+/** `<@U123>` 또는 예전 형식 `<@U123|이름>`. 이름 부분은 `>` 앞에서 끊어야 멘션이 여럿일 때 하나로 뭉치지 않는다. */
+const USER_MENTION = /<@([A-Z0-9]+)(?:\|[^>]*)?>/g;
 
 export const messageFunctionList: MessageSetting[] = [
   {
@@ -171,9 +172,10 @@ export const messageFunctionList: MessageSetting[] = [
       ts,
       text
     }) {
-      if (USER_TEXT_REGEX.test(text)) {
-        const match = text.matchAll(USER_TEXT_REGEX);
-        const userId = Array.from(match, (matchResult) => `<@${matchResult[1]}>`);
+      // `/g` 정규식에 `.test()`를 쓰면 lastIndex가 남아 다음 메시지 판정이 틀어진다.
+      // matchAll은 정규식 상태를 건드리지 않는다.
+      const userId = Array.from(text.matchAll(USER_MENTION), (matchResult) => `<@${matchResult[1]}>`);
+      if (userId.length > 0) {
         await sendSlackText({
           client,
           channel,
@@ -205,10 +207,12 @@ export const messageFunctionList: MessageSetting[] = [
       const selectedEmojis = Array.from({ length: 3 }, () => emojis[Math.floor(Math.random() * emojis.length)]);
       const emojiText = selectedEmojis.join('');
 
+      // 하루 단위(KST)로 사람마다 시도 횟수를 센다. 첫 시도엔 저장된 값이 없다.
       const storage = useStorage('kvStorage');
-      const key = `roulette_${(new Date()).toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' }).replaceAll('. ', '-')}`;
-      const attemptCounts = await storage.getItem<Record<string, number>>(`roullet-${key}`);
-      attemptCounts[userId] = (attemptCounts[userId] || 0) + 1;
+      const key = `roulette:${new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' })}`;
+      const attemptCounts = (await storage.getItem<Record<string, number>>(key)) ?? {};
+      attemptCounts[userId] = (attemptCounts[userId] ?? 0) + 1;
+      await storage.setItem(key, attemptCounts);
 
       if (attemptCounts[userId] > 3) {
         await sendSlackText({
@@ -282,8 +286,9 @@ export const messageFunctionList: MessageSetting[] = [
           threadTs: ts,
           text: `추첨 대상이 없습니다 :cry:`,
         })
+        return;
       }
-      const participants = threadInfo.messages![0].reactions?.find(reaction => reaction.name === 'hand')?.users;
+      const participants = threadInfo.messages?.[0]?.reactions?.find(reaction => reaction.name === 'hand')?.users;
       if (participants == null) {
         await client.chat.postMessage({
           channel: channel,
