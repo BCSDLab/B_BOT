@@ -332,11 +332,7 @@ export function resolveAmbiguities(
 
 /** 원본을 건드리지 않고 수정본을 새로 만든다. 적용 전 미리보기와 실제 적용이 갈라지지 않게. */
 export function applyPatches(lectures: Lecture[], patches: Patch[]): Lecture[] {
-  const byKey = new Map<string, Patch[]>();
-  for (const patch of patches) {
-    const id = `${patch.lecture.code}|${patch.lecture.lecture_class}`;
-    byKey.set(id, [...(byKey.get(id) ?? []), patch]);
-  }
+  const byKey = Map.groupBy(patches, (patch) => `${patch.lecture.code}|${patch.lecture.lecture_class}`);
 
   return lectures.map((lecture) => {
     const own = byKey.get(`${lecture.code}|${lecture.lecture_class}`);

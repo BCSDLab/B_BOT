@@ -360,11 +360,7 @@ export function resolvePatch(
     return null;
   }
 
-  const bySemester = new Map<SemesterType, typeof matches>();
-  for (const match of matches) {
-    const semesterType = match.payload.semester_type as SemesterType;
-    bySemester.set(semesterType, [...(bySemester.get(semesterType) ?? []), match]);
-  }
+  const bySemester = Map.groupBy(matches, (match) => match.payload.semester_type as SemesterType);
   if (bySemester.size > 1) {
     problems.push(
       `"${label}"이 여러 학기에 걸쳐 있습니다: ${[...bySemester.keys()].map((s) => TITLE_OF[s]).join(", ")}. ` +
@@ -647,11 +643,7 @@ function findSingleRoute(
     problems.push(`"${label}"에 해당하는 노선을 찾지 못했습니다.`);
     return undefined;
   }
-  const bySemester = new Map<SemesterType, typeof matches>();
-  for (const match of matches) {
-    const semesterType = match.payload.semester_type as SemesterType;
-    bySemester.set(semesterType, [...(bySemester.get(semesterType) ?? []), match]);
-  }
+  const bySemester = Map.groupBy(matches, (match) => match.payload.semester_type as SemesterType);
   if (bySemester.size > 1) {
     problems.push(
       `"${label}"이 여러 학기에 걸쳐 있습니다: ${[...bySemester.keys()].map((s) => TITLE_OF[s]).join(", ")}. 학기를 지정해주세요.`,
