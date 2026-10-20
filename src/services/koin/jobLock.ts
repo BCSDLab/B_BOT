@@ -1,4 +1,4 @@
-import { getPool, query } from "~/helper/adapter/postgres";
+import { getPool, query } from "~/infra/postgres";
 
 /**
  * 반영 작업의 상태와 락.

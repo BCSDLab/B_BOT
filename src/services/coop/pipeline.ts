@@ -1,5 +1,5 @@
 import type { KnownBlock } from "@slack/web-api";
-import type { StructuredImageMimeType } from "~/helper/adapter/structured";
+import type { StructuredImageMimeType } from "~/infra/structured";
 import {
   labelOf,
   isProduction,

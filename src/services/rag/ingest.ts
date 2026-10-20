@@ -1,6 +1,6 @@
 // 지식 소스 색인: 문서 upsert(소스·프로젝트 단위 갱신) + GitHub README 커넥터.
-import { getPool, query } from "~/helper/adapter/postgres";
-import { embed } from "~/helper/adapter/ollama";
+import { getPool, query } from "~/infra/postgres";
+import { embed } from "~/infra/ollama";
 import { chunk } from "./chunk";
 import { classifyDocType } from "./classify";
 import RAG_REPOS from "@/constant/RAG_REPOS.json";

@@ -1,4 +1,4 @@
-import { ensureOnce, getPool, query } from "~/helper/adapter/postgres";
+import { ensureOnce, getPool, query } from "~/infra/postgres";
 import { createJobLock } from "~/services/koin/jobLock";
 
 export type { JobStatus as CoopJobStatus, ClaimResult as CoopClaimResult } from "~/services/koin/jobLock";

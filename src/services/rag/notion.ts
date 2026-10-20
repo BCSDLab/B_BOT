@@ -3,8 +3,8 @@
 // 0청크로 자동 스킵 → 흩어진 문서화를 루트 몇 개로 자동 발견하면서 노이즈는 안 들어옴.
 // 공식 SDK(@notionhq/client, 신모델 data_sources) 사용 — 타입·내장 재시도·보일러플레이트↓.
 import { Client } from "@notionhq/client";
-import { getPool, query } from "~/helper/adapter/postgres";
-import { embed } from "~/helper/adapter/ollama";
+import { getPool, query } from "~/infra/postgres";
+import { embed } from "~/infra/ollama";
 import { chunk } from "./chunk";
 import { classifyDocType } from "./classify";
 import type { Pool } from "pg";

@@ -42,7 +42,7 @@ describe.skipIf(!hasTestDb)("버스 반영 작업 상태", () => {
   });
 
   afterAll(async () => {
-    const { createPool, query } = await import("~/helper/adapter/postgres");
+    const { createPool, query } = await import("~/infra/postgres");
     const pool = createPool();
     await query(pool, `DELETE FROM bus_update_job WHERE token LIKE 'test-%'`);
     await pool.end();

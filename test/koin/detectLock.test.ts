@@ -24,7 +24,7 @@ describe.skipIf(!hasTestDb)("감지 알림 중복 클릭 방어", () => {
   });
 
   afterAll(async () => {
-    const { createPool, query } = await import("~/helper/adapter/postgres");
+    const { createPool, query } = await import("~/infra/postgres");
     const pool = createPool();
     await query(pool, `DELETE FROM detect_lock WHERE channel_id = $1`, [CHANNEL]);
     await pool.end();
@@ -65,7 +65,7 @@ describe.skipIf(!hasTestDb)("감지 알림 중복 클릭 방어", () => {
     const article = nextArticle();
     expect((await acquireDetectLock("lecture", CHANNEL, article, "U1")).ok).toBe(true);
     expect((await acquireDetectLock("lecture", "C_OTHER", article, "U1")).ok).toBe(true);
-    const { createPool, query } = await import("~/helper/adapter/postgres");
+    const { createPool, query } = await import("~/infra/postgres");
     const pool = createPool();
     await query(pool, `DELETE FROM detect_lock WHERE channel_id = 'C_OTHER'`);
     await pool.end();
@@ -86,7 +86,7 @@ describe.skipIf(!hasTestDb)("감지 알림 중복 클릭 방어", () => {
     const article = nextArticle();
     await acquireDetectLock("lecture", CHANNEL, article, "U1");
 
-    const { createPool, query } = await import("~/helper/adapter/postgres");
+    const { createPool, query } = await import("~/infra/postgres");
     const pool = createPool();
     await query(
       pool,

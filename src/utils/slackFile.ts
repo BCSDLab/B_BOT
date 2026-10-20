@@ -1,4 +1,4 @@
-import type { StructuredImageMimeType } from "~/helper/adapter/structured";
+import type { StructuredImageMimeType } from "~/infra/structured";
 
 /** 슬랙에 올라온 파일 중 우리가 다루는 정보만. */
 export interface SlackFile {

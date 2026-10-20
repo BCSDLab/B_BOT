@@ -1,8 +1,8 @@
 // Google Drive(Docs) 커넥터: 봇 Google 계정(Meet과 동일 OAuth, drive.readonly 스코프 추가)으로
 // Google Docs를 마크다운 export → 청킹 → 임베딩 → pgvector. 스프레드시트·슬라이드 등은 제외(Docs만).
 // 범위: GDRIVE_FOLDER_IDS(쉼표구분) 지정 시 그 폴더들 재귀, 없으면 계정이 접근 가능한 전체 Docs.
-import { getPool, query } from "~/helper/adapter/postgres";
-import { embed } from "~/helper/adapter/ollama";
+import { getPool, query } from "~/infra/postgres";
+import { embed } from "~/infra/ollama";
 import { chunk } from "./chunk";
 import { classifyDocType } from "./classify";
 import { auth } from "google-auth-library";

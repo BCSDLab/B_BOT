@@ -1,7 +1,7 @@
 // RAG: 질문 → 임베딩 → (레포 라우팅) → pgvector top-k 검색 → 컨텍스트 → 소형 LLM 생성 → 답+출처
 import { createHash } from "node:crypto";
-import { getPool, query } from "~/helper/adapter/postgres";
-import { embed, generateStream } from "~/helper/adapter/ollama";
+import { getPool, query } from "~/infra/postgres";
+import { embed, generateStream } from "~/infra/ollama";
 import RAG_REPOS from "@/constant/RAG_REPOS.json";
 import { TYPE_WEIGHT, type DocType } from "./classify";
 

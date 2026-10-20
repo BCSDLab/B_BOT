@@ -1,4 +1,4 @@
-import type { StructuredImageMimeType } from "~/helper/adapter/structured";
+import type { StructuredImageMimeType } from "~/infra/structured";
 import { normalizeSemester, normalizeVacationSemester } from "./convert";
 import type { KoinEnv } from "~/services/koin/target";
 import {

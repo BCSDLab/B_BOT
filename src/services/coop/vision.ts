@@ -2,7 +2,7 @@ import regularPrompt from "./prompts/regular-timetable";
 import { normalizeSemester, normalizeVacationSemester } from "./convert";
 import { generateCoopStructured } from "./llm";
 import type { RawRegularCoopTimetable } from "./types";
-import type { StructuredImageMimeType } from "~/helper/adapter/structured";
+import type { StructuredImageMimeType } from "~/infra/structured";
 
 const RAW_TIMETABLE_SCHEMA = {
   type: "object",

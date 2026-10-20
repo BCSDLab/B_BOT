@@ -1,4 +1,4 @@
-import { ensureOnce, getPool, query } from "~/helper/adapter/postgres";
+import { ensureOnce, getPool, query } from "~/infra/postgres";
 import type { KoinEnv } from "~/services/koin/target";
 
 export interface DiningReportMessage {

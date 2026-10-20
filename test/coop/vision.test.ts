@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { toDataUrl, validateStructuredImages } from "~/helper/adapter/structured";
+import { toDataUrl, validateStructuredImages } from "~/infra/structured";
 import {
   isRegularSemesterLabel,
   resolveExtractedCoopSemester,

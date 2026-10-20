@@ -1,6 +1,6 @@
-import { getPRThreadTs, savePRThread } from "~/helper/api/prThread";
+import { getPRThreadTs, savePRThread } from "~/services/github/prThreadStore";
 import CHANNEL_ID from "@/constant/CHANNEL_ID.json";
-import { getMembersOrEmpty, mentionByName } from "~/utils/member";
+import { getMembersOrEmpty, mentionByName } from "~/services/member/members";
 import { sendSlackBlock } from "~/utils/slackFunction";
 
 interface RequestBody {

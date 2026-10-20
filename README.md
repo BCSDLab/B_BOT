@@ -36,11 +36,11 @@ node .output/server/index.mjs
 ```
 src/
   routes/        Slack 수신 — event / slash / interaction (.post.ts) · event.get.ts
-  plugins/       createInstnace.ts(WebClient·DB pool 주입)
-  services/      slack 등 도메인 로직
+  plugins/       injectContext.ts(WebClient·DB pool 주입)
+  services/      도메인 로직(bus·coop·lecture·koin·rag·member…)과 Slack 핸들러(slack/)
   tasks/         scheduledTasks (예: crawl/clarity)
-  utils/         member.ts(멤버 조회·타입) 등
-  helper/        adapter/mysql.ts (DB 풀·쿼리)
+  utils/         Slack 전송·서명 검증·파일 등 공용 함수
+  infra/         외부 연결 어댑터 — postgres(공유 풀), LLM(openai·anthropic·ollama)
   constant/      JSON 상수 (@/constant 별칭)
   types/         index.d.ts (env 타입 등)
 nitro.config.ts  srcDir=src, tasks, KV(fs), scheduledTasks

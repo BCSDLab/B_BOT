@@ -19,7 +19,7 @@ describe.skipIf(!hasTestDb)("품절 제보 메시지 저장소", () => {
   beforeAll(async () => ensureDiningMessageSchema());
 
   afterAll(async () => {
-    const { createPool, query } = await import("~/helper/adapter/postgres");
+    const { createPool, query } = await import("~/infra/postgres");
     const pool = createPool();
     await query(pool, `DELETE FROM dining_report_message WHERE report_id >= $1`, [TEST_REPORT_BASE]);
     await pool.end();

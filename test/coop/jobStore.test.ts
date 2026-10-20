@@ -29,7 +29,7 @@ describe.skipIf(!hasTestDb)("생협 반영 작업 상태", () => {
   beforeAll(async () => ensureCoopJobSchema());
 
   afterAll(async () => {
-    const { createPool, query } = await import("~/helper/adapter/postgres");
+    const { createPool, query } = await import("~/infra/postgres");
     const pool = createPool();
     await query(pool, `DELETE FROM coop_update_job WHERE token LIKE 'coop-test-%'`);
     await pool.end();
