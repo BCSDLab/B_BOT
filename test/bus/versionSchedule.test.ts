@@ -63,7 +63,7 @@ describe("버전 갱신 예약 안내 문구", () => {
 });
 
 describe("버스 버전 Admin API", () => {
-  it("현재 version을 보존해 title과 content를 PUT 한다", async () => {
+  it("현재 version을 보존해 title과 content를 POST 한다", async () => {
     const { updateBusVersionViaAdminApi } = await import("~/services/bus/adminApi");
     const fetch = vi
       .fn()
@@ -84,7 +84,7 @@ describe("버스 버전 Admin API", () => {
       signal: expect.any(AbortSignal),
     });
     expect(fetch).toHaveBeenNthCalledWith(2, "https://api.stage.koreatech.in/admin/version/shuttle_bus_timetable", {
-      method: "PUT",
+      method: "POST",
       signal: expect.any(AbortSignal),
       headers: {
         Authorization: "Bearer admin-token",
@@ -98,7 +98,7 @@ describe("버스 버전 Admin API", () => {
     });
   });
 
-  it("현재 version 조회 실패 시 PUT 하지 않는다", async () => {
+  it("현재 version 조회 실패 시 POST 하지 않는다", async () => {
     const { updateBusVersionViaAdminApi } = await import("~/services/bus/adminApi");
     const fetch = vi.fn().mockResolvedValue(new Response(null, { status: 404 }));
     vi.stubGlobal("fetch", fetch);
