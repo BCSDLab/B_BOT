@@ -1,13 +1,13 @@
 import type {
   GenericMessageEvent,
   MessageChangedEvent,
-  MessageRepliedEvent,
   ReactionAddedEvent,
   ReactionRemovedEvent,
   SlackEvent,
   WebClient,
 } from "@slack/web-api";
 import { messageFunctionList } from "~/services/slack/message";
+import type { MessageSetting } from "~/services/slack/type";
 import { botUserId } from "~/utils/slackBot";
 import type { SlackFile } from "~/utils/slackFile";
 import { setFeedback } from "~/services/rag";
@@ -21,6 +21,19 @@ type Body = {
 } | {
   type: "url_verification";
   challenge?: string;
+}
+
+type MessageEvent = Extract<SlackEvent, { type: "message" }>;
+
+interface IncomingMessage {
+  text: string;
+  ts: string;
+  user: string;
+  channel: string;
+  files?: SlackFile[];
+  // 스레드 답장인지 알아야 어느 변환 건에 대한 수정인지 찾을 수 있다.
+  // ts는 답장 자신의 ts라 부모를 따로 들고 간다.
+  parentTs?: string;
 }
 
 interface Context {
@@ -58,67 +71,12 @@ export default defineEventHandler(async (event) => {
     return "not Implemented";
   }
 
-  let text = "";
-  let threadTs = "";
-  let userId = "";
-  let channelId = "";
-  let files: SlackFile[] | undefined;
-  // 스레드 답장인지 알아야 어느 변환 건에 대한 수정인지 찾을 수 있다.
-  // 기존 ts는 답장 자신의 ts라 부모를 따로 들고 간다.
-  let parentTs: string | undefined;
-
-  if (body.event.subtype === undefined) {
-    const eventBody = body.event as GenericMessageEvent;
-    
-    if (eventBody.bot_id) {
-      return { ok: true };
-    }
-    
-    text = eventBody.text ?? "";
-    channelId = eventBody.channel;
-    userId = eventBody.user ?? "";
-    threadTs = eventBody.ts ?? eventBody.thread_ts ?? "";
-    parentTs = eventBody.thread_ts;
-
-  } else if (body.event.subtype === "file_share") {
-    // 엑셀을 올리면서 명령어를 적는 흐름(!강의반영)을 위해 받는다.
-    // 일반 메시지와 달리 subtype이 붙어 있어 위 분기로는 들어오지 않는다.
-    const eventBody = body.event as GenericMessageEvent & { files?: SlackFile[] };
-    if (eventBody.bot_id) {
-      return { ok: true };
-    }
-    text = eventBody.text ?? "";
-    channelId = eventBody.channel;
-    userId = eventBody.user ?? "";
-    threadTs = eventBody.ts ?? eventBody.thread_ts ?? "";
-    parentTs = eventBody.thread_ts;
-    files = eventBody.files;
-
-  } else if (body.event.subtype === "message_changed") {
-    const eventBody = body.event as MessageChangedEvent;
-    if (eventBody.message.subtype !== undefined) {
-      return;
-    }
-    const message = eventBody.message as GenericMessageEvent;
-    text = message.text ?? "";
-    channelId = message.channel ?? "";
-    userId = message.user ?? "";
-    threadTs = message.ts ?? "";
-  }
-
-  if (!text) {
+  const message = readUserMessage(body.event);
+  if (!message?.text) {
     return { ok: true };
   }
 
-  processMessage({
-    client: context.slackWebClient,
-    text,
-    ts: threadTs,
-    user: userId,
-    channel: channelId,
-    files,
-    parentTs,
-  }).catch(console.error);
+  processMessage({ client: context.slackWebClient, ...message }).catch(console.error);
 
   return { ok: true };
 });
@@ -141,6 +99,46 @@ async function handleReaction(
   );
 }
 
+/** 사람이 쓴 메시지만 꺼낸다. 봇 메시지와 처리하지 않는 subtype은 null. */
+function readUserMessage(event: MessageEvent): IncomingMessage | null {
+  // file_share: 엑셀을 올리면서 명령어를 적는 흐름(!강의반영)을 위해 받는다.
+  // 일반 메시지와 달리 subtype이 붙어 있어 따로 허용해야 들어온다.
+  if (event.subtype === undefined || event.subtype === "file_share") {
+    const message = event as GenericMessageEvent & { files?: SlackFile[] };
+    if (message.bot_id) {
+      return null;
+    }
+    return {
+      text: message.text ?? "",
+      channel: message.channel,
+      user: message.user ?? "",
+      ts: message.ts ?? message.thread_ts ?? "",
+      parentTs: message.thread_ts,
+      files: event.subtype === "file_share" ? message.files : undefined,
+    };
+  }
+
+  if (event.subtype === "message_changed") {
+    const changed = (event as MessageChangedEvent).message;
+    if (changed.subtype !== undefined) {
+      return null;
+    }
+    const message = changed as GenericMessageEvent;
+    return {
+      text: message.text ?? "",
+      channel: message.channel ?? "",
+      user: message.user ?? "",
+      ts: message.ts ?? "",
+    };
+  }
+
+  return null;
+}
+
+function matchesText({ regex }: MessageSetting, text: string): boolean {
+  return typeof regex === "string" ? text.includes(regex) : regex.test(text);
+}
+
 async function processMessage({
   client,
   text,
@@ -149,34 +147,15 @@ async function processMessage({
   channel,
   files,
   parentTs,
-}: {
-  client: WebClient;
-  text: string;
-  ts: string;
-  user: string;
-  channel: string;
-  files?: SlackFile[];
-  parentTs?: string;
-}) {
+}: IncomingMessage & { client: WebClient }) {
   const hasFiles = (files?.length ?? 0) > 0;
 
-  for (const messageFunction of messageFunctionList) {
-    // 파일이 붙은 메시지는 그걸 받겠다고 선언한 핸들러만 처리한다.
-    if (hasFiles && !messageFunction.acceptsFiles) {
-      continue;
-    }
-    if (typeof messageFunction.regex === "string") {
-      const isIncluded = text.includes(messageFunction.regex);
-      if (!isIncluded) {
-        continue;
-      }
-    } else {
-      const isMatched = messageFunction.regex.test(text);
-      if (!isMatched) {
-        continue;
-      }
-    }
+  // 파일이 붙은 메시지는 그걸 받겠다고 선언한 핸들러만 처리한다.
+  const handlers = messageFunctionList.filter(
+    (setting) => (!hasFiles || setting.acceptsFiles) && matchesText(setting, text),
+  );
 
+  for (const messageFunction of handlers) {
     try {
       await messageFunction.handler({
         client,
