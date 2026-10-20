@@ -58,7 +58,7 @@ const stored = {
 };
 
 function slack() {
-  return { chat: { update: vi.fn(async () => ({})), postEphemeral: vi.fn(async () => ({})) } };
+  return { chat: { update: vi.fn(async (_args: unknown) => ({})), postEphemeral: vi.fn(async (_args: unknown) => ({})) } };
 }
 
 async function press(actionId: "lecture:apply" | "lecture:cancel") {

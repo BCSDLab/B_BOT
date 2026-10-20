@@ -37,7 +37,7 @@ const conversion = (semester: string, fromDate: string, toDate: string) => ({
 const meta = { env: "stage", year: 2026, termName: "1학기", sourceFileName: "생협.png", shopCount: 11 };
 
 async function press(actionId: "coop:apply" | "coop:cancel") {
-  const client = { chat: { update: vi.fn(async () => ({})), postEphemeral: vi.fn(async () => ({})) } };
+  const client = { chat: { update: vi.fn(async (_args: unknown) => ({})), postEphemeral: vi.fn(async (_args: unknown) => ({})) } };
   await handleCoopApplyAction(
     client as never,
     { channel: { id: "C1" }, user: { id: "U1" }, message: { ts: "100.1" } } as never,
