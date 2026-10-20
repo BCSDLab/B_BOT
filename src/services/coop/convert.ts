@@ -125,7 +125,7 @@ function normalizeStatus(value: string): string | null {
   return null;
 }
 
-function normalizeClock(value: string): string | null {
+export function normalizeClock(value: string): string | null {
   const match = /^(\d{1,2}):(\d{2})$/.exec(value.trim());
   if (!match) return null;
   const hour = Number(match[1]);

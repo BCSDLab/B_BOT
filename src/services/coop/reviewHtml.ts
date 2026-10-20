@@ -13,7 +13,7 @@ function formatKoreanDate(value: string, includeYear: boolean): string {
   return `${includeYear ? `${year}년 ` : ""}${month}월 ${day}일`;
 }
 
-function displayHour(hour: AdminOperationHour): string {
+export function displayHour(hour: AdminOperationHour): string {
   return hour.open_time === hour.close_time
     ? hour.open_time
     : `${hour.open_time} - ${hour.close_time}`;

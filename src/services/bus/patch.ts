@@ -9,6 +9,7 @@ import type {
 } from "./types";
 import { ARRIVAL_MARKERS } from "./types";
 import { normalizeTime } from "./validation";
+import { BUS_REGIONS, clean } from "./text";
 
 const TITLES = ["정규학기", "계절학기", "방학기간"] as const;
 const SEMESTER_OF: Record<string, SemesterType> = {
@@ -62,12 +63,6 @@ export interface BusPatchPlan {
   problems: string[];
 }
 
-const clean = (value: unknown) =>
-  String(value ?? "")
-    .replaceAll("\n", " ")
-    .replace(/\s+/g, " ")
-    .trim();
-
 const daysLabel = (days?: Day[]) => days?.map((d) => DAY_LABELS[d]).join(",") ?? "운행일 없음";
 
 const PATCH_SCHEMA = {
@@ -96,7 +91,7 @@ const PATCH_SCHEMA = {
         ],
         properties: {
           semester: { type: "string", enum: [...TITLES], description: "바꿀 대상 학기. 원문에서 안 보이면 변환 목록에 하나뿐인 학기로 채운다." },
-          region: { type: "string", description: "지역(천안/청주/서울/세종/대전/아산). 모르면 빈 문자열." },
+          region: { type: "string", description: `지역(${BUS_REGIONS.join("/")}). 모르면 빈 문자열.` },
           direction: { type: "string", description: "등교/하교/셔틀. 모르면 빈 문자열." },
           route: { type: "string", description: "노선명. 사용자가 부른 그대로." },
           field: {

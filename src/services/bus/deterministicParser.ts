@@ -2,6 +2,7 @@ import type { AnalysedWorkbook } from "./excelAnalyzer";
 import type { BusRoute } from "./types";
 import { normalizeTime } from "./validation";
 import { sourceDays } from "./days";
+import { sourceRegion } from "./text";
 
 const marker = new Set([
   "도착",
@@ -12,10 +13,6 @@ const marker = new Set([
   "승하차",
   "종점",
 ]);
-const sourceRegion = (text = "") =>
-  ["천안", "청주", "서울", "세종", "대전", "아산"].find((name) =>
-    text.includes(name),
-  );
 /** True when a cell looks like a section title rather than a stop or body value. */
 export const headingLike = (value: unknown) =>
   typeof value === "string" &&
@@ -132,7 +129,7 @@ export function parseCourseStopTimeTriples(
         (item) =>
           item.column <= header.column &&
           headingLike(item.value) &&
-          /천안|청주|서울|세종|대전|아산/.test(String(item.value)),
+          sourceRegion(String(item.value)) !== undefined,
       );
       const directionText = nearby.find(
         (item) =>

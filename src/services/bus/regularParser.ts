@@ -6,6 +6,7 @@ import type {
 import type { ArrivalTime, BusRoute, BusTarget } from "./types";
 import { normalizeTime } from "./validation";
 import { sourceDays, WEEKDAYS, type Day } from "./days";
+import { clean, sourceRegion } from "./text";
 
 const KOREAN_DAY: Record<Day, string> = {
   MON: "월요일",
@@ -82,11 +83,6 @@ const MARKERS = new Set([
 ]);
 
 const key = (row: number, column: number) => `${row}:${column}`;
-const clean = (value: unknown) =>
-  String(value ?? "")
-    .replaceAll("\n", " ")
-    .replace(/\s+/g, " ")
-    .trim();
 const isMaster = (cell: AnalysedCell) => !cell.merged_from;
 const isBlank = (value: unknown) =>
   value == null || value === "" || /^[xX-]$/.test(clean(value));
@@ -109,11 +105,6 @@ function arrivalList(value: unknown): ArrivalTime | undefined {
     : undefined;
 }
 
-function sourceRegion(text: string): string | undefined {
-  return ["천안", "청주", "서울", "세종", "대전", "아산"].find((region) =>
-    text.includes(region),
-  );
-}
 
 function sourceDirection(text: string): string {
   if (/등교/.test(text)) return "등교";

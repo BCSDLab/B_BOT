@@ -1,7 +1,8 @@
 import type { KnownBlock } from "@slack/web-api";
 import { generateCoopStructured } from "./llm";
-import { normalizeDate, normalizeMealType, normalizePhone } from "./convert";
+import { normalizeClock, normalizeDate, normalizeMealType, normalizePhone } from "./convert";
 import type { AdminOperationHour, RegularConversionResult } from "./types";
+import { displayHour } from "./reviewHtml";
 
 export type CoopPatchField =
   | "operation_hours"
@@ -86,8 +87,6 @@ const normalizePatchDay = (value: string): string => {
     ? "주말"
     : value;
 };
-const displayHour = (hour: AdminOperationHour) =>
-  hour.open_time === hour.close_time ? hour.open_time : `${hour.open_time} - ${hour.close_time}`;
 
 function findShop(result: RegularConversionResult, name: string) {
   const wanted = clean(name);
@@ -106,15 +105,6 @@ function normalizeStatus(value: string): string | null {
   if (/^휴점$/.test(compact)) return "휴점";
   if (/미운영$/.test(compact)) return "미운영";
   return null;
-}
-
-function normalizeClock(value: string): string | null {
-  const matched = /^(\d{1,2}):(\d{2})$/.exec(value.trim());
-  if (!matched) return null;
-  const hour = Number(matched[1]);
-  const minute = Number(matched[2]);
-  if (hour > 23 || minute > 59) return null;
-  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
 }
 
 function parseHours(value: string): { openTime: string; closeTime: string } | null {
