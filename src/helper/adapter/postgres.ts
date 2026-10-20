@@ -23,6 +23,20 @@ export async function closePool(): Promise<void> {
   sharedPool = undefined;
 }
 
+/**
+ * 스키마 준비를 처음 한 번만 돌린다. 이 레포엔 마이그레이션 도구가 없어 첫 사용 때 만든다.
+ * 실패하면 캐시를 비운다. 실패한 Promise를 들고 있으면 일시적인 DB 오류 한 번으로
+ * 재시작 전까지 모든 호출이 막힌다.
+ */
+export function ensureOnce(setup: () => Promise<void>): () => Promise<void> {
+  let ready: Promise<void> | undefined;
+  return () =>
+    (ready ??= setup().catch((error) => {
+      ready = undefined;
+      throw error;
+    }));
+}
+
 export interface ResultSet {
   rows: any;
   fields: any;

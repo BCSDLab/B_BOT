@@ -1,4 +1,4 @@
-import { getPool, query } from "~/helper/adapter/postgres";
+import { ensureOnce, getPool, query } from "~/helper/adapter/postgres";
 
 /**
  * 감지 알림의 `예`를 한 번만 통과시킨다.
@@ -14,23 +14,19 @@ import { getPool, query } from "~/helper/adapter/postgres";
  */
 const STALE_MINUTES = 30;
 
-let schemaReady: Promise<void> | undefined;
-
-function ensureSchema(): Promise<void> {
-  return (schemaReady ??= (async () => {
-    await query(
-      getPool(),
-      `CREATE TABLE IF NOT EXISTS detect_lock (
-         scope      TEXT NOT NULL,
-         channel_id TEXT NOT NULL,
-         article_id BIGINT NOT NULL,
-         actor      TEXT NOT NULL,
-         created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-         PRIMARY KEY (scope, channel_id, article_id)
-       )`,
-    );
-  })());
-}
+const ensureSchema = ensureOnce(async () => {
+  await query(
+    getPool(),
+    `CREATE TABLE IF NOT EXISTS detect_lock (
+       scope      TEXT NOT NULL,
+       channel_id TEXT NOT NULL,
+       article_id BIGINT NOT NULL,
+       actor      TEXT NOT NULL,
+       created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+       PRIMARY KEY (scope, channel_id, article_id)
+     )`,
+  );
+});
 
 export interface DetectLockResult {
   ok: boolean;

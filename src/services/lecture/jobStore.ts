@@ -1,4 +1,4 @@
-import { getPool, query } from "~/helper/adapter/postgres";
+import { ensureOnce, getPool, query } from "~/helper/adapter/postgres";
 import { createJobLock } from "~/services/koin/jobLock";
 
 export type { ClaimResult, JobStatus } from "~/services/koin/jobLock";
@@ -20,40 +20,35 @@ export interface LectureJob {
   updated_at: string;
 }
 
-// 이 레포에는 마이그레이션 도구가 없다. 첫 사용 때 한 번 만들고 넘어간다.
-let schemaReady: Promise<void> | undefined;
-
-export function ensureSchema(): Promise<void> {
-  return (schemaReady ??= (async () => {
-    await query(
-      getPool(),
-      `CREATE TABLE IF NOT EXISTS lecture_update_job (
-         token         TEXT PRIMARY KEY,
-         channel_id    TEXT NOT NULL,
-         thread_ts     TEXT NOT NULL,
-         year          INTEGER NOT NULL,
-         term          TEXT NOT NULL,
-         source_file   TEXT NOT NULL,
-         lecture_count INTEGER NOT NULL,
-         status        TEXT NOT NULL DEFAULT 'PENDING',
-         actor         TEXT,
-         error         TEXT,
-         created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
-         updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
-       )`,
-    );
-    // 이미 만들어진 테이블에도 붙는다. 어디에 반영했는지는 나중에 꼭 필요해진다.
-    await query(
-      getPool(),
-      `ALTER TABLE lecture_update_job ADD COLUMN IF NOT EXISTS target_env TEXT`,
-    );
-    await query(
-      getPool(),
-      `CREATE INDEX IF NOT EXISTS lecture_update_job_thread_idx
-         ON lecture_update_job (channel_id, thread_ts)`,
-    );
-  })());
-}
+export const ensureSchema = ensureOnce(async () => {
+  await query(
+    getPool(),
+    `CREATE TABLE IF NOT EXISTS lecture_update_job (
+       token         TEXT PRIMARY KEY,
+       channel_id    TEXT NOT NULL,
+       thread_ts     TEXT NOT NULL,
+       year          INTEGER NOT NULL,
+       term          TEXT NOT NULL,
+       source_file   TEXT NOT NULL,
+       lecture_count INTEGER NOT NULL,
+       status        TEXT NOT NULL DEFAULT 'PENDING',
+       actor         TEXT,
+       error         TEXT,
+       created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+       updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+     )`,
+  );
+  // 이미 만들어진 테이블에도 붙는다. 어디에 반영했는지는 나중에 꼭 필요해진다.
+  await query(
+    getPool(),
+    `ALTER TABLE lecture_update_job ADD COLUMN IF NOT EXISTS target_env TEXT`,
+  );
+  await query(
+    getPool(),
+    `CREATE INDEX IF NOT EXISTS lecture_update_job_thread_idx
+       ON lecture_update_job (channel_id, thread_ts)`,
+  );
+});
 
 export async function createJob(job: {
   token: string;

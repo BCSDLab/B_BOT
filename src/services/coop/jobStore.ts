@@ -1,4 +1,4 @@
-import { getPool, query } from "~/helper/adapter/postgres";
+import { ensureOnce, getPool, query } from "~/helper/adapter/postgres";
 import { createJobLock } from "~/services/koin/jobLock";
 
 export type { JobStatus as CoopJobStatus, ClaimResult as CoopClaimResult } from "~/services/koin/jobLock";
@@ -23,42 +23,38 @@ export interface CoopJob {
   updated_at: string;
 }
 
-let schemaReady: Promise<void> | undefined;
-
-export function ensureCoopJobSchema(): Promise<void> {
-  return (schemaReady ??= (async () => {
-    await query(
-      getPool(),
-      `CREATE TABLE IF NOT EXISTS coop_update_job (
-         token       TEXT PRIMARY KEY,
-         channel_id  TEXT NOT NULL,
-         thread_ts   TEXT NOT NULL,
-         year        INTEGER NOT NULL,
-         term        TEXT NOT NULL,
-         source_file TEXT NOT NULL,
-         shop_count  INTEGER NOT NULL,
-         target_env  TEXT NOT NULL,
-         semester_id INTEGER,
-         semester_ids JSONB NOT NULL DEFAULT '[]'::jsonb,
-         status      TEXT NOT NULL DEFAULT 'PENDING',
-         actor       TEXT,
-         error       TEXT,
-         created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
-         updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
-       )`,
-    );
-    await query(
-      getPool(),
-      `ALTER TABLE coop_update_job
-         ADD COLUMN IF NOT EXISTS semester_ids JSONB NOT NULL DEFAULT '[]'::jsonb`,
-    );
-    await query(
-      getPool(),
-      `CREATE INDEX IF NOT EXISTS coop_update_job_thread_idx
-         ON coop_update_job (channel_id, thread_ts)`,
-    );
-  })());
-}
+export const ensureCoopJobSchema = ensureOnce(async () => {
+  await query(
+    getPool(),
+    `CREATE TABLE IF NOT EXISTS coop_update_job (
+       token       TEXT PRIMARY KEY,
+       channel_id  TEXT NOT NULL,
+       thread_ts   TEXT NOT NULL,
+       year        INTEGER NOT NULL,
+       term        TEXT NOT NULL,
+       source_file TEXT NOT NULL,
+       shop_count  INTEGER NOT NULL,
+       target_env  TEXT NOT NULL,
+       semester_id INTEGER,
+       semester_ids JSONB NOT NULL DEFAULT '[]'::jsonb,
+       status      TEXT NOT NULL DEFAULT 'PENDING',
+       actor       TEXT,
+       error       TEXT,
+       created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+       updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+     )`,
+  );
+  await query(
+    getPool(),
+    `ALTER TABLE coop_update_job
+       ADD COLUMN IF NOT EXISTS semester_ids JSONB NOT NULL DEFAULT '[]'::jsonb`,
+  );
+  await query(
+    getPool(),
+    `CREATE INDEX IF NOT EXISTS coop_update_job_thread_idx
+       ON coop_update_job (channel_id, thread_ts)`,
+  );
+});
 
 export async function createCoopJob(job: {
   token: string;

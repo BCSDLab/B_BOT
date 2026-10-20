@@ -1,4 +1,4 @@
-import { query } from "~/helper/adapter/postgres";
+import { ensureOnce, query } from "~/helper/adapter/postgres";
 import { closePool, getPool } from "~/helper/adapter/postgres";
 import { createJobLock } from "~/services/koin/jobLock";
 import type { BusVersionUpdate } from "./types";
@@ -46,45 +46,35 @@ export interface BusJob {
 /** 테스트 종료용. 평소 실행 중엔 부를 필요가 없다 — 프로세스가 끝날 때 같이 닫힌다. */
 export const closeBusJobPool = closePool;
 
-// 이 레포에는 마이그레이션 도구가 없다. 첫 사용 때 한 번 만들고 넘어간다.
-let schemaReady: Promise<void> | undefined;
-
-export function ensureBusJobSchema(): Promise<void> {
-  return (schemaReady ??= (async () => {
-    await query(
-      getPool(),
-      `CREATE TABLE IF NOT EXISTS bus_update_job (
-         token          TEXT PRIMARY KEY,
-         channel_id     TEXT NOT NULL,
-         thread_ts      TEXT NOT NULL,
-         source_file    TEXT NOT NULL,
-         route_count    INTEGER NOT NULL,
-         semester_types JSONB NOT NULL DEFAULT '[]'::jsonb,
-         target_env     TEXT NOT NULL,
-         status         TEXT NOT NULL DEFAULT 'PENDING',
-         actor          TEXT,
-         error          TEXT,
-         created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
-         updated_at     TIMESTAMPTZ NOT NULL DEFAULT now()
-       )`,
-    );
-    // 이미 만들어진 테이블에도 붙는다.
-    await query(
-      getPool(),
-      `ALTER TABLE bus_update_job ADD COLUMN IF NOT EXISTS version_schedules JSONB NOT NULL DEFAULT '[]'::jsonb`,
-    );
-    await query(
-      getPool(),
-      `CREATE INDEX IF NOT EXISTS bus_update_job_thread_idx
-         ON bus_update_job (channel_id, thread_ts)`,
-    );
-  })().catch((error) => {
-    // 실패한 Promise를 캐싱해두면 일시적인 DB 오류 한 번으로 이후 모든 호출이
-    // 계속 막힌다. 다음 호출이 다시 시도할 수 있게 캐시를 비운다.
-    schemaReady = undefined;
-    throw error;
-  }));
-}
+export const ensureBusJobSchema = ensureOnce(async () => {
+  await query(
+    getPool(),
+    `CREATE TABLE IF NOT EXISTS bus_update_job (
+       token          TEXT PRIMARY KEY,
+       channel_id     TEXT NOT NULL,
+       thread_ts      TEXT NOT NULL,
+       source_file    TEXT NOT NULL,
+       route_count    INTEGER NOT NULL,
+       semester_types JSONB NOT NULL DEFAULT '[]'::jsonb,
+       target_env     TEXT NOT NULL,
+       status         TEXT NOT NULL DEFAULT 'PENDING',
+       actor          TEXT,
+       error          TEXT,
+       created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+       updated_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+     )`,
+  );
+  // 이미 만들어진 테이블에도 붙는다.
+  await query(
+    getPool(),
+    `ALTER TABLE bus_update_job ADD COLUMN IF NOT EXISTS version_schedules JSONB NOT NULL DEFAULT '[]'::jsonb`,
+  );
+  await query(
+    getPool(),
+    `CREATE INDEX IF NOT EXISTS bus_update_job_thread_idx
+       ON bus_update_job (channel_id, thread_ts)`,
+  );
+});
 
 export async function createBusJob(job: {
   token: string;
