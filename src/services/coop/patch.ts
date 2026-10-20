@@ -1,8 +1,7 @@
 import type { KnownBlock } from "@slack/web-api";
 import { generateCoopStructured } from "./llm";
-import { normalizeClock, normalizeDate, normalizeMealType, normalizePhone } from "./convert";
+import { displayHour, normalizeClock, normalizeDate, normalizeMealType, normalizePhone } from "./convert";
 import type { AdminOperationHour, RegularConversionResult } from "./types";
-import { displayHour } from "./reviewHtml";
 
 export type CoopPatchField =
   | "operation_hours"

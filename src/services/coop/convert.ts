@@ -125,6 +125,13 @@ function normalizeStatus(value: string): string | null {
   return null;
 }
 
+/** 여는 시각과 닫는 시각이 같으면 한 번만 적는다. */
+export function displayHour(hour: AdminOperationHour): string {
+  return hour.open_time === hour.close_time
+    ? hour.open_time
+    : `${hour.open_time} - ${hour.close_time}`;
+}
+
 export function normalizeClock(value: string): string | null {
   const match = /^(\d{1,2}):(\d{2})$/.exec(value.trim());
   if (!match) return null;
