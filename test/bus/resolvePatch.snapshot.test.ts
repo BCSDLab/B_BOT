@@ -61,6 +61,8 @@ const CASES: Array<[string, Partial<RawPatch>, BusConversion[]?]> = [
   ["기간 — 학기 하나", { field: "period", value: "2026-03-03~2026-06-20" }],
   ["기간 — 형식 오류", { field: "period", value: "3월부터" }],
   ["기간 — 거꾸로", { field: "period", value: "2026-06-20~2026-03-03" }],
+  ["기간 — 없는 학기 지정, 학기 하나", { field: "period", semester: "계절학기", value: "2026-03-03~2026-06-20" }],
+  ["기간 — 없는 학기 지정, 학기 여럿", { field: "period", semester: "방학기간", value: "2026-03-03~2026-06-20" }, both],
   ["기간 — 학기 여럿, 미지정", { field: "period", value: "2026-03-03~2026-06-20" }, both],
   ["기간 — 학기 여럿, 지정", { field: "period", semester: "계절학기", value: "2026-06-23~2026-08-15" }, both],
   ["노선 없음", { route: "대전", region: "", direction: "" }],
