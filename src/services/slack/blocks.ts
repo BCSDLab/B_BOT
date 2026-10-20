@@ -13,9 +13,6 @@ export function shorten(name: string): string {
   return name.length > 28 ? `${name.slice(0, 27)}…` : name;
 }
 
-export const koreatechArticleUrl = (articleId: number) =>
-  `https://koreatech.in/articles/${articleId}`;
-
 /**
  * 버튼이 달린 원본 메시지를 갈아끼운다.
  *

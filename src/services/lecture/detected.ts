@@ -1,4 +1,14 @@
-import { createReviewToken, isValidToken } from "./reviewStore";
+import {
+  cleanAttachmentName,
+  collectNewestAttachments,
+  createDetectedStore,
+  downloadAttachment,
+  fetchKoinArticle,
+  isAllowedFileUrl as isAllowedKoinFileUrl,
+  isZipFile,
+  sortByLikelyName,
+  type ArticleAttachment,
+} from "~/services/koin/article";
 import type { KoinEnv } from "~/services/koin/target";
 
 export interface AttachmentFile {
@@ -23,32 +33,9 @@ export interface DetectedNotice {
   files: AttachmentFile[];
 }
 
-/** 학교가 올린 파일만 받는다. 남이 넣은 주소로 봇이 아무거나 받아오게 두지 않는다. */
-const ALLOWED_FILE_HOSTS = ["koreatech.ac.kr", "koreatech.in"];
-
-export function isAllowedFileUrl(url: string): boolean {
-  try {
-    const { protocol, hostname } = new URL(url);
-    return (
-      protocol === "https:" &&
-      ALLOWED_FILE_HOSTS.some((host) => hostname === host || hostname.endsWith(`.${host}`))
-    );
-  } catch {
-    return false;
-  }
-}
-
-interface ArticleAttachment {
-  name?: string;
-  url?: string;
-  created_at?: string;
-}
-
-interface Article {
-  title?: string;
-  url?: string;
-  attachments?: ArticleAttachment[];
-}
+export const isAllowedFileUrl = isAllowedKoinFileUrl;
+export const cleanFileName = cleanAttachmentName;
+export const fetchArticle = fetchKoinArticle;
 
 /** 편람일 가능성이 높은 이름. 이 순서가 곧 버튼 순서가 된다. */
 const LIKELY_NAMES = ["개설교과목", "개설 교과목", "편람", "교과목"];
@@ -60,46 +47,18 @@ const LIKELY_NAMES = ["개설교과목", "개설 교과목", "편람", "교과�
  * (편람 외에 폐강강좌·시간표 등). 조용히 첫 번째를 집으면 엉뚱한 파일을
  * 변환하고도 아무도 모른다. 둘 이상이면 사람이 고른다.
  *
- * 같은 파일이 여러 번 실려 오는 게시글이 있어 주소로 한 번 걸러낸다. 이때 **가장 최근
- * 것을 남긴다.** 학교가 편람을 새로 올리면 포털은 같은 자리(fs)의 파일을 갈아끼우는데
- * 코인은 옛 이름과 새 이름을 둘 다 들고 있다. 먼저 나온 걸 잡으면 받아오는 파일은
- * 최신인데 이름만 옛날 날짜로 뜬다. 사람이 알아채기 어려운 어긋남이다.
+ * 같은 주소는 가장 최근 것만 남긴다(`collectNewestAttachments` 참고).
  *
  * 이름 끝에 `(21 KB)`처럼 크기가 붙어 있어 확장자는 그 앞에서 본다.
  */
 export function collectExcelAttachments(
   attachments: ArticleAttachment[] | undefined,
 ): AttachmentFile[] {
-  const newest = new Map<string, { file: AttachmentFile; at: string }>();
-
-  for (const attachment of attachments ?? []) {
-    const url = attachment.url ?? "";
-    const name = cleanFileName(attachment.name ?? "");
-    if (!url || !name.toLowerCase().endsWith(".xlsx") || !isAllowedFileUrl(url)) {
-      continue;
-    }
-
-    const at = attachment.created_at ?? "";
-    const kept = newest.get(url);
-    if (!kept || at > kept.at) {
-      newest.set(url, { file: { name, url }, at });
-    }
-  }
-
+  const files = collectNewestAttachments(attachments, (name, url) =>
+    name.toLowerCase().endsWith(".xlsx") ? { name, url } : null,
+  );
   // 편람으로 보이는 걸 앞에 둔다. 고르는 사람이 대개 첫 번째를 누르게 된다.
-  return [...newest.values()]
-    .map(({ file }) => file)
-    .sort((a, b) => likelihood(b.name) - likelihood(a.name));
-}
-
-function likelihood(name: string): number {
-  const index = LIKELY_NAMES.findIndex((word) => name.includes(word));
-  return index === -1 ? 0 : LIKELY_NAMES.length - index;
-}
-
-/** `붙임2. 개설교과목.xlsx(21 KB)` → `붙임2. 개설교과목.xlsx` */
-export function cleanFileName(raw: string): string {
-  return raw.replace(/\s*\(\s*[\d.]+\s*[KMG]?B\s*\)\s*$/i, "").trim();
+  return sortByLikelyName(files, LIKELY_NAMES);
 }
 
 /** 위에서부터 처음 맞는 규칙을 쓴다. 계절학기 표기를 학기 번호보다 먼저 본다. */
@@ -126,74 +85,18 @@ export function guessSemester(title: string): { year: number; term: string } | n
   return term ? { year, term } : null;
 }
 
-/**
- * 공지는 **항상 프로덕션에서 읽는다.** 반영 대상과 무관하다.
- *
- * 배치가 넘기는 번호는 프로덕션 코인의 게시글 번호이고(링크도 koreatech.in),
- * 스테이지는 게시글 크롤링이 돌지 않아 그 번호가 없다. 여기서 스테이지를 보면
- * 스테이지 테스트가 통째로 막힌다.
- *
- * 읽기뿐이라 프로덕션을 봐도 되돌릴 일이 없다. 되돌릴 수 없는 건 강의 반영 쪽이고,
- * 그건 여전히 채널이 정한다.
- */
-const ARTICLE_BASE_URL = "https://api.koreatech.in";
-
-/** 게시글을 조회해 제목과 첨부를 얻는다. 배치가 넘긴 번호 하나로 나머지를 채운다. */
-export async function fetchArticle(articleId: number): Promise<Article> {
-  const response = await fetch(`${ARTICLE_BASE_URL}/articles/${articleId}`);
-  if (!response.ok) {
-    throw new Error(`게시글 ${articleId}을 찾지 못했습니다 (HTTP ${response.status}).`);
-  }
-  return (await response.json()) as Article;
-}
-
-const MAX_BYTES = 20 * 1024 * 1024;
-
-/**
- * 공지 첨부파일을 받는다. 슬랙 파일과 달리 봇 토큰을 붙이지 않는다 —
- * 학교 서버에 우리 토큰을 보낼 이유가 없다.
- */
+/** 공지 첨부파일을 받는다. 엑셀이 아닌 게(로그인 페이지 등) 오면 여기서 걸린다. */
 export async function downloadNoticeFile(url: string): Promise<ArrayBuffer> {
-  if (!isAllowedFileUrl(url)) {
-    throw new Error("학교 주소가 아닌 곳에서는 파일을 받지 않습니다.");
-  }
-
-  const response = await fetch(url, { redirect: "follow" });
-  if (!response.ok) {
-    throw new Error(`첨부파일을 받지 못했습니다 (HTTP ${response.status}).`);
-  }
-
-  const size = Number(response.headers.get("content-length") ?? 0);
-  if (size > MAX_BYTES) {
-    throw new Error(`파일이 너무 큽니다 (${Math.round(size / 1024 / 1024)}MB).`);
-  }
-
-  const buffer = await response.arrayBuffer();
-  // xlsx는 zip이라 PK로 시작한다. 로그인 페이지가 오면 여기서 걸린다.
-  const head = new Uint8Array(buffer.slice(0, 2));
-  if (head[0] !== 0x50 || head[1] !== 0x4b) {
+  const buffer = await downloadAttachment(url);
+  if (!isZipFile(buffer)) {
     throw new Error("엑셀 파일이 아닙니다. 첨부 주소를 확인해주세요.");
   }
-
   return buffer;
 }
 
-const key = (token: string) => `lecture-detected:${token}`;
+const store = createDetectedStore<DetectedNotice>("lecture");
 
 /** 버튼을 누를 때까지 들고 있는다. 주소가 길어 버튼 value에 담기 어렵다. */
-export async function saveDetected(notice: DetectedNotice): Promise<string> {
-  const token = createReviewToken();
-  await useStorage("kvStorage").setItem(key(token), notice);
-  return token;
-}
-
-export async function loadDetected(token: string): Promise<DetectedNotice | null> {
-  if (!isValidToken(token)) {
-    return null;
-  }
-  return (await useStorage("kvStorage").getItem<DetectedNotice>(key(token))) ?? null;
-}
-
-export async function dropDetected(token: string): Promise<void> {
-  await useStorage("kvStorage").removeItem(key(token));
-}
+export const saveDetected = store.save;
+export const loadDetected = store.load;
+export const dropDetected = store.drop;

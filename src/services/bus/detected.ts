@@ -8,20 +8,20 @@
  * lecture와 동일하게 둘 이상이면 사람이 버튼으로 고르게 한다.
  */
 
-import { createBusReviewToken, isValidBusReviewToken } from "./reviewStore";
+import {
+  cleanAttachmentName,
+  collectNewestAttachments,
+  createDetectedStore,
+  downloadAttachment,
+  fetchKoinArticle,
+  isAllowedFileUrl,
+  isZipFile,
+  type ArticleAttachment,
+  type KoinArticle,
+} from "~/services/koin/article";
 import type { KoinEnv } from "~/services/koin/target";
 
-interface BusArticleAttachment {
-  name?: string;
-  url?: string;
-  created_at?: string;
-}
-
-export interface BusArticle {
-  title?: string;
-  url?: string;
-  attachments?: BusArticleAttachment[];
-}
+export type BusArticle = KoinArticle;
 
 export interface BusNoticeFile {
   name: string;
@@ -42,104 +42,29 @@ export interface BusDetectedNotice {
   files: BusNoticeFile[];
 }
 
-const MAX_BYTES = 20 * 1024 * 1024;
-const ARTICLE_BASE_URL = "https://api.koreatech.in";
-const ALLOWED_FILE_HOSTS = ["koreatech.ac.kr", "koreatech.in"];
-
-export function cleanBusFileName(raw: string): string {
-  return raw.replace(/\s*\(\s*[\d.]+\s*[KMG]?B\s*\)\s*$/i, "").trim();
-}
-
-export function isAllowedBusFileUrl(url: string): boolean {
-  try {
-    const { protocol, hostname } = new URL(url);
-    return (
-      protocol === "https:" &&
-      ALLOWED_FILE_HOSTS.some((host) => hostname === host || hostname.endsWith(`.${host}`))
-    );
-  } catch {
-    return false;
-  }
-}
-
-export async function fetchBusArticle(articleId: number): Promise<BusArticle> {
-  const response = await fetch(`${ARTICLE_BASE_URL}/articles/${articleId}`, {
-    signal: AbortSignal.timeout(30_000),
-  });
-  if (!response.ok) {
-    throw new Error(`게시글 ${articleId}을 찾지 못했습니다 (HTTP ${response.status}).`);
-  }
-  return (await response.json()) as BusArticle;
-}
+export const cleanBusFileName = cleanAttachmentName;
+export const isAllowedBusFileUrl = isAllowedFileUrl;
+export const fetchBusArticle = fetchKoinArticle;
 
 /** 버스 공지의 시간표(xls/xlsx) 첨부를 모은다. 같은 주소는 가장 최근 이름만 남긴다. */
-export function collectBusSpreadsheets(
-  attachments: BusArticleAttachment[] | undefined,
-): BusNoticeFile[] {
-  const newest = new Map<string, { file: BusNoticeFile; at: string }>();
-  for (const attachment of attachments ?? []) {
-    const url = attachment.url ?? "";
-    const name = cleanBusFileName(attachment.name ?? "");
-    const isSpreadsheet = [".xls", ".xlsx"].some((extension) =>
-      name.toLowerCase().endsWith(extension),
-    );
-    if (!url || !name || !isSpreadsheet || !isAllowedBusFileUrl(url)) continue;
-
-    const at = attachment.created_at ?? "";
-    const kept = newest.get(url);
-    if (!kept || at > kept.at) {
-      newest.set(url, { file: { name, url }, at });
-    }
-  }
-  return [...newest.values()].map(({ file }) => file);
+export function collectBusSpreadsheets(attachments: ArticleAttachment[] | undefined): BusNoticeFile[] {
+  return collectNewestAttachments(attachments, (name, url) =>
+    [".xls", ".xlsx"].some((extension) => name.toLowerCase().endsWith(extension)) ? { name, url } : null,
+  );
 }
 
 /** 학교 게시글 첨부 다운로드. Slack 봇 토큰은 학교 서버로 보내지 않는다. */
 export async function downloadBusNoticeFile(file: BusNoticeFile): Promise<Buffer> {
-  if (!isAllowedBusFileUrl(file.url)) {
-    throw new Error("학교 주소가 아닌 곳에서는 파일을 받지 않습니다.");
-  }
-  const response = await fetch(file.url, {
-    redirect: "follow",
-    signal: AbortSignal.timeout(30_000),
-  });
-  if (!response.ok) {
-    throw new Error(`첨부 파일을 받지 못했습니다 (HTTP ${response.status}).`);
-  }
-  const declared = Number(response.headers.get("content-length") ?? 0);
-  if (declared > MAX_BYTES) {
-    throw new Error(`파일이 너무 큽니다 (${Math.round(declared / 1024 / 1024)}MB).`);
-  }
-  const buffer = await response.arrayBuffer();
-  if (buffer.byteLength > MAX_BYTES) {
-    throw new Error(`파일이 너무 큽니다 (${Math.round(buffer.byteLength / 1024 / 1024)}MB).`);
-  }
-  if (file.name.toLowerCase().endsWith(".xlsx")) {
-    // xlsx는 zip이라 PK로 시작한다. slackFile.ts의 검사와 같은 이유.
-    const head = new Uint8Array(buffer.slice(0, 2));
-    if (head[0] !== 0x50 || head[1] !== 0x4b) {
-      throw new Error("엑셀 파일이 아닙니다.");
-    }
+  const buffer = await downloadAttachment(file.url);
+  // xls(BIFF)는 매직 바이트 규칙이 달라 xlsx만 검사한다. slackFile.ts의 검사와 같은 이유.
+  if (file.name.toLowerCase().endsWith(".xlsx") && !isZipFile(buffer)) {
+    throw new Error("엑셀 파일이 아닙니다.");
   }
   return Buffer.from(buffer);
 }
 
-const key = (token: string) => `bus-detected:${token}`;
+const store = createDetectedStore<BusDetectedNotice>("bus");
 
-/** 버튼을 누를 때까지 들고 있는다. 주소가 길어 버튼 value에 담기 어렵다. */
-export async function saveBusDetected(notice: BusDetectedNotice): Promise<string> {
-  const token = createBusReviewToken();
-  await useStorage("kvStorage").setItem(key(token), notice);
-  return token;
-}
-
-export async function loadBusDetected(token: string): Promise<BusDetectedNotice | null> {
-  if (!isValidBusReviewToken(token)) {
-    return null;
-  }
-  return (await useStorage("kvStorage").getItem<BusDetectedNotice>(key(token))) ?? null;
-}
-
-export async function dropBusDetected(token: string): Promise<void> {
-  await useStorage("kvStorage").removeItem(key(token));
-}
+export const saveBusDetected = store.save;
+export const loadBusDetected = store.load;
+export const dropBusDetected = store.drop;

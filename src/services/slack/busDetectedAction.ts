@@ -15,7 +15,8 @@ import { linkBusThread } from "~/services/bus/reviewStore";
 import { acquireDetectLock, releaseDetectLock } from "~/services/koin/detectLock";
 import { labelOf, resolveTarget } from "~/services/koin/target";
 import type { KoinEnv } from "~/services/koin/target";
-import { koreatechArticleUrl, MAX_CHOICES, notice, replaceOriginal, shorten } from "./blocks";
+import { MAX_CHOICES, notice, replaceOriginal, shorten } from "./blocks";
+import { koreatechArticleUrl } from "~/services/koin/article";
 import type { BlockActionSetting } from "./type";
 import { errorMessage } from "~/utils/errorMessage";
 
