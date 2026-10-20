@@ -10,6 +10,7 @@ import {
 import { notice } from "./blocks";
 import type { BlockActionSetting } from "./type";
 import { updateSlack } from "~/utils/slackFunction";
+import { errorMessage } from "~/utils/errorMessage";
 
 function vacationSeason(termName: string): "하계" | "동계" {
   return termName.startsWith("하계") ? "하계" : "동계";
@@ -100,7 +101,7 @@ export const coopPatchActions: BlockActionSetting[] = [
       } catch (error) {
         await updateSlack({
           client, channel, ts, text: "생협 수정 실패",
-          blocks: notice(`:x: *생협 수정 적용 실패*\n${error instanceof Error ? error.message : "알 수 없는 오류입니다"}`),
+          blocks: notice(`:x: *생협 수정 적용 실패*\n${errorMessage(error)}`),
         });
       }
     },

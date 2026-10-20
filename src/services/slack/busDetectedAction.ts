@@ -17,6 +17,7 @@ import { labelOf, resolveTarget } from "~/services/koin/target";
 import type { KoinEnv } from "~/services/koin/target";
 import { koreatechArticleUrl, MAX_CHOICES, notice, replaceOriginal, shorten } from "./blocks";
 import type { BlockActionSetting } from "./type";
+import { errorMessage } from "~/utils/errorMessage";
 
 /**
  * 고른 파일을 내려받아 변환하고 검토 링크까지 올린다.
@@ -85,9 +86,7 @@ async function runConversion({
       ts,
       text: "버스 시간표 변환 실패",
       blocks: notice(
-        `:x: *변환 실패*\n${
-          error instanceof Error ? error.message : "알 수 없는 오류입니다"
-        }\n${file.name} · 요청: <@${actor}>`,
+        `:x: *변환 실패*\n${errorMessage(error)}\n${file.name} · 요청: <@${actor}>`,
       ),
     });
   } finally {
@@ -234,7 +233,7 @@ export async function handleBusDetectedAction(
     await releaseDetectLock("bus", channel, articleId);
     await say(
       "버스 게시글 조회 실패",
-      `:x: *게시글을 읽지 못했습니다.*\n${error instanceof Error ? error.message : ""}`,
+      `:x: *게시글을 읽지 못했습니다.*\n${errorMessage(error, "")}`,
     );
     return;
   }

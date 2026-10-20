@@ -17,6 +17,7 @@ import { linkThread } from "~/services/lecture/reviewStore";
 import { MAX_CHOICES, notice, replaceOriginal, shorten } from "./blocks";
 import type { BlockActionSetting } from "./type";
 import { updateSlack } from "~/utils/slackFunction";
+import { errorMessage } from "~/utils/errorMessage";
 
 /**
  * 고른 파일을 내려받아 변환하고 검토 링크까지 올린다.
@@ -75,7 +76,7 @@ async function runConversion({
       text: "변환 실패",
       blocks: [
         { type: "section", text: { type: "mrkdwn",
-          text: `:x: *변환 실패*\n${error instanceof Error ? error.message : "알 수 없는 오류입니다"}` } },
+          text: `:x: *변환 실패*\n${errorMessage(error)}` } },
         { type: "context", elements: [{ type: "mrkdwn",
           text: `${file.name} · 작업자: <@${actor}>` }] },
       ],
@@ -157,7 +158,7 @@ export const lectureDetectedActions: BlockActionSetting[] = [
       } catch (error) {
         await releaseDetectLock("lecture", channel, articleId);
         await say("게시글 조회 실패",
-          `:x: *게시글을 읽지 못했습니다.*\n${error instanceof Error ? error.message : ""}`);
+          `:x: *게시글을 읽지 못했습니다.*\n${errorMessage(error, "")}`);
         return;
       }
 

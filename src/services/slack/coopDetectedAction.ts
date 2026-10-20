@@ -28,6 +28,7 @@ import { resolveExtractedCoopSemester } from "~/services/coop/vision";
 import { acquireDetectLock, releaseDetectLock } from "~/services/koin/detectLock";
 import { koreatechArticleUrl, MAX_CHOICES, notice, replaceOriginal, shorten } from "./blocks";
 import type { BlockActionSetting } from "./type";
+import { errorMessage } from "~/utils/errorMessage";
 
 async function runCoopConversion({
   client,
@@ -132,7 +133,7 @@ async function runCoopConversion({
       ts,
       text: "생협 운영시간 변환 실패",
       blocks: [
-        ...notice(`:x: *변환 실패*\n${error instanceof Error ? error.message : "알 수 없는 오류입니다"}`),
+        ...notice(`:x: *변환 실패*\n${errorMessage(error)}`),
         { type: "context", elements: [{ type: "mrkdwn", text: `${image.name} · 작업자: <@${actor}>` }] },
       ],
     });
@@ -268,7 +269,7 @@ export async function handleCoopDetectedAction(
     article = await fetchCoopArticle(articleId);
   } catch (error) {
     await releaseDetectLock("coop", channel, articleId);
-    await say("생협 게시글 조회 실패", `:x: *게시글을 읽지 못했습니다.*\n${error instanceof Error ? error.message : ""}`);
+    await say("생협 게시글 조회 실패", `:x: *게시글을 읽지 못했습니다.*\n${errorMessage(error, "")}`);
     return;
   }
 

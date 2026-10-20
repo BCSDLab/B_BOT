@@ -17,6 +17,7 @@ import {
   dropPendingCoopVacation,
   loadPendingCoopVacation,
 } from "~/services/coop/vacationStore";
+import { errorMessage } from "~/utils/errorMessage";
 
 export const messages: MessageSetting[] = [];
 
@@ -78,7 +79,7 @@ messages.push({
         channel,
         ts: messageTs,
         text: "생협 방학 시간표 분리 실패",
-        blocks: [{ type: "section", text: { type: "mrkdwn", text: `:x: *분리 실패*\n${error instanceof Error ? error.message : "알 수 없는 오류입니다"}` } }],
+        blocks: [{ type: "section", text: { type: "mrkdwn", text: `:x: *분리 실패*\n${errorMessage(error)}` } }],
       });
     }
   },
@@ -212,7 +213,7 @@ messages.push({
           type: "section",
           text: {
             type: "mrkdwn",
-            text: `:x: *수정 요청을 처리하지 못했습니다*\n${error instanceof Error ? error.message : "알 수 없는 오류입니다"}`,
+            text: `:x: *수정 요청을 처리하지 못했습니다*\n${errorMessage(error)}`,
           },
         }],
       });

@@ -12,6 +12,7 @@ import { labelOf, resolveTargetByEnv } from "~/services/koin/target";
 import { notice } from "./blocks";
 import { updateSlack } from "~/utils/slackFunction";
 import type { BlockActionSetting } from "./type";
+import { errorMessage } from "~/utils/errorMessage";
 
 export const COOP_APPLY_ACTION_IDS = ["coop:apply", "coop:cancel"] as const;
 
@@ -117,7 +118,7 @@ export async function handleCoopApplyAction(
       },
     ] });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "알 수 없는 오류입니다";
+    const message = errorMessage(error);
     const partial = appliedSemesterIds.length > 0
       ? `\n:warning: 먼저 처리된 학기 ID: ${appliedSemesterIds.join(", ")} · 재시도하면 같은 데이터로 다시 갱신합니다.`
       : "";

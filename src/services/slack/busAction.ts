@@ -23,6 +23,7 @@ import { computeBusVersionSchedules, describeBusVersionSchedules } from "~/servi
 import { notice } from "./blocks";
 import { updateSlack } from "~/utils/slackFunction";
 import type { BlockActionSetting } from "./type";
+import { errorMessage } from "~/utils/errorMessage";
 
 export const BUS_APPLY_ACTION_IDS = ["bus:apply", "bus:cancel"] as const;
 export const BUS_PATCH_ACTION_IDS = ["bus:patch_apply", "bus:patch_cancel"] as const;
@@ -122,7 +123,7 @@ export async function handleBusApplyAction(
       },
     ] });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "알 수 없는 오류입니다";
+    const message = errorMessage(error);
     // 각 PUT은 대상×학기 하나를 통째로 덮어쓴다. 중간에 실패해도 앞선 PUT은 이미
     // 반영된 상태로 남으므로, 재시도가 안전하다는 것과 어디까지 갔는지를 함께 알린다.
     const partial = appliedPayloads.length > 0
@@ -220,7 +221,7 @@ export async function handleBusPatchAction(
       },
     ] });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "알 수 없는 오류입니다";
+    const message = errorMessage(error);
     await updateSlack({
       client,
       channel,

@@ -8,6 +8,7 @@ import { messages as lectureMessages } from "./domain/lecture";
 import { messages as coopMessages } from "./domain/coop";
 import { messages as busMessages } from "./domain/bus";
 import { answerStream, logQuery } from "~/services/rag";
+import { errorMessage } from "~/utils/errorMessage";
 import { sendSlackBlock, sendSlackText } from "~/utils/slackFunction";
 
 
@@ -54,7 +55,7 @@ export const messageFunctionList: MessageSetting[] = [
         await client.chat.update({
           channel,
           ts: msgTs,
-          text: `검색 중 오류가 발생했어요: ${error instanceof Error ? error.message : "알 수 없는 오류"}`,
+          text: `검색 중 오류가 발생했어요: ${errorMessage(error, "알 수 없는 오류")}`,
         });
         await logQuery({
           channel, msgTs, user, question, answer: "",

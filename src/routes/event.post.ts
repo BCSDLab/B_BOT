@@ -13,6 +13,7 @@ import type { SlackFile } from "~/utils/slackFile";
 import { setFeedback } from "~/services/rag";
 import { assertSlackRequest } from "~/utils/slackRequest";
 import { sendSlackText } from "~/utils/slackFunction";
+import { errorMessage } from "~/utils/errorMessage";
 
 type Body = {
   type: "event_callback";
@@ -192,7 +193,7 @@ async function processMessage({
         client,
         channel,
         threadTs: ts,
-        text: `오류가 발생했어요: ${error instanceof Error ? error.message : '알 수 없는 오류입니다'}`,
+        text: `오류가 발생했어요: ${errorMessage(error)}`,
       });
     }
   }
