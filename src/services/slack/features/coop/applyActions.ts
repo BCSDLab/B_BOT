@@ -9,9 +9,9 @@ import {
 import { loadCoopReview } from "~/services/coop/reviewStore";
 import { getKoinAdminAuth } from "~/services/koin/adminAuth";
 import { labelOf, resolveTargetByEnv } from "~/services/koin/target";
-import { notice } from "./blocks";
+import { notice } from "~/services/slack/blocks";
 import { updateSlack } from "~/utils/slackFunction";
-import type { BlockActionSetting } from "./type";
+import type { BlockActionSetting } from "~/services/slack/types";
 import { errorMessage } from "~/utils/errorMessage";
 
 export const COOP_APPLY_ACTION_IDS = ["coop:apply", "coop:cancel"] as const;

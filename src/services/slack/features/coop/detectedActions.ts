@@ -26,9 +26,9 @@ import {
 import { savePendingCoopVacation } from "~/services/coop/vacationStore";
 import { resolveExtractedCoopSemester } from "~/services/coop/vision";
 import { acquireDetectLock, releaseDetectLock } from "~/services/koin/detectLock";
-import { MAX_CHOICES, notice, replaceOriginal, shorten } from "./blocks";
+import { MAX_CHOICES, notice, replaceOriginal, shorten } from "~/services/slack/blocks";
 import { koreatechArticleUrl } from "~/services/koin/article";
-import type { BlockActionSetting } from "./type";
+import type { BlockActionSetting } from "~/services/slack/types";
 import { errorMessage } from "~/utils/errorMessage";
 
 async function runCoopConversion({

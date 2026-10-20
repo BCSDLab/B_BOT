@@ -83,7 +83,7 @@ beforeEach(() => {
 
 describe("bus:detected_ignore", () => {
   it("게시글을 조회하지 않고 원본 메시지를 넘어감으로 바꾼다", async () => {
-    const { handleBusDetectedAction } = await import("~/services/slack/busDetectedAction");
+    const { handleBusDetectedAction } = await import("~/services/slack/features/bus/detectedActions");
     const mock = client();
 
     await handleBusDetectedAction(
@@ -102,7 +102,7 @@ describe("bus:detected_ignore", () => {
 
 describe("bus:detected", () => {
   it("채널이 반영 대상이 아니면 게시글을 조회하지 않는다", async () => {
-    const { handleBusDetectedAction } = await import("~/services/slack/busDetectedAction");
+    const { handleBusDetectedAction } = await import("~/services/slack/features/bus/detectedActions");
     const mock = client();
 
     await handleBusDetectedAction(
@@ -117,7 +117,7 @@ describe("bus:detected", () => {
   it("첨부가 없으면 변환을 시도하지 않고 안내한다", async () => {
     fetchBusArticle.mockResolvedValue({ title: "버스 시간표 변경 안내", url: "https://koreatech.in/articles/1", attachments: [] });
     collectBusSpreadsheets.mockReturnValue([]);
-    const { handleBusDetectedAction } = await import("~/services/slack/busDetectedAction");
+    const { handleBusDetectedAction } = await import("~/services/slack/features/bus/detectedActions");
     const mock = client();
 
     await handleBusDetectedAction(
@@ -144,7 +144,7 @@ describe("bus:detected", () => {
       noDaysRouteCount: 0,
       semesterTypes: ["REGULAR"],
     });
-    const { handleBusDetectedAction } = await import("~/services/slack/busDetectedAction");
+    const { handleBusDetectedAction } = await import("~/services/slack/features/bus/detectedActions");
     const mock = client();
 
     await handleBusDetectedAction(
@@ -178,7 +178,7 @@ describe("bus:detected", () => {
     fetchBusArticle.mockResolvedValue({ title: "공지", url: "https://koreatech.in/articles/1", attachments: [{}] });
     collectBusSpreadsheets.mockReturnValue([{ name: "시간표.xlsx", url: "https://koreatech.in/f/1" }]);
     downloadBusNoticeFile.mockRejectedValue(new Error("첨부 파일을 받지 못했습니다"));
-    const { handleBusDetectedAction } = await import("~/services/slack/busDetectedAction");
+    const { handleBusDetectedAction } = await import("~/services/slack/features/bus/detectedActions");
     const mock = client();
 
     await handleBusDetectedAction(
@@ -201,7 +201,7 @@ describe("bus:detected", () => {
       { name: "정규학기.xlsx", url: "https://koreatech.in/f/1" },
       { name: "계절학기.xlsx", url: "https://koreatech.in/f/2" },
     ]);
-    const { handleBusDetectedAction } = await import("~/services/slack/busDetectedAction");
+    const { handleBusDetectedAction } = await import("~/services/slack/features/bus/detectedActions");
     const mock = client();
 
     await handleBusDetectedAction(
@@ -248,7 +248,7 @@ describe("bus:detected_start", () => {
       noDaysRouteCount: 0,
       semesterTypes: ["SEASONAL"],
     });
-    const { handleBusDetectedAction } = await import("~/services/slack/busDetectedAction");
+    const { handleBusDetectedAction } = await import("~/services/slack/features/bus/detectedActions");
     const mock = client();
 
     await handleBusDetectedAction(
@@ -272,7 +272,7 @@ describe("bus:detected_start", () => {
 
   it("만료됐거나 이미 처리된 알림이면 변환하지 않는다", async () => {
     loadBusDetected.mockResolvedValue(null);
-    const { handleBusDetectedAction } = await import("~/services/slack/busDetectedAction");
+    const { handleBusDetectedAction } = await import("~/services/slack/features/bus/detectedActions");
     const mock = client();
 
     await handleBusDetectedAction(
@@ -296,7 +296,7 @@ describe("bus:detected_start", () => {
       files: [{ name: "정규학기.xlsx", url: "https://koreatech.in/f/1" }],
     });
     downloadBusNoticeFile.mockRejectedValue(new Error("첨부 파일을 받지 못했습니다"));
-    const { handleBusDetectedAction } = await import("~/services/slack/busDetectedAction");
+    const { handleBusDetectedAction } = await import("~/services/slack/features/bus/detectedActions");
     const mock = client();
 
     await handleBusDetectedAction(
@@ -321,7 +321,7 @@ describe("bus:detected_ignore (파일 선택 중 취소)", () => {
       articleUrl: "https://koreatech.in/articles/3",
       files: [{ name: "시간표.xlsx", url: "https://koreatech.in/f/1" }],
     });
-    const { handleBusDetectedAction } = await import("~/services/slack/busDetectedAction");
+    const { handleBusDetectedAction } = await import("~/services/slack/features/bus/detectedActions");
     const mock = client();
 
     await handleBusDetectedAction(

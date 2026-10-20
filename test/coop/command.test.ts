@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildRegularCoopResultBlocks } from "~/services/coop/pipeline";
-import { messages as coopMessages, parseVacationBoundary } from "~/services/slack/domain/coop";
+import { messages as coopMessages, parseVacationBoundary } from "~/services/slack/features/coop/messages";
 
 describe("생협 후속 명령", () => {
   it("방학 시작일 명령은 ISO 날짜만 읽는다", () => {

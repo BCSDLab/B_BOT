@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { blockActions } from "~/services/slack/blockAction";
+import { blockActions } from "~/services/slack/registry/blockActions";
 import { commands } from "~/services/slack/command";
 import { messageFunctionList } from "~/services/slack/message";
 import { shortcuts } from "~/services/slack/shortcut";

@@ -1,12 +1,12 @@
-import { busApplyActions, busPatchActions } from "./busAction";
-import { busDetectedActions } from "./busDetectedAction";
-import { coopApplyActions } from "./coopApplyAction";
-import { coopDetectedActions } from "./coopDetectedAction";
-import { coopPatchActions } from "./coopPatchAction";
-import { diningActions } from "./diningAction";
-import { lectureActions } from "./lectureAction";
-import { lectureDetectedActions } from "./lectureDetectedAction";
-import type { BlockActionSetting } from "./type";
+import { busApplyActions, busPatchActions } from "~/services/slack/features/bus/actions";
+import { busDetectedActions } from "~/services/slack/features/bus/detectedActions";
+import { coopApplyActions } from "~/services/slack/features/coop/applyActions";
+import { coopDetectedActions } from "~/services/slack/features/coop/detectedActions";
+import { coopPatchActions } from "~/services/slack/features/coop/patchActions";
+import { diningActions } from "~/services/slack/features/dining";
+import { lectureActions } from "~/services/slack/features/lecture/actions";
+import { lectureDetectedActions } from "~/services/slack/features/lecture/detectedActions";
+import type { BlockActionSetting } from "~/services/slack/types";
 
 /**
  * 버튼·셀렉트 조작(block_actions) 핸들러 등록표.

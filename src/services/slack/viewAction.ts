@@ -3,7 +3,7 @@ import type {
   GroupMentionMetadata,
   MentionMetadata,
   ViewActionSetting,
-} from "./type";
+} from "~/services/slack/types";
 import INTERACTION_MODAL from "@/constant/INTERACTION_MODAL.json";
 import CHANNEL_ID from "@/constant/CHANNEL_ID.json";
 import { getMentionTargetMembers, type ActiveStatus, type MentionGroup, type Track } from "~/services/member/members";

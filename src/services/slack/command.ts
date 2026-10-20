@@ -1,10 +1,10 @@
 import type { View } from "@slack/web-api";
-import type { CommandSetting, GroupMentionMetadata } from "./type";
+import type { CommandSetting, GroupMentionMetadata } from "~/services/slack/types";
 import CHANNEL_ID from "@/constant/CHANNEL_ID.json";
 import INTERACTION_MODAL from "@/constant/INTERACTION_MODAL.json";
 import {
   command as googleMeetCommand,
-} from "./domain/googleMeet"
+} from "~/services/slack/features/googleMeet"
 import { sendSlackText } from "~/utils/slackFunction";
 
 export const commands: CommandSetting[] = [

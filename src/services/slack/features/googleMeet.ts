@@ -1,5 +1,5 @@
 import { createMeeting, removeMeeting, saveMeeting } from "~/services/google/googleMeet";
-import { CommandSetting, MessageSetting } from "../type";
+import { CommandSetting, MessageSetting } from "~/services/slack/types";
 import { sendSlackText, updateSlack } from "~/utils/slackFunction";
 
 export const messages: MessageSetting[] = [

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseCommand } from "~/services/slack/domain/lecture";
+import { parseCommand } from "~/services/slack/features/lecture/messages";
 import { findExcelFile } from "~/utils/slackFile";
 
 describe("!강의반영 인자", () => {

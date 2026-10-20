@@ -125,7 +125,7 @@ describe("bus:apply", () => {
     submitBusTimetables.mockImplementation(async (_conversions, _auth, onApplied) => {
       onApplied?.({ target: "commuting", semesterType: "REGULAR" });
     });
-    const { handleBusApplyAction } = await import("~/services/slack/busAction");
+    const { handleBusApplyAction } = await import("~/services/slack/features/bus/actions");
     const mock = client();
 
     await handleBusApplyAction(
@@ -150,7 +150,7 @@ describe("bus:apply", () => {
 
   it("클레임에 실패하면 이유를 개인 메시지로만 보여주고 반영을 시도하지 않는다", async () => {
     claimBusJob.mockResolvedValue({ ok: false, reason: "이미 <@U9>님이 반영했습니다." });
-    const { handleBusApplyAction } = await import("~/services/slack/busAction");
+    const { handleBusApplyAction } = await import("~/services/slack/features/bus/actions");
     const mock = client();
 
     await handleBusApplyAction(
@@ -168,7 +168,7 @@ describe("bus:apply", () => {
 
   it("검토 링크가 만료됐으면 반영을 실패로 종결한다", async () => {
     loadBusReview.mockResolvedValue(null);
-    const { handleBusApplyAction } = await import("~/services/slack/busAction");
+    const { handleBusApplyAction } = await import("~/services/slack/features/bus/actions");
     const mock = client();
 
     await handleBusApplyAction(
@@ -186,7 +186,7 @@ describe("bus:apply", () => {
       onApplied?.({ target: "commuting", semesterType: "REGULAR" });
       throw new Error("shuttle Admin API failed: 500");
     });
-    const { handleBusApplyAction } = await import("~/services/slack/busAction");
+    const { handleBusApplyAction } = await import("~/services/slack/features/bus/actions");
     const mock = client();
 
     await handleBusApplyAction(
@@ -208,7 +208,7 @@ describe("bus:apply", () => {
 describe("bus:cancel", () => {
   it("이미 진행 중이면 취소되지 않고 메시지도 갱신하지 않는다", async () => {
     cancelBusJob.mockResolvedValue(false);
-    const { handleBusApplyAction } = await import("~/services/slack/busAction");
+    const { handleBusApplyAction } = await import("~/services/slack/features/bus/actions");
     const mock = client();
 
     await handleBusApplyAction(
@@ -248,7 +248,7 @@ describe("bus:patch_apply", () => {
       request: "천안역 1회 천안역 시간을 09:00으로",
       createdAt: "2026-08-08T00:00:00.000Z",
     });
-    const { handleBusPatchAction } = await import("~/services/slack/busAction");
+    const { handleBusPatchAction } = await import("~/services/slack/features/bus/actions");
     const mock = client();
 
     await handleBusPatchAction(
@@ -280,7 +280,7 @@ describe("bus:patch_apply", () => {
       request: "아무 요청",
       createdAt: "2026-08-08T00:00:00.000Z",
     });
-    const { handleBusPatchAction } = await import("~/services/slack/busAction");
+    const { handleBusPatchAction } = await import("~/services/slack/features/bus/actions");
     const mock = client();
 
     await handleBusPatchAction(

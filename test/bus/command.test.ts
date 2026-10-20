@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { messages as busMessages, parseBusCommand } from "~/services/slack/domain/bus";
+import { messages as busMessages, parseBusCommand } from "~/services/slack/features/bus/messages";
 import { findSpreadsheetFile } from "~/utils/slackFile";
 
 const file = (name: string, filetype = "binary") => ({

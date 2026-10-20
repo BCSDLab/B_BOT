@@ -1,12 +1,12 @@
-import type { MessageSetting } from "./type";
+import type { MessageSetting } from "~/services/slack/types";
 
 import ICEBRAKING_QUESTIONS from "@/constant/ICEBRAKING_QUESTIONS.json";
 import CHANNEL_ID from "@/constant/CHANNEL_ID.json";
 import BASE_URL from "@/constant/BASE_URL.json";
-import { messages as googleMeetMessages } from "./domain/googleMeet";
-import { messages as lectureMessages } from "./domain/lecture";
-import { messages as coopMessages } from "./domain/coop";
-import { messages as busMessages } from "./domain/bus";
+import { messages as googleMeetMessages } from "~/services/slack/features/googleMeet";
+import { messages as lectureMessages } from "~/services/slack/features/lecture/messages";
+import { messages as coopMessages } from "~/services/slack/features/coop/messages";
+import { messages as busMessages } from "~/services/slack/features/bus/messages";
 import { answerStream, logQuery } from "~/services/rag";
 import { errorMessage } from "~/utils/errorMessage";
 import { sendSlackBlock, sendSlackText } from "~/utils/slackFunction";

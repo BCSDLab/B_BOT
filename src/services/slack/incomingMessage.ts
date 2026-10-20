@@ -1,6 +1,6 @@
 import type { GenericMessageEvent, MessageChangedEvent, SlackEvent } from "@slack/web-api";
 import type { SlackFile } from "~/utils/slackFile";
-import type { MessageSetting } from "./type";
+import type { MessageSetting } from "~/services/slack/types";
 
 export type MessageEvent = Extract<SlackEvent, { type: "message" }>;
 

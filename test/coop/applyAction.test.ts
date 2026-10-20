@@ -67,7 +67,7 @@ import {
   claimCoopJob,
   finishCoopJob,
 } from "~/services/coop/jobStore";
-import { handleCoopApplyAction } from "~/services/slack/coopApplyAction";
+import { handleCoopApplyAction } from "~/services/slack/features/coop/applyActions";
 import { loadCoopReview } from "~/services/coop/reviewStore";
 
 function client() {

@@ -4,7 +4,7 @@ import { decideReport, type Decision } from "~/services/dining/decision";
 import { resolveDiningAuth } from "~/services/dining/diningApi";
 import { APPROVE_ACTION_ID, REJECT_ACTION_ID } from "~/services/dining/render";
 import { envOfChannel, wakeDiningWorker } from "~/services/dining/worker";
-import type { BlockActionSetting } from "./type";
+import type { BlockActionSetting } from "~/services/slack/types";
 
 async function handleDiningDecision(
   decision: Decision,

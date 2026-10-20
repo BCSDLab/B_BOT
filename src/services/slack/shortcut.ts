@@ -1,5 +1,5 @@
 import type { View } from "@slack/web-api";
-import type { GroupMentionMetadata, ShortcutSetting } from "./type";
+import type { GroupMentionMetadata, ShortcutSetting } from "~/services/slack/types";
 import INTERACTION_MODAL from "@/constant/INTERACTION_MODAL.json";
 import { sendSlackText } from "~/utils/slackFunction";
 
