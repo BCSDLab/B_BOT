@@ -1,5 +1,6 @@
 import { query } from "~/helper/adapter/postgres";
-import { createJobLock, closeJobPool, getPool } from "~/services/koin/jobLock";
+import { closePool, getPool } from "~/helper/adapter/postgres";
+import { createJobLock } from "~/services/koin/jobLock";
 import type { BusVersionUpdate } from "./types";
 
 /**
@@ -43,7 +44,7 @@ export interface BusJob {
 }
 
 /** 테스트 종료용. 평소 실행 중엔 부를 필요가 없다 — 프로세스가 끝날 때 같이 닫힌다. */
-export const closeBusJobPool = closeJobPool;
+export const closeBusJobPool = closePool;
 
 // 이 레포에는 마이그레이션 도구가 없다. 첫 사용 때 한 번 만들고 넘어간다.
 let schemaReady: Promise<void> | undefined;

@@ -1,5 +1,5 @@
-import { query } from "~/helper/adapter/postgres";
-import { createJobLock, getPool } from "~/services/koin/jobLock";
+import { getPool, query } from "~/helper/adapter/postgres";
+import { createJobLock } from "~/services/koin/jobLock";
 
 export type { JobStatus as CoopJobStatus, ClaimResult as CoopClaimResult } from "~/services/koin/jobLock";
 import type { JobStatus as CoopJobStatus } from "~/services/koin/jobLock";

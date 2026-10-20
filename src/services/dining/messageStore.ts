@@ -1,5 +1,4 @@
-import { query } from "~/helper/adapter/postgres";
-import { getPool } from "~/services/koin/jobLock";
+import { getPool, query } from "~/helper/adapter/postgres";
 import type { KoinEnv } from "~/services/koin/target";
 
 export interface DiningReportMessage {

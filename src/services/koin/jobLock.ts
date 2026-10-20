@@ -1,5 +1,4 @@
-import type pg from "pg";
-import { createPool, query } from "~/helper/adapter/postgres";
+import { getPool, query } from "~/helper/adapter/postgres";
 
 /**
  * 반영 작업의 상태와 락.
@@ -26,17 +25,6 @@ export interface ClaimResult {
   ok: boolean;
   /** 가져가지 못한 이유. 누른 사람에게만 보여준다. */
   reason?: string;
-}
-
-let pool: pg.Pool | undefined;
-
-export function getPool(): pg.Pool {
-  return (pool ??= createPool());
-}
-
-export async function closeJobPool(): Promise<void> {
-  await pool?.end();
-  pool = undefined;
 }
 
 /**

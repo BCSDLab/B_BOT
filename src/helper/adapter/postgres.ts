@@ -11,6 +11,18 @@ export function createPool(): pg.Pool {
   });
 }
 
+let sharedPool: pg.Pool | undefined;
+
+/** 봇 전체가 함께 쓰는 풀. 모듈마다 풀을 만들면 연결 수만 늘어난다. */
+export function getPool(): pg.Pool {
+  return (sharedPool ??= createPool());
+}
+
+export async function closePool(): Promise<void> {
+  await sharedPool?.end();
+  sharedPool = undefined;
+}
+
 export interface ResultSet {
   rows: any;
   fields: any;

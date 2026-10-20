@@ -1,5 +1,4 @@
-import type pg from "pg";
-import { createPool, query } from "~/helper/adapter/postgres";
+import { getPool, query } from "~/helper/adapter/postgres";
 
 /**
  * 감지 알림의 `예`를 한 번만 통과시킨다.
@@ -14,11 +13,6 @@ import { createPool, query } from "~/helper/adapter/postgres";
  * 조건부 INSERT 한 번으로 잡는다. 조회 후 삽입하면 그 사이에 끼어들 수 있다.
  */
 const STALE_MINUTES = 30;
-
-let pool: pg.Pool | undefined;
-function getPool(): pg.Pool {
-  return (pool ??= createPool());
-}
 
 let schemaReady: Promise<void> | undefined;
 
