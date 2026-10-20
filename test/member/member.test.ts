@@ -8,8 +8,8 @@ import {
   mentionByName,
   toBcsdMembers,
   type BcsdMember,
-} from "~/utils/member";
-import { getPRThread, markPRThreadMerged } from "~/helper/api/prThread";
+} from "~/services/member/members";
+import { getPRThread, markPRThreadMerged } from "~/services/github/prThreadStore";
 
 const serviceMember = (overrides: Record<string, unknown>) => ({
   id: 1,

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { ensureOnce } from "~/helper/adapter/postgres";
+import { ensureOnce } from "~/infra/postgres";
 
 describe("스키마 준비 1회 실행", () => {
   it("성공하면 다시 돌리지 않는다", async () => {

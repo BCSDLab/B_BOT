@@ -1,5 +1,5 @@
 import CHANNEL_ID from "@/constant/CHANNEL_ID.json";
-import { getMembersOrEmpty, mentionByName } from "~/utils/member";
+import { getMembersOrEmpty, mentionByName } from "~/services/member/members";
 import { sendSlackBlock } from "~/utils/slackFunction";
 
 interface RequestBody {

@@ -1,5 +1,5 @@
 import type { Pool } from "pg";
-import { query } from "~/helper/adapter/postgres";
+import { query } from "~/infra/postgres";
 
 export async function getPRThreadTs(pool: Pool, pullRequestLink: string): Promise<string | null> {
   const result = await query(

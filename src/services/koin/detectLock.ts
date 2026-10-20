@@ -1,4 +1,4 @@
-import { ensureOnce, getPool, query } from "~/helper/adapter/postgres";
+import { ensureOnce, getPool, query } from "~/infra/postgres";
 
 /**
  * 감지 알림의 `예`를 한 번만 통과시킨다.

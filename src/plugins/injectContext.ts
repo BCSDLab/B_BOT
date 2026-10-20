@@ -1,5 +1,5 @@
 import { WebClient } from '@slack/web-api';
-import { getPool } from "~/helper/adapter/postgres";
+import { getPool } from "~/infra/postgres";
 
 export default defineNitroPlugin(async (nitroApp) => {
   const webClient = new WebClient(import.meta.env.SLACK_BOT_TOKEN);
