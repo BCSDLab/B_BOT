@@ -10,6 +10,7 @@ import type {
 import { ARRIVAL_MARKERS } from "./types";
 import { normalizeTime } from "./validation";
 import { BUS_REGIONS, clean } from "./text";
+import { groupBy } from "~/utils/groupBy";
 
 const TITLES = ["정규학기", "계절학기", "방학기간"] as const;
 const SEMESTER_OF: Record<string, SemesterType> = {
@@ -360,7 +361,7 @@ export function resolvePatch(
     return null;
   }
 
-  const bySemester = Map.groupBy(matches, (match) => match.payload.semester_type as SemesterType);
+  const bySemester = groupBy(matches, (match) => match.payload.semester_type as SemesterType);
   if (bySemester.size > 1) {
     problems.push(
       `"${label}"이 여러 학기에 걸쳐 있습니다: ${[...bySemester.keys()].map((s) => TITLE_OF[s]).join(", ")}. ` +
@@ -643,7 +644,7 @@ function findSingleRoute(
     problems.push(`"${label}"에 해당하는 노선을 찾지 못했습니다.`);
     return undefined;
   }
-  const bySemester = Map.groupBy(matches, (match) => match.payload.semester_type as SemesterType);
+  const bySemester = groupBy(matches, (match) => match.payload.semester_type as SemesterType);
   if (bySemester.size > 1) {
     problems.push(
       `"${label}"이 여러 학기에 걸쳐 있습니다: ${[...bySemester.keys()].map((s) => TITLE_OF[s]).join(", ")}. 학기를 지정해주세요.`,

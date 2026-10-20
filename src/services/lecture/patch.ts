@@ -7,6 +7,7 @@ import {
 import { describeClassTime } from "./describeTime";
 import { generateStructured } from "./llm";
 import type { Lecture, TimeFormat } from "./types";
+import { groupBy } from "~/utils/groupBy";
 
 /** 계절학기는 요일이 없어 월~금으로 전개한다. 변환 때와 같은 규칙이다. */
 const SEASONAL_DAYS = [0, 1, 2, 3, 4];
@@ -332,7 +333,7 @@ export function resolveAmbiguities(
 
 /** 원본을 건드리지 않고 수정본을 새로 만든다. 적용 전 미리보기와 실제 적용이 갈라지지 않게. */
 export function applyPatches(lectures: Lecture[], patches: Patch[]): Lecture[] {
-  const byKey = Map.groupBy(patches, (patch) => `${patch.lecture.code}|${patch.lecture.lecture_class}`);
+  const byKey = groupBy(patches, (patch) => `${patch.lecture.code}|${patch.lecture.lecture_class}`);
 
   return lectures.map((lecture) => {
     const own = byKey.get(`${lecture.code}|${lecture.lecture_class}`);
