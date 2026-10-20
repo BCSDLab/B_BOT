@@ -77,7 +77,7 @@ export default defineTask({
         client: slackWebClient,
         channel: CHANNEL_ID.코인_오류_front_end,
         blocks,
-        unfurl_links: false,
+        unfurlLinks: false,
       });
     } catch (e) {
       console.error(e);
