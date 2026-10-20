@@ -2,6 +2,7 @@ import type { AnalysedWorkbook } from "./excelAnalyzer";
 import type { BusRoute } from "./types";
 import { normalizeTime } from "./validation";
 import { sourceDays } from "./days";
+import { sourceRegion } from "./text";
 
 const marker = new Set([
   "도착",
@@ -12,26 +13,21 @@ const marker = new Set([
   "승하차",
   "종점",
 ]);
-const sourceRegion = (text = "") =>
-  ["천안", "청주", "서울", "세종", "대전", "아산"].find((name) =>
-    text.includes(name),
-  );
 /** True when a cell looks like a section title rather than a stop or body value. */
 export const headingLike = (value: unknown) =>
   typeof value === "string" &&
   !/^\s*-/.test(value) &&
   (/^\s*■/.test(value) ||
     /등(?:\s*\/\s*)?하교|통학|셔틀|순환|등교|하교/.test(value));
+/** 위에서부터 처음 맞는 규칙을 쓴다. "등하교"는 "하교"보다 먼저 봐야 등교로 묶인다. */
+const ROUTE_TYPE_RULES = [
+  [/등하교|등\s*\/\s*하교/, "등교"],
+  [/등교/, "등교"],
+  [/하교/, "하교"],
+  [/셔틀|순환/, "셔틀"],
+] as const;
 const sourceRouteType = (text = "") =>
-  /등하교|등\s*\/\s*하교/.test(text)
-    ? "등교"
-    : text.includes("등교")
-      ? "등교"
-      : text.includes("하교")
-        ? "하교"
-        : text.includes("셔틀") || text.includes("순환")
-          ? "셔틀"
-          : undefined;
+  ROUTE_TYPE_RULES.find(([pattern]) => pattern.test(text))?.[1];
 
 /** Canonicalizes a source route title into a stable route_name for dedupe and review. */
 export function normalizeRoute(value: string) {
@@ -133,7 +129,7 @@ export function parseCourseStopTimeTriples(
         (item) =>
           item.column <= header.column &&
           headingLike(item.value) &&
-          /천안|청주|서울|세종|대전|아산/.test(String(item.value)),
+          sourceRegion(String(item.value)) !== undefined,
       );
       const directionText = nearby.find(
         (item) =>
@@ -154,11 +150,8 @@ export function parseCourseStopTimeTriples(
       }
       for (const [name, nodes] of groups)
         if (nodes.length) {
-          const routeDirection = /하교/.test(name)
-            ? "하교"
-            : /등교/.test(name)
-              ? "등교"
-              : direction;
+          const routeDirection =
+            (["하교", "등교"] as const).find((word) => name.includes(word)) ?? direction;
           const routeDays = sourceDays(name) ?? days;
           routes.push({
             region,

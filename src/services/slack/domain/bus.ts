@@ -15,6 +15,7 @@ import { resolveTarget } from "~/services/koin/target";
 import { downloadSlackSpreadsheet, findSpreadsheetFiles } from "~/utils/slackFile";
 import { readThreadContext, threadRootOf } from "~/utils/slackThread";
 import type { MessageSetting } from "../type";
+import { errorMessage } from "~/utils/errorMessage";
 
 const COMMAND = /^!버스반영/;
 /** `!버스반영` — 버스 명령은 파일 첨부만 받으므로 완전 일치만 인정한다. */
@@ -183,9 +184,7 @@ export const messages: MessageSetting[] = [
               type: "section",
               text: {
                 type: "mrkdwn",
-                text: `:x: *변환 실패*\n${
-                  error instanceof Error ? error.message : "알 수 없는 오류입니다"
-                }`,
+                text: `:x: *변환 실패*\n${errorMessage(error)}`,
               },
             },
             {
@@ -293,9 +292,7 @@ messages.push({
             type: "section",
             text: {
               type: "mrkdwn",
-              text: `:x: *수정 요청을 처리하지 못했습니다*\n${
-                error instanceof Error ? error.message : "알 수 없는 오류입니다"
-              }`,
+              text: `:x: *수정 요청을 처리하지 못했습니다*\n${errorMessage(error)}`,
             },
           },
         ],

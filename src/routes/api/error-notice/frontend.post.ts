@@ -1,5 +1,6 @@
 
 import CHANNEL_ID from "@/constant/CHANNEL_ID.json";
+import { sendSlackBlock } from "~/utils/slackFunction";
 
 interface RequestBody {
   url: string;

@@ -1,5 +1,6 @@
 import { WebClient } from "@slack/web-api";
 import CHANNEL_ID from "@/constant/CHANNEL_ID.json";
+import { sendSlackBlock } from "~/utils/slackFunction";
 
 const CLARITY_DATA_KEY = "CLARITY_LIST";
 const CLARITY_DATA_PREFIX = "CLARITY_DATA_";

@@ -4,9 +4,15 @@ import type {
   MentionMetadata,
   ViewActionSetting,
 } from "./type";
-import type { ActiveStatus, MentionGroup } from "@/utils/member";
 import INTERACTION_MODAL from "@/constant/INTERACTION_MODAL.json";
 import CHANNEL_ID from "@/constant/CHANNEL_ID.json";
+import { getMentionTargetMembers, type ActiveStatus, type MentionGroup } from "~/utils/member";
+import { sendSlackText } from "~/utils/slackFunction";
+
+const MEMBER_TYPE_LABEL: Record<string, string> = {
+  all: "",
+  TRACK_LEAD: "트랙장",
+};
 
 export const viewActions: ViewActionSetting[] = [
   {
@@ -77,8 +83,8 @@ export const viewActions: ViewActionSetting[] = [
       }
 
       if (selectedMember.length > 0) {
-        let trackText = `${track === 'all' ? '' : `${track}트랙`} `;
-        let memberTypeText = `${memberType === 'all' ? '' : memberType === 'TRACK_LEAD' ? '트랙장' : `${memberType.toLowerCase()}`} `;
+        const trackText = `${track === 'all' ? '' : `${track}트랙`} `;
+        const memberTypeText = `${MEMBER_TYPE_LABEL[memberType] ?? memberType.toLowerCase()} `;
         await sendSlackText({
           client,
           channel: channel,

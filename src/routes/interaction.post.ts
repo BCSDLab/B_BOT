@@ -9,6 +9,7 @@ import { blockActions } from '~/services/slack/blockAction';
 import { shortcuts } from '~/services/slack/shortcut';
 import { viewActions } from '~/services/slack/viewAction';
 import { assertSlackRequest } from "~/utils/slackRequest";
+import { errorMessage } from "~/utils/errorMessage";
 
 type Interaction = SlackAction | SlackShortcut | ViewSubmitAction;
 
@@ -107,6 +108,6 @@ async function notifyBlockActionError(
   await client.chat.postEphemeral({
     channel: body.channel.id,
     user: body.user.id,
-    text: `오류가 발생했어요: ${error instanceof Error ? error.message : "알 수 없는 오류입니다"}`,
+    text: `오류가 발생했어요: ${errorMessage(error)}`,
   });
 }

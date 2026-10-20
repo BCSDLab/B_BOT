@@ -9,6 +9,7 @@ import type {
 } from "./types";
 import { ARRIVAL_MARKERS } from "./types";
 import { normalizeTime } from "./validation";
+import { BUS_REGIONS, clean } from "./text";
 
 const TITLES = ["정규학기", "계절학기", "방학기간"] as const;
 const SEMESTER_OF: Record<string, SemesterType> = {
@@ -62,12 +63,6 @@ export interface BusPatchPlan {
   problems: string[];
 }
 
-const clean = (value: unknown) =>
-  String(value ?? "")
-    .replaceAll("\n", " ")
-    .replace(/\s+/g, " ")
-    .trim();
-
 const daysLabel = (days?: Day[]) => days?.map((d) => DAY_LABELS[d]).join(",") ?? "운행일 없음";
 
 const PATCH_SCHEMA = {
@@ -96,7 +91,7 @@ const PATCH_SCHEMA = {
         ],
         properties: {
           semester: { type: "string", enum: [...TITLES], description: "바꿀 대상 학기. 원문에서 안 보이면 변환 목록에 하나뿐인 학기로 채운다." },
-          region: { type: "string", description: "지역(천안/청주/서울/세종/대전/아산). 모르면 빈 문자열." },
+          region: { type: "string", description: `지역(${BUS_REGIONS.join("/")}). 모르면 빈 문자열.` },
           direction: { type: "string", description: "등교/하교/셔틀. 모르면 빈 문자열." },
           route: { type: "string", description: "노선명. 사용자가 부른 그대로." },
           field: {
@@ -283,6 +278,12 @@ function findStop(nodes: BusRoute["node_info"], name: string): StopMatch {
   return { kind: "none" };
 }
 
+/** 회차를 지정했으면 이름으로 찾고, 안 했으면 회차가 하나뿐일 때만 그걸 쓴다. */
+function pickTrip<T extends { name: string }>(trips: T[], name: string | undefined): T | undefined {
+  if (name) return trips.find((trip) => clean(trip.name) === clean(name));
+  return trips.length === 1 ? trips[0] : undefined;
+}
+
 export function resolvePatch(
   raw: RawPatch,
   conversions: BusConversion[],
@@ -383,11 +384,7 @@ export function resolvePatch(
   const where = describeRoute(route);
 
   const trips = route.route_info;
-  const trip = raw.trip
-    ? trips.find((t) => clean(t.name) === clean(raw.trip))
-    : trips.length === 1
-      ? trips[0]
-      : undefined;
+  const trip = pickTrip(trips, raw.trip);
 
   if (raw.field === "route_name") {
     const after = clean(raw.value);
@@ -780,36 +777,57 @@ function routeOf(conversion: BusConversion, patch: BusPatch): { payload: BusPayl
   return null;
 }
 
-function applyPatch(conversion: BusConversion, patch: BusPatch) {
-  if (patch.kind === "period") {
+interface RouteTarget {
+  payload: BusPayload;
+  route: BusRoute;
+}
+
+interface TripTarget extends RouteTarget {
+  trip: BusRoute["route_info"][number];
+}
+
+/** 노선을 찾은 다음에 적용하는 패치. */
+function onRoute(apply: (patch: BusPatch, target: RouteTarget) => void) {
+  return (patch: BusPatch, conversion: BusConversion) => {
+    const found = routeOf(conversion, patch);
+    if (!found) throw new Error(`적용 대상 노선을 찾지 못했습니다: ${patch.routeName}`);
+    apply(patch, found);
+  };
+}
+
+/** 노선 안에서 회차까지 찾은 다음에 적용하는 패치. */
+function onTrip(apply: (patch: BusPatch, target: TripTarget) => void) {
+  return onRoute((patch, found) => {
+    const trip = found.route.route_info.find((candidate) => clean(candidate.name) === clean(patch.tripName));
+    if (!trip) throw new Error(`적용 대상 회차를 찾지 못했습니다: ${patch.tripName}`);
+    apply(patch, { ...found, trip });
+  });
+}
+
+function stopIndex(route: BusRoute, stopName: string | undefined): number {
+  const index = route.node_info.findIndex((node) => clean(node.name) === stopName);
+  if (index === -1) throw new Error(`정류장을 찾지 못했습니다: ${stopName}`);
+  return index;
+}
+
+/** kind마다 적용 방법 하나. `Record`라 kind가 늘면 여기를 채우기 전엔 컴파일되지 않는다. */
+const PATCH_APPLIERS: Record<BusPatchKind, (patch: BusPatch, conversion: BusConversion) => void> = {
+  period: (patch, conversion) => {
     conversion.version_update.content = patch.value!;
-    return;
-  }
-
-  const found = routeOf(conversion, patch);
-  if (!found) throw new Error(`적용 대상 노선을 찾지 못했습니다: ${patch.routeName}`);
-  const { payload, route } = found;
-
-  if (patch.kind === "route_name") {
+  },
+  route_name: onRoute((patch, { route }) => {
     route.route_name = patch.value!;
-    return;
-  }
-  if (patch.kind === "remove_route") {
+  }),
+  remove_route: onRoute((_, { payload, route }) => {
     const routes = Object.values(payload.body)[0];
-    const index = routes.findIndex((candidate) => candidate === route);
-    routes.splice(index, 1);
-    return;
-  }
-
-  if (patch.kind === "remove_stop") {
-    const index = route.node_info.findIndex((node) => clean(node.name) === patch.stopName);
-    if (index === -1) throw new Error(`정류장을 찾지 못했습니다: ${patch.stopName}`);
+    routes.splice(routes.indexOf(route), 1);
+  }),
+  remove_stop: onRoute((patch, { route }) => {
+    const index = stopIndex(route, patch.stopName);
     route.node_info.splice(index, 1);
     for (const trip of route.route_info) trip.arrival_time.splice(index, 1);
-    return;
-  }
-
-  if (patch.kind === "add_stop") {
+  }),
+  add_stop: onRoute((patch, { route }) => {
     const addStop = patch.addStop!;
     const reference = addStop.afterStop ?? addStop.beforeStop;
     const found = route.node_info.findIndex((node) => clean(node.name) === reference);
@@ -817,36 +835,27 @@ function applyPatch(conversion: BusConversion, patch: BusPatch) {
     const index = addStop.afterStop ? found + 1 : found;
     route.node_info.splice(index, 0, { name: addStop.name });
     for (const trip of route.route_info) trip.arrival_time.splice(index, 0, null);
-    return;
-  }
-
-  if (patch.kind === "add_trip") {
+  }),
+  add_trip: onRoute((patch, { route }) => {
     const value = patch.value ?? null;
     route.route_info.push({
       name: patch.tripName!,
       arrival_time: route.node_info.map((_, index) => (index === 0 ? value : null)),
     });
-    return;
-  }
-
-  const trip = route.route_info.find((candidate) => clean(candidate.name) === clean(patch.tripName));
-  if (!trip) throw new Error(`적용 대상 회차를 찾지 못했습니다: ${patch.tripName}`);
-
-  if (patch.kind === "arrival_time") {
-    const index = route.node_info.findIndex((node) => clean(node.name) === patch.stopName);
-    if (index === -1) throw new Error(`정류장을 찾지 못했습니다: ${patch.stopName}`);
-    trip.arrival_time[index] = patch.value!;
-    return;
-  }
-  if (patch.kind === "running_days") {
+  }),
+  arrival_time: onTrip((patch, { route, trip }) => {
+    trip.arrival_time[stopIndex(route, patch.stopName)] = patch.value!;
+  }),
+  running_days: onTrip((patch, { trip }) => {
     trip.running_days = patch.days;
-    return;
-  }
-  if (patch.kind === "remove_trip") {
-    const index = route.route_info.findIndex((candidate) => candidate === trip);
-    route.route_info.splice(index, 1);
-    return;
-  }
+  }),
+  remove_trip: onTrip((_, { route, trip }) => {
+    route.route_info.splice(route.route_info.indexOf(trip), 1);
+  }),
+};
+
+function applyPatch(conversion: BusConversion, patch: BusPatch) {
+  PATCH_APPLIERS[patch.kind](patch, conversion);
 }
 
 /**

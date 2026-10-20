@@ -1,5 +1,6 @@
 import CHANNEL_ID from "@/constant/CHANNEL_ID.json";
 import { resolvePackageName } from "~/services/package/packageName";
+import { sendSlackBlock, sendSlackText } from "~/utils/slackFunction";
 
 interface RequestBody {
   pullRequestLink: string;

@@ -1,6 +1,7 @@
 import type { View } from "@slack/web-api";
 import type { GroupMentionMetadata, ShortcutSetting } from "./type";
 import INTERACTION_MODAL from "@/constant/INTERACTION_MODAL.json";
+import { sendSlackText } from "~/utils/slackFunction";
 
 export const shortcuts: ShortcutSetting[] = [
   {

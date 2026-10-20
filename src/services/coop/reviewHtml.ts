@@ -1,4 +1,5 @@
 import { escapeHtml } from "~/services/koin/reviewPage";
+import { displayHour } from "./convert";
 import type {
   AdminOperationHour,
   ConversionIssue,
@@ -11,12 +12,6 @@ function formatKoreanDate(value: string, includeYear: boolean): string {
   const [year, month, day] = value.split("-").map(Number);
   if (!year || !month || !day) return value;
   return `${includeYear ? `${year}년 ` : ""}${month}월 ${day}일`;
-}
-
-function displayHour(hour: AdminOperationHour): string {
-  return hour.open_time === hour.close_time
-    ? hour.open_time
-    : `${hour.open_time} - ${hour.close_time}`;
 }
 
 const displayDay = (day: string): string => day === "FRIDAY" ? "금요일" : day;

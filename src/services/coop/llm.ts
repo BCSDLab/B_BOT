@@ -12,7 +12,3 @@ export function generateCoopStructured<T>(request: StructuredGenerationRequest):
 
   throw new Error("OPENAI_API_KEY 또는 ANTHROPIC_API_KEY 중 하나가 필요합니다.");
 }
-
-export function hasCoopLlmCredentials(): boolean {
-  return Boolean(import.meta.env.OPENAI_API_KEY || import.meta.env.ANTHROPIC_API_KEY);
-}

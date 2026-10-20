@@ -131,25 +131,3 @@ export async function downloadSlackSpreadsheet(file: SlackFile): Promise<Buffer>
   }
   return Buffer.from(buffer);
 }
-
-export async function downloadSlackImage(
-  file: SlackFile,
-): Promise<{ buffer: ArrayBuffer; mimeType: StructuredImageMimeType }> {
-  const mimeType = slackImageMimeType(file);
-  if (!mimeType) {
-    throw new Error("지원하는 이미지 형식이 아닙니다. PNG, JPEG, WebP, GIF를 사용해주세요.");
-  }
-
-  const buffer = await download(file);
-  const bytes = new Uint8Array(buffer);
-  const valid =
-    (mimeType === "image/png" && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) ||
-    (mimeType === "image/jpeg" && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) ||
-    (mimeType === "image/gif" && bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46) ||
-    (mimeType === "image/webp" && bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46 && bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50);
-
-  if (!valid) {
-    throw new Error("이미지 파일 내용이 확장자와 일치하지 않습니다.");
-  }
-  return { buffer, mimeType };
-}

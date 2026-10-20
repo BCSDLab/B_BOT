@@ -1,5 +1,5 @@
 import type { BlockAction } from "@slack/bolt";
-import type { KnownBlock, WebClient } from "@slack/web-api";
+import type { WebClient } from "@slack/web-api";
 import { submitBusTimetables } from "~/services/bus/adminApi";
 import {
   cancelBusJob,
@@ -20,21 +20,10 @@ import {
 import { labelOf, resolveTargetByEnv } from "~/services/koin/target";
 import { validateConversion } from "~/services/bus/validation";
 import { computeBusVersionSchedules, describeBusVersionSchedules } from "~/services/bus/versionSchedule";
+import { notice } from "./blocks";
+import { updateSlack } from "~/utils/slackFunction";
 import type { BlockActionSetting } from "./type";
-
-const section = (text: string): KnownBlock[] => [
-  { type: "section", text: { type: "mrkdwn", text } },
-];
-
-async function update(
-  client: WebClient,
-  channel: string,
-  ts: string | undefined,
-  text: string,
-  blocks: KnownBlock[],
-) {
-  await client.chat.update({ channel, ts, text, blocks });
-}
+import { errorMessage } from "~/utils/errorMessage";
 
 export const BUS_APPLY_ACTION_IDS = ["bus:apply", "bus:cancel"] as const;
 export const BUS_PATCH_ACTION_IDS = ["bus:patch_apply", "bus:patch_cancel"] as const;
@@ -62,13 +51,13 @@ export async function handleBusApplyAction(
       });
       return;
     }
-    await update(
+    await updateSlack({
       client,
       channel,
       ts,
-      "버스 시간표 반영 취소됨",
-      section(`:no_entry_sign: *버스 시간표 반영을 취소했습니다.*\n<@${actor}>`),
-    );
+      text: "버스 시간표 반영 취소됨",
+      blocks: notice(`:no_entry_sign: *버스 시간표 반영을 취소했습니다.*\n<@${actor}>`),
+    });
     return;
   }
 
@@ -86,26 +75,26 @@ export async function handleBusApplyAction(
     const stored = await loadBusReview(token);
     if (!stored) {
       await finishBusJob(token, "FAILED", "검토 링크 만료");
-      await update(
+      await updateSlack({
         client,
         channel,
         ts,
-        "버스 검토 링크 만료",
-        section(":x: 버스 검토 링크가 만료됐습니다. 파일을 다시 올려주세요."),
-      );
+        text: "버스 검토 링크 만료",
+        blocks: notice(":x: 버스 검토 링크가 만료됐습니다. 파일을 다시 올려주세요."),
+      });
       return;
     }
 
-    await update(
+    await updateSlack({
       client,
       channel,
       ts,
-      "버스 시간표 반영 중",
-      section(
+      text: "버스 시간표 반영 중",
+      blocks: notice(
         `:hourglass_flowing_sand: *버스 시간표 반영 중…* ${stored.meta.routeCount}개\n` +
           `${labelOf(stored.meta.env)} · 작업자: <@${actor}>`,
       ),
-    );
+    });
 
     const resolved = resolveTargetByEnv(stored.meta.env);
     if (!resolved.target) {
@@ -122,8 +111,8 @@ export async function handleBusApplyAction(
     // 시간표는 지금 반영됐지만, 사이트 버전 문구는 적용 전날 00:05에 바뀌어야 한다.
     await setBusVersionSchedules(token, versionSchedules);
 
-    await update(client, channel, ts, "버스 시간표 반영 완료", [
-      ...section(
+    await updateSlack({ client, channel, ts, text: "버스 시간표 반영 완료", blocks: [
+      ...notice(
         `:white_check_mark: *버스 시간표 반영 완료*\n` +
           `${labelOf(stored.meta.env)} · 노선 *${stored.meta.routeCount}개*\n` +
           `버전 문구 갱신 예약:\n${describeBusVersionSchedules(versionSchedules)}`,
@@ -132,17 +121,17 @@ export async function handleBusApplyAction(
         type: "context",
         elements: [{ type: "mrkdwn", text: `작업자: <@${actor}> · ${stored.meta.sourceFileName}` }],
       },
-    ]);
+    ] });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "알 수 없는 오류입니다";
+    const message = errorMessage(error);
     // 각 PUT은 대상×학기 하나를 통째로 덮어쓴다. 중간에 실패해도 앞선 PUT은 이미
     // 반영된 상태로 남으므로, 재시도가 안전하다는 것과 어디까지 갔는지를 함께 알린다.
     const partial = appliedPayloads.length > 0
       ? `\n:warning: 먼저 반영된 항목: ${appliedPayloads.join(", ")} · 재시도하면 같은 데이터로 다시 덮어씁니다.`
       : "";
     await finishBusJob(token, "FAILED", `${message}${partial}`);
-    await update(client, channel, ts, "버스 시간표 반영 실패", [
-      ...section(`:x: *버스 시간표 반영 실패*\n${message}${partial}`),
+    await updateSlack({ client, channel, ts, text: "버스 시간표 반영 실패", blocks: [
+      ...notice(`:x: *버스 시간표 반영 실패*\n${message}${partial}`),
       {
         type: "actions",
         elements: [{
@@ -156,7 +145,7 @@ export async function handleBusApplyAction(
         type: "context",
         elements: [{ type: "mrkdwn", text: `작업자: <@${actor}> · 원인을 해결한 뒤 눌러주세요.` }],
       },
-    ]);
+    ] });
   }
 }
 
@@ -177,25 +166,25 @@ export async function handleBusPatchAction(
 
   if (action.action_id === "bus:patch_cancel") {
     await dropBusPatchPlan(patchToken);
-    await update(
+    await updateSlack({
       client,
       channel,
       ts,
-      "수정 취소됨",
-      section(":x: 수정 요청을 취소했습니다."),
-    );
+      text: "수정 취소됨",
+      blocks: notice(":x: 수정 요청을 취소했습니다."),
+    });
     return;
   }
 
   const plan = await loadBusPatchPlan(patchToken);
   if (!plan) {
-    await update(
+    await updateSlack({
       client,
       channel,
       ts,
-      "수정 계획 만료",
-      section(":x: 수정 계획이 만료됐습니다. `!수정`을 다시 요청해주세요."),
-    );
+      text: "수정 계획 만료",
+      blocks: notice(":x: 수정 계획이 만료됐습니다. `!수정`을 다시 요청해주세요."),
+    });
     return;
   }
   // 먼저 지운다. 두 명이 동시에 눌러 두 번 적용되면 안 된다.
@@ -222,24 +211,24 @@ export async function handleBusPatchAction(
 
     // 버튼이 달린 원본 미리보기 메시지를 그대로 두면 이미 적용한 뒤에도 다시
     // 누를 수 있어 보인다. bus:apply/bus:cancel과 똑같이 원본을 갱신해 버튼을 없앤다.
-    await update(client, channel, ts, "버스 시간표 수정 적용", [
-      ...section(
+    await updateSlack({ client, channel, ts, text: "버스 시간표 수정 적용", blocks: [
+      ...notice(
         `:white_check_mark: *수정 ${plan.patches.length}건 적용*\n검토 페이지가 갱신됐습니다. 다시 확인해주세요.`,
       ),
       {
         type: "context",
         elements: [{ type: "mrkdwn", text: `요청: <@${requesterId ?? body.user.id}>` }],
       },
-    ]);
+    ] });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "알 수 없는 오류입니다";
-    await update(
+    const message = errorMessage(error);
+    await updateSlack({
       client,
       channel,
       ts,
-      "수정 적용 실패",
-      section(`:x: *수정 적용 실패*\n${message}\n\`!수정\`을 다시 요청해주세요.`),
-    );
+      text: "수정 적용 실패",
+      blocks: notice(`:x: *수정 적용 실패*\n${message}\n\`!수정\`을 다시 요청해주세요.`),
+    });
   }
 }
 

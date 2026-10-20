@@ -1,7 +1,7 @@
 // RAG: 질문 → 임베딩 → (레포 라우팅) → pgvector top-k 검색 → 컨텍스트 → 소형 LLM 생성 → 답+출처
 import { createHash } from "node:crypto";
 import { createPool, query } from "~/helper/adapter/postgres";
-import { embed, generate, generateStream } from "~/helper/adapter/ollama";
+import { embed, generateStream } from "~/helper/adapter/ollama";
 import type { Pool } from "pg";
 import RAG_REPOS from "@/constant/RAG_REPOS.json";
 import { TYPE_WEIGHT, type DocType } from "./classify";
@@ -175,13 +175,6 @@ const EMPTY: RagAnswer = {
   text: "아직 학습된 문서가 없어요. 관리자에게 문서 색인을 요청해주세요.",
   sources: [],
 };
-
-export async function answer(question: string): Promise<RagAnswer> {
-  const rows = await retrieve(question);
-  if (rows.length === 0) return EMPTY;
-  const text = await generate(buildPrompt(question, rows), NUM_PREDICT);
-  return { text, sources: dedupSources(rows) };
-}
 
 // 질의 로그(실사용량·응답시간·해결률 측정). 로깅 실패가 사용자 답변을 막지 않도록 자체 흡수.
 // user는 해시만 저장(PII 비보관). 표시용이 아니라 집계용.

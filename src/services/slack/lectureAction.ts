@@ -17,8 +17,10 @@ import {
   savePatchPlan,
   updateReview,
 } from "~/services/lecture/reviewStore";
-import { notice } from "./notice";
+import { notice } from "./blocks";
 import type { BlockActionSetting } from "./type";
+import { updateSlack } from "~/utils/slackFunction";
+import { errorMessage } from "~/utils/errorMessage";
 
 /** 검토 결과에 대한 수정 적용·반영·취소. */
 export const lectureActions: BlockActionSetting[] = [
@@ -111,7 +113,7 @@ export const lectureActions: BlockActionSetting[] = [
         ]);
       } catch (error) {
         await say("수정 실패", [{ type: "section", text: { type: "mrkdwn",
-          text: `:x: *수정 적용 실패*\n${error instanceof Error ? error.message : "알 수 없는 오류입니다"}` } }]);
+          text: `:x: *수정 적용 실패*\n${errorMessage(error)}` } }]);
       }
     },
   },
@@ -213,7 +215,7 @@ export const lectureActions: BlockActionSetting[] = [
           ],
         });
       } catch (error) {
-        const message = error instanceof Error ? error.message : "알 수 없는 오류입니다";
+        const message = errorMessage(error);
         // 실패로 되돌려 원인을 고친 뒤 다시 누를 수 있게 한다.
         await finishJob(token, "FAILED", message);
 

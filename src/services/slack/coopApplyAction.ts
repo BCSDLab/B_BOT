@@ -1,5 +1,5 @@
 import type { BlockAction } from "@slack/bolt";
-import type { KnownBlock, WebClient } from "@slack/web-api";
+import type { WebClient } from "@slack/web-api";
 import { applyCoopTimetable, applyCoopTimetables } from "~/services/coop/adminApi";
 import {
   cancelCoopJob,
@@ -9,21 +9,10 @@ import {
 import { loadCoopReview } from "~/services/coop/reviewStore";
 import { getKoinAdminAuth } from "~/services/koin/adminAuth";
 import { labelOf, resolveTargetByEnv } from "~/services/koin/target";
+import { notice } from "./blocks";
+import { updateSlack } from "~/utils/slackFunction";
 import type { BlockActionSetting } from "./type";
-
-const section = (text: string) => [
-  { type: "section" as const, text: { type: "mrkdwn" as const, text } },
-];
-
-async function update(
-  client: WebClient,
-  channel: string,
-  ts: string | undefined,
-  text: string,
-  blocks: KnownBlock[],
-) {
-  await client.chat.update({ channel, ts, text, blocks });
-}
+import { errorMessage } from "~/utils/errorMessage";
 
 export const COOP_APPLY_ACTION_IDS = ["coop:apply", "coop:cancel"] as const;
 
@@ -50,13 +39,13 @@ export async function handleCoopApplyAction(
       });
       return;
     }
-    await update(
+    await updateSlack({
       client,
       channel,
       ts,
-      "생협 반영 취소됨",
-      section(`:no_entry_sign: *생협 반영을 취소했습니다.*\n<@${actor}>`),
-    );
+      text: "생협 반영 취소됨",
+      blocks: notice(`:no_entry_sign: *생협 반영을 취소했습니다.*\n<@${actor}>`),
+    });
     return;
   }
 
@@ -74,9 +63,9 @@ export async function handleCoopApplyAction(
     const stored = await loadCoopReview(token);
     if (!stored) {
       await finishCoopJob(token, "FAILED", { error: "검토 링크 만료" });
-      await update(client, channel, ts, "생협 검토 링크 만료", section(
+      await updateSlack({ client, channel, ts, text: "생협 검토 링크 만료", blocks: notice(
         ":x: 생협 검토 링크가 만료됐습니다. 이미지를 다시 변환해주세요.",
-      ));
+      ) });
       return;
     }
 
@@ -86,10 +75,10 @@ export async function handleCoopApplyAction(
       throw new Error("학기 이름 또는 운영 기간이 비어 있습니다. 검토 페이지에서 확인해주세요.");
     }
 
-    await update(client, channel, ts, "생협 반영 중", section(
+    await updateSlack({ client, channel, ts, text: "생협 반영 중", blocks: notice(
       `:hourglass_flowing_sand: *생협 운영시간 반영 중…* ${stored.meta.shopCount}개\n` +
       `${labelOf(stored.meta.env)} · 작업자: <@${actor}>`,
-    ));
+    ) });
 
     const resolved = resolveTargetByEnv(stored.meta.env);
     if (!resolved.target) {
@@ -118,8 +107,8 @@ export async function handleCoopApplyAction(
       ? { semesterId: appliedSemesterIds[0], semesterIds: appliedSemesterIds }
       : { semesterId: appliedSemesterIds[0] });
 
-    await update(client, channel, ts, "생협 반영 완료", [
-      ...section(
+    await updateSlack({ client, channel, ts, text: "생협 반영 완료", blocks: [
+      ...notice(
         `:white_check_mark: *${stored.meta.year} ${stored.meta.termName} 생협 반영 완료*\n` +
         `${labelOf(stored.meta.env)} · 매장 *${stored.meta.shopCount}개* · 학기 ID ${appliedSemesterIds.join(", ")}`,
       ),
@@ -127,9 +116,9 @@ export async function handleCoopApplyAction(
         type: "context",
         elements: [{ type: "mrkdwn", text: `작업자: <@${actor}> · ${stored.meta.sourceFileName}` }],
       },
-    ]);
+    ] });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "알 수 없는 오류입니다";
+    const message = errorMessage(error);
     const partial = appliedSemesterIds.length > 0
       ? `\n:warning: 먼저 처리된 학기 ID: ${appliedSemesterIds.join(", ")} · 재시도하면 같은 데이터로 다시 갱신합니다.`
       : "";
@@ -138,8 +127,8 @@ export async function handleCoopApplyAction(
       semesterId: appliedSemesterIds[0],
       semesterIds: appliedSemesterIds,
     });
-    await update(client, channel, ts, "생협 반영 실패", [
-      ...section(`:x: *생협 반영 실패*\n${message}${partial}`),
+    await updateSlack({ client, channel, ts, text: "생협 반영 실패", blocks: [
+      ...notice(`:x: *생협 반영 실패*\n${message}${partial}`),
       {
         type: "actions",
         elements: [{
@@ -153,7 +142,7 @@ export async function handleCoopApplyAction(
         type: "context",
         elements: [{ type: "mrkdwn", text: `작업자: <@${actor}> · 원인을 해결한 뒤 눌러주세요.` }],
       },
-    ]);
+    ] });
   }
 }
 

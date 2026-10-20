@@ -41,9 +41,6 @@ importers:
       pg:
         specifier: ^8.21.0
         version: 8.21.0
-      ts-pattern:
-        specifier: ^5.6.2
-        version: 5.6.2
       xlsx:
         specifier: https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz
         version: https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz
@@ -2998,9 +2995,6 @@ packages:
 
   ts-algebra@2.0.0:
     resolution: {integrity: sha512-FPAhNPFMrkwz76P7cdjdmiShwMynZYN6SgOujD1urY4oNm80Ou9oMdmbR45LotcKOXoy7wSmHkRFE6Mxbrhefw==}
-
-  ts-pattern@5.6.2:
-    resolution: {integrity: sha512-d4IxJUXROL5NCa3amvMg6VQW2HVtZYmUTPfvVtO7zJWGYLJ+mry9v2OmYm+z67aniQoQ8/yFNadiEwtNS9qQiw==}
 
   tsscmp@1.0.6:
     resolution: {integrity: sha512-LxhtAkPDTkVCMQjt2h6eBVY28KCjikZqZfMcC15YBeNjkgUpdCfBu5HoiOTDu86v6smE8yOjyEktJ8hlbANHQA==}
@@ -6298,8 +6292,6 @@ snapshots:
   traverse@0.3.9: {}
 
   ts-algebra@2.0.0: {}
-
-  ts-pattern@5.6.2: {}
 
   tsscmp@1.0.6: {}
 

@@ -14,36 +14,10 @@ import { labelOf, resolveTarget } from "~/services/koin/target";
 import type { KoinEnv } from "~/services/koin/target";
 import { buildResultBlocks, convertToReview } from "~/services/lecture/pipeline";
 import { linkThread } from "~/services/lecture/reviewStore";
-import { notice } from "./notice";
+import { MAX_CHOICES, notice, replaceOriginal, shorten } from "./blocks";
 import type { BlockActionSetting } from "./type";
-
-/**
- * 버튼이 달린 원본 메시지를 갈아끼운다.
- *
- * `chat.update`를 쓰지 않는 건 배치가 **웹훅으로** 올린 메시지이기 때문이다.
- * 작성자가 봇 토큰이 아니라 `cant_update_message`로 거절당한다.
- * 버튼 클릭에 딸려 오는 response_url은 그 제약이 없다.
- */
-async function replaceOriginal(
-  responseUrl: string | undefined,
-  text: string,
-  blocks: Parameters<typeof updateSlack>[0]["blocks"],
-) {
-  if (!responseUrl) return;
-  await fetch(responseUrl, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ replace_original: true, text, blocks }),
-  });
-}
-
-/** 버튼이 너무 많으면 읽히지 않는다. 넘치면 명령어로 직접 올리는 편이 낫다. */
-const MAX_CHOICES = 4;
-
-/** 버튼 글자가 길면 잘려서 무엇인지 알 수 없다. */
-function shorten(name: string): string {
-  return name.length > 28 ? `${name.slice(0, 27)}…` : name;
-}
+import { updateSlack } from "~/utils/slackFunction";
+import { errorMessage } from "~/utils/errorMessage";
 
 /**
  * 고른 파일을 내려받아 변환하고 검토 링크까지 올린다.
@@ -102,7 +76,7 @@ async function runConversion({
       text: "변환 실패",
       blocks: [
         { type: "section", text: { type: "mrkdwn",
-          text: `:x: *변환 실패*\n${error instanceof Error ? error.message : "알 수 없는 오류입니다"}` } },
+          text: `:x: *변환 실패*\n${errorMessage(error)}` } },
         { type: "context", elements: [{ type: "mrkdwn",
           text: `${file.name} · 작업자: <@${actor}>` }] },
       ],
@@ -184,7 +158,7 @@ export const lectureDetectedActions: BlockActionSetting[] = [
       } catch (error) {
         await releaseDetectLock("lecture", channel, articleId);
         await say("게시글 조회 실패",
-          `:x: *게시글을 읽지 못했습니다.*\n${error instanceof Error ? error.message : ""}`);
+          `:x: *게시글을 읽지 못했습니다.*\n${errorMessage(error, "")}`);
         return;
       }
 
