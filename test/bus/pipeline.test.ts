@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { buildBusPatchBlocks, buildReviewApprovalBlocks, buildStoredBusReview } from "~/services/bus/pipeline";
+import { buildStoredBusReview } from "~/services/bus/pipeline";
+import { buildBusPatchBlocks, buildReviewApprovalBlocks } from "~/services/slack/features/bus/blocks";
 import type { BusPatchPlan } from "~/services/bus/patch";
 import type { BusConversion } from "~/services/bus/types";
 

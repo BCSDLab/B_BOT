@@ -34,6 +34,8 @@ vi.mock("~/services/koin/target", () => ({
 }));
 vi.mock("~/services/lecture/pipeline", () => ({
   convertToReview: mocks.convertToReview,
+}));
+vi.mock("~/services/slack/features/lecture/blocks", () => ({
   buildResultBlocks: vi.fn((outcome, target, actor) => [{ type: "section", text: { type: "mrkdwn", text: `결과 ${outcome.token} ${target.termName} <@${actor}>` } }]),
 }));
 vi.mock("~/services/lecture/jobStore", () => ({ createJob: mocks.createJob }));

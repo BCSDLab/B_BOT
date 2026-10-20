@@ -10,7 +10,8 @@ import {
 } from "~/services/bus/detected";
 import type { BusNoticeFile } from "~/services/bus/detected";
 import { createBusJob } from "~/services/bus/jobStore";
-import { buildReviewApprovalBlocks, convertBusToReview } from "~/services/bus/pipeline";
+import { convertBusToReview } from "~/services/bus/pipeline";
+import { buildReviewApprovalBlocks } from "~/services/slack/features/bus/blocks";
 import { linkBusThread } from "~/services/bus/reviewStore";
 import { labelOf, type KoinEnv } from "~/services/koin/target";
 import { notice } from "~/services/slack/blocks";

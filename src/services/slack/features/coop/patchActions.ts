@@ -1,7 +1,7 @@
 import { applyCoopPatches } from "~/services/coop/patch";
 import { findCoopJob } from "~/services/coop/jobStore";
 import { assertPatchable } from "~/services/koin/jobLock";
-import { buildCoopApplyButtons } from "~/services/coop/pipeline";
+import { buildCoopApplyButtons } from "~/services/slack/features/coop/blocks";
 import { renderRegularCoopReview, renderVacationCoopReview } from "~/services/coop/reviewHtml";
 import {
   dropCoopPatchPlan,

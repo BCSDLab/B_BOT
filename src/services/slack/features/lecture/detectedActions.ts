@@ -10,7 +10,8 @@ import {
 import type { AttachmentFile } from "~/services/lecture/detected";
 import { createJob } from "~/services/lecture/jobStore";
 import { labelOf, type KoinEnv } from "~/services/koin/target";
-import { buildResultBlocks, convertToReview } from "~/services/lecture/pipeline";
+import { convertToReview } from "~/services/lecture/pipeline";
+import { buildResultBlocks } from "~/services/slack/features/lecture/blocks";
 import { linkThread } from "~/services/lecture/reviewStore";
 import {
   beginDetected,

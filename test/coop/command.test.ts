@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildRegularCoopResultBlocks } from "~/services/coop/pipeline";
+import { buildRegularCoopResultBlocks } from "~/services/slack/features/coop/blocks";
 import { messages as coopMessages, parseVacationBoundary } from "~/services/slack/features/coop/messages";
 
 describe("생협 후속 명령", () => {

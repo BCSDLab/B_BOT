@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildRegularCoopResultBlocks, buildVacationCoopResultBlocks } from "~/services/coop/pipeline";
+import { buildRegularCoopResultBlocks, buildVacationCoopResultBlocks } from "~/services/slack/features/coop/blocks";
 
 const outcome = {
   token: "a".repeat(32),

@@ -1,9 +1,7 @@
-import {
-  buildRegularCoopResultBlocks,
-  buildVacationCoopResultBlocks,
-  convertVacationCoopToReview,
-} from "~/services/coop/pipeline";
-import { buildCoopPatchBlocks, planCoopPatches } from "~/services/coop/patch";
+import { convertVacationCoopToReview } from "~/services/coop/pipeline";
+import { buildRegularCoopResultBlocks, buildVacationCoopResultBlocks } from "~/services/slack/features/coop/blocks";
+import { planCoopPatches } from "~/services/coop/patch";
+import { buildCoopPatchBlocks } from "~/services/slack/features/coop/blocks";
 import {
   linkCoopThread,
   loadCoopReview,

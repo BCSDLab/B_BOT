@@ -10,7 +10,8 @@ import { assertPatchable } from "~/services/koin/jobLock";
 import { labelOf } from "~/services/koin/target";
 import { handleApplyButton, type ApplyJob } from "~/services/slack/applyFlow";
 import { applyPatches, resolveAmbiguities } from "~/services/lecture/patch";
-import { buildPatchBlocks, buildStoredReview } from "~/services/lecture/pipeline";
+import { buildStoredReview } from "~/services/lecture/pipeline";
+import { buildPatchBlocks } from "~/services/slack/features/lecture/blocks";
 import {
   dropPatchPlan,
   loadPatchPlan,

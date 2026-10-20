@@ -1,7 +1,8 @@
 import { createJob } from "~/services/lecture/jobStore";
 import { resolveTarget } from "~/services/koin/target";
 import { planPatches } from "~/services/lecture/patch";
-import { buildPatchBlocks, buildResultBlocks, convertToReview } from "~/services/lecture/pipeline";
+import { convertToReview } from "~/services/lecture/pipeline";
+import { buildPatchBlocks, buildResultBlocks } from "~/services/slack/features/lecture/blocks";
 import { findTokenByThread, linkThread, loadReview, savePatchPlan } from "~/services/lecture/reviewStore";
 import { downloadSlackFile, findExcelFile } from "~/utils/slackFile";
 import { readThreadContext, threadRootOf } from "~/utils/slackThread";

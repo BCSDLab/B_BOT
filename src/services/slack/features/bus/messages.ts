@@ -1,10 +1,7 @@
 import { createBusJob } from "~/services/bus/jobStore";
 import { planBusPatches } from "~/services/bus/patch";
-import {
-  buildBusPatchBlocks,
-  buildReviewApprovalBlocks,
-  convertBusToReview,
-} from "~/services/bus/pipeline";
+import { convertBusToReview } from "~/services/bus/pipeline";
+import { buildBusPatchBlocks, buildReviewApprovalBlocks } from "~/services/slack/features/bus/blocks";
 import {
   findBusTokenByThread,
   linkBusThread,

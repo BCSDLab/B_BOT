@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
-import {
-  applyCoopPatches,
-  buildCoopPatchBlocks,
-  resolveCoopPatch,
-} from "~/services/coop/patch";
+import { applyCoopPatches, resolveCoopPatch } from "~/services/coop/patch";
+import { buildCoopPatchBlocks } from "~/services/slack/features/coop/blocks";
 import type { RegularConversionResult } from "~/services/coop/types";
 
 const conversion = (): RegularConversionResult => ({

@@ -49,6 +49,8 @@ const convertBusToReview = vi.fn();
 const buildReviewApprovalBlocks = vi.fn(() => [{ type: "section", text: { type: "mrkdwn", text: "검토" } }]);
 vi.mock("~/services/bus/pipeline", () => ({
   convertBusToReview: (...args: unknown[]) => (convertBusToReview as (...a: unknown[]) => unknown)(...args),
+}));
+vi.mock("~/services/slack/features/bus/blocks", () => ({
   buildReviewApprovalBlocks: (...args: unknown[]) =>
     (buildReviewApprovalBlocks as (...a: unknown[]) => unknown)(...args),
 }));
