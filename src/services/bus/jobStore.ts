@@ -1,5 +1,4 @@
-import { ensureOnce, query } from "~/helper/adapter/postgres";
-import { closePool, getPool } from "~/helper/adapter/postgres";
+import { closePool, ensureOnce, getPool, query } from "~/helper/adapter/postgres";
 import { createJobLock } from "~/services/koin/jobLock";
 import type { BusVersionUpdate } from "./types";
 
