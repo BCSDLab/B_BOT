@@ -14,9 +14,9 @@ import { labelOf, resolveTarget } from "~/services/koin/target";
 import type { KoinEnv } from "~/services/koin/target";
 import { buildResultBlocks, convertToReview } from "~/services/lecture/pipeline";
 import { linkThread } from "~/services/lecture/reviewStore";
-import { MAX_CHOICES, notice, replaceOriginal, shorten } from "./blocks";
+import { MAX_CHOICES, notice, replaceOriginal, shorten } from "~/services/slack/blocks";
 import { koreatechArticleUrl } from "~/services/koin/article";
-import type { BlockActionSetting } from "./type";
+import type { BlockActionSetting } from "~/services/slack/types";
 import { updateSlack } from "~/utils/slackFunction";
 import { errorMessage } from "~/utils/errorMessage";
 

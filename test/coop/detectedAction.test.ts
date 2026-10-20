@@ -84,7 +84,7 @@ import {
 import { convertRegularRawCoopToReview, extractCoopImage } from "~/services/coop/pipeline";
 import { linkCoopThread } from "~/services/coop/reviewStore";
 import { createCoopJob } from "~/services/coop/jobStore";
-import { handleCoopDetectedAction } from "~/services/slack/coopDetectedAction";
+import { handleCoopDetectedAction } from "~/services/slack/features/coop/detectedActions";
 import { savePendingCoopVacation } from "~/services/coop/vacationStore";
 
 function slackClient() {

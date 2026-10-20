@@ -1,5 +1,5 @@
-import { commands } from "~/services/slack/command";
-import type { Command } from "~/services/slack/type";
+import { commands } from "~/services/slack/registry/commands";
+import type { Command } from "~/services/slack/types";
 import { assertSlackRequest } from "~/utils/slackRequest";
 
 export default defineEventHandler(async (event) => {

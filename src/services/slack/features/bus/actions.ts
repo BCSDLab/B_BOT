@@ -21,9 +21,9 @@ import {
 import { labelOf, resolveTargetByEnv } from "~/services/koin/target";
 import { validateConversion } from "~/services/bus/validation";
 import { computeBusVersionSchedules, describeBusVersionSchedules } from "~/services/bus/versionSchedule";
-import { notice } from "./blocks";
+import { notice } from "~/services/slack/blocks";
 import { updateSlack } from "~/utils/slackFunction";
-import type { BlockActionSetting } from "./type";
+import type { BlockActionSetting } from "~/services/slack/types";
 import { errorMessage } from "~/utils/errorMessage";
 
 export const BUS_APPLY_ACTION_IDS = ["bus:apply", "bus:cancel"] as const;

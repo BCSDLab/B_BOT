@@ -37,7 +37,8 @@ node .output/server/index.mjs
 src/
   routes/        Slack 수신 — event / slash / interaction (.post.ts) · event.get.ts
   plugins/       injectContext.ts(WebClient·DB pool 주입)
-  services/      도메인 로직(bus·coop·lecture·koin·rag·member…)과 Slack 핸들러(slack/)
+  services/      도메인 로직(bus·coop·lecture·koin·rag·member…)
+    slack/       Slack 핸들러 — features/<기능>(구현) · registry/(등록표)
   tasks/         scheduledTasks (예: crawl/clarity)
   utils/         Slack 전송·서명 검증·파일 등 공용 함수
   infra/         외부 연결 어댑터 — postgres(공유 풀), LLM(openai·anthropic·ollama)

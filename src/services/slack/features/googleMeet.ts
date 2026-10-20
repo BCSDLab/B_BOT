@@ -1,5 +1,5 @@
 import { createMeeting, removeMeeting, saveMeeting } from "~/services/google/googleMeet";
-import { CommandSetting, MessageSetting } from "../type";
+import { CommandSetting, MessageSetting } from "~/services/slack/types";
 import { sendSlackText, updateSlack } from "~/utils/slackFunction";
 
 export const messages: MessageSetting[] = [
@@ -44,7 +44,7 @@ export const messages: MessageSetting[] = [
   },
 ];
 
-export const command: CommandSetting[] = [
+export const commands: CommandSetting[] = [
   {
     command: "/회의생성",
     async handler({

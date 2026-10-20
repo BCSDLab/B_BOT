@@ -18,8 +18,8 @@ import {
   savePatchPlan,
   updateReview,
 } from "~/services/lecture/reviewStore";
-import { notice } from "./blocks";
-import type { BlockActionSetting } from "./type";
+import { notice } from "~/services/slack/blocks";
+import type { BlockActionSetting } from "~/services/slack/types";
 import { updateSlack } from "~/utils/slackFunction";
 import { errorMessage } from "~/utils/errorMessage";
 

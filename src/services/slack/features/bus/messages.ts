@@ -1,29 +1,35 @@
-import { createJob } from "~/services/lecture/jobStore";
+import { createBusJob } from "~/services/bus/jobStore";
+import { planBusPatches } from "~/services/bus/patch";
+import {
+  buildBusPatchBlocks,
+  buildReviewApprovalBlocks,
+  convertBusToReview,
+} from "~/services/bus/pipeline";
+import {
+  findBusTokenByThread,
+  linkBusThread,
+  loadBusReview,
+  saveBusPatchPlan,
+} from "~/services/bus/reviewStore";
 import { resolveTarget } from "~/services/koin/target";
-import { planPatches } from "~/services/lecture/patch";
-import { buildPatchBlocks, buildResultBlocks, convertToReview } from "~/services/lecture/pipeline";
-import { findTokenByThread, linkThread, loadReview, savePatchPlan } from "~/services/lecture/reviewStore";
-import { findBusTokenByThread } from "~/services/bus/reviewStore";
-import { findCoopTokenByThread } from "~/services/coop/reviewStore";
-import { downloadSlackFile, findExcelFile } from "~/utils/slackFile";
+import { downloadSlackSpreadsheet, findSpreadsheetFiles } from "~/utils/slackFile";
 import { readThreadContext, threadRootOf } from "~/utils/slackThread";
-import type { MessageSetting } from "../type";
+import type { MessageSetting } from "~/services/slack/types";
 import { errorMessage } from "~/utils/errorMessage";
 
-const COMMAND = /^!강의반영/;
-/** `!강의반영 2026 여름학기` */
-const ARGS = /^!강의반영\s+(\d{4})\s*(1학기|2학기|여름학기|겨울학기)\s*$/;
+const COMMAND = /^!버스반영/;
+/** `!버스반영` — 버스 명령은 파일 첨부만 받으므로 완전 일치만 인정한다. */
+const ARGS = /^!버스반영\s*$/;
 
 /** 사람이 직접 치는 값이라 규칙을 한 곳에 모아두고 테스트로 고정한다. */
-export function parseCommand(text: string): { year: number; termName: string } | null {
-  const matched = ARGS.exec(text.trim());
-  return matched ? { year: Number(matched[1]), termName: matched[2] } : null;
+export function parseBusCommand(text: string): boolean {
+  return ARGS.test(text.trim());
 }
 
 const USAGE = [
-  "*사용법* — 엑셀 파일을 올리면서 메시지에 함께 적어주세요.",
-  "```!강의반영 2026 여름학기```",
-  "학기는 `1학기` `2학기` `여름학기` `겨울학기` 중 하나입니다.",
+  "*사용법* — 버스 시간표 파일을 올리면서 메시지에 함께 적어주세요.",
+  "```!버스반영```",
+  "지원 형식은 `.xls` `.xlsx`입니다.",
 ].join("\n");
 
 export const messages: MessageSetting[] = [
@@ -36,10 +42,9 @@ export const messages: MessageSetting[] = [
       const threadRoot = threadRootOf(ts, parentTs);
 
       // 한 스레드에 변환이 둘이면 !수정이 어느 것에 적용되는지 헷갈린다.
-      // 덮어쓰는 대신 막는다. 만료돼 조회되지 않는 건 막을 이유가 없다.
       if (parentTs) {
-        const existing = await findTokenByThread(channel, threadRoot);
-        if (existing && (await loadReview(existing))) {
+        const existing = await findBusTokenByThread(channel, threadRoot);
+        if (existing && (await loadBusReview(existing))) {
           await client.chat.postMessage({
             channel,
             thread_ts: threadRoot,
@@ -62,26 +67,46 @@ export const messages: MessageSetting[] = [
       }
 
       // 어느 코인에 반영할지는 채널이 정한다. 모르는 채널이면 진행하지 않는다.
-      const resolved = resolveTarget(channel, "강의");
+      const resolved = resolveTarget(channel, "버스");
       if (!resolved.target) {
         await client.chat.postMessage({
           channel,
           thread_ts: threadRoot,
-          text: "이 채널은 강의 반영 대상이 아닙니다.",
+          text: "이 채널은 버스 반영 대상이 아닙니다.",
+          blocks: [
+            { type: "section", text: { type: "mrkdwn", text: `:no_entry: ${resolved.reason}` } },
+          ],
+        });
+        return;
+      }
+
+      // 여러 개를 올리면 어느 걸 변환해야 하는지 봇도 사용자도 알 방법이 없다.
+      // 예전엔 첫 번째만 조용히 골라서, 두 번째 파일이 그냥 무시된 채로 넘어갔다.
+      const spreadsheets = findSpreadsheetFiles(files);
+      if (spreadsheets.length > 1) {
+        await client.chat.postMessage({
+          channel,
+          thread_ts: threadRoot,
+          text: "파일이 여러 개입니다.",
           blocks: [
             {
               type: "section",
-              text: { type: "mrkdwn", text: `:no_entry: ${resolved.reason}` },
+              text: {
+                type: "mrkdwn",
+                text: [
+                  `:warning: *시간표 파일이 ${spreadsheets.length}개 올라왔습니다.*`,
+                  spreadsheets.map((f) => `• ${f.name}`).join("\n"),
+                  "하나만 올려주세요. 여러 파일 중 어느 걸 반영해야 할지 정할 수 없습니다.",
+                ].join("\n"),
+              },
             },
           ],
         });
         return;
       }
 
-      const parsed = parseCommand(text);
-      const excel = findExcelFile(files);
-
-      if (!parsed || !excel) {
+      const file = spreadsheets[0] ?? null;
+      if (!parseBusCommand(text) || !file) {
         await client.chat.postMessage({
           channel,
           thread_ts: threadRoot,
@@ -92,8 +117,8 @@ export const messages: MessageSetting[] = [
               text: {
                 type: "mrkdwn",
                 text: [
-                  !excel ? ":file_folder: 엑셀 파일(.xlsx)을 함께 올려주세요." : null,
-                  !parsed ? ":pencil: 연도와 학기를 적어주세요." : null,
+                  !file ? ":file_folder: 버스 시간표 파일(xls/xlsx)을 함께 올려주세요." : null,
+                  !parseBusCommand(text) ? ":pencil: `!버스반영`만 입력해주세요." : null,
                   "",
                   USAGE,
                 ]
@@ -106,10 +131,7 @@ export const messages: MessageSetting[] = [
         return;
       }
 
-      const target = { ...parsed, env: resolved.target.env, fileName: excel.name };
-
-      // 변환은 LLM 호출과 파싱이 걸려 수십 초가 나올 수 있다.
-      // 먼저 붙잡아두지 않으면 사람들이 명령어를 또 친다.
+      const target = { env: resolved.target.env, fileName: file.name };
       const placeholder = await client.chat.postMessage({
         channel,
         thread_ts: threadRoot,
@@ -119,7 +141,7 @@ export const messages: MessageSetting[] = [
             type: "section",
             text: {
               type: "mrkdwn",
-              text: `:hourglass_flowing_sand: *${target.year} ${target.termName}* 변환 중…\n${resolved.target.label} · ${excel.name}`,
+              text: `:hourglass_flowing_sand: *버스 시간표* 변환 중…\n${resolved.target.label} · ${file.name}`,
             },
           },
         ],
@@ -127,31 +149,32 @@ export const messages: MessageSetting[] = [
       const messageTs = placeholder.ts as string;
 
       try {
-        const buffer = await downloadSlackFile(excel);
-        const outcome = await convertToReview(buffer, target);
+        const bytes = await downloadSlackSpreadsheet(file);
+        const extension = `.${file.name.split(".").pop()?.toLowerCase()}`;
+        const outcome = await convertBusToReview(bytes, extension, target);
 
-        // 이 스레드에 온 수정 요청이 어느 변환 건인지 찾을 수 있게 해둔다.
-        await linkThread(channel, threadRoot, outcome.token);
-        // 반영 권한을 한 명만 갖게 하려면 상태가 DB에 있어야 한다.
-        await createJob({
+        // 반영 권한을 한 명만 갖게 하려면 상태가 DB에 있어야 한다. job 행이 없는데
+        // 스레드부터 묶으면, 여기서 실패했을 때 스레드가 막다른 곳이 된다
+        // (재실행하면 "이미 변환 결과가 있다"고 막히는데 정작 반영 버튼은 없다).
+        await createBusJob({
           token: outcome.token,
           channelId: channel,
           threadTs: threadRoot,
-          year: target.year,
-          term: target.termName,
           sourceFile: target.fileName,
-          lectureCount: outcome.lectureCount,
+          routeCount: outcome.routeCount,
+          semesterTypes: outcome.semesterTypes,
           targetEnv: target.env,
         });
+        // 이 스레드에 온 수정 요청이 어느 변환 건인지 찾을 수 있게 해둔다.
+        await linkBusThread(channel, threadRoot, outcome.token);
 
         await client.chat.update({
           channel,
           ts: messageTs,
-          text: `${target.year} ${target.termName} 변환 완료 · ${outcome.lectureCount}건`,
-          blocks: buildResultBlocks(outcome, target, user),
+          text: `버스 시간표 변환 완료 · ${outcome.routeCount}개`,
+          blocks: buildReviewApprovalBlocks(outcome, target, user),
         });
       } catch (error) {
-        // 실패해도 원래 메시지를 갱신한다. 새 메시지를 쌓으면 어느 게 최신인지 헷갈린다.
         await client.chat.update({
           channel,
           ts: messageTs,
@@ -166,7 +189,7 @@ export const messages: MessageSetting[] = [
             },
             {
               type: "context",
-              elements: [{ type: "mrkdwn", text: `${excel.name} · 요청: <@${user}>` }],
+              elements: [{ type: "mrkdwn", text: `${file.name} · 요청: <@${user}>` }],
             },
           ],
         });
@@ -178,7 +201,6 @@ export const messages: MessageSetting[] = [
 /**
  * 검토 중 발견한 수정 사항을 스레드에 자연어로 적으면 받는다.
  * 명령어 접두사를 두지 않은 건, 이미 그 스레드가 어느 변환 건인지 정해져 있어서다.
- * 반대로 변환 스레드가 아닌 곳의 대화는 여기까지 오지 않는다.
  */
 const EDIT_COMMAND = /^!수정/;
 
@@ -186,38 +208,12 @@ messages.push({
   regex: EDIT_COMMAND,
   async handler({ client, channel, ts, text, user, parentTs }) {
     const request = text.replace(EDIT_COMMAND, "").trim();
-    const token = parentTs ? await findTokenByThread(channel, parentTs) : null;
-    const stored = token ? await loadReview(token) : null;
+    const token = parentTs ? await findBusTokenByThread(channel, parentTs) : null;
+    const stored = token ? await loadBusReview(token) : null;
 
-    // 버스 검수 스레드의 `!수정`은 bus 도메인이 처리한다. 여기서는 조용히 빠진다.
-    if (!stored && parentTs && (await findBusTokenByThread(channel, parentTs))) return;
-    // 생협 검수 스레드의 `!수정`은 coop 도메인이 처리한다.
-    if (!stored && parentTs && (await findCoopTokenByThread(channel, parentTs))) return;
-
-    // 변환 스레드가 아니거나 만료됐으면 어디서 써야 하는지 알려준다.
-    // 조용히 무시하면 왜 반응이 없는지 알 수 없다.
-    if (!parentTs || !stored) {
-      await client.chat.postMessage({
-        channel,
-        thread_ts: ts,
-        text: "변환 결과 스레드에서 사용해주세요.",
-        blocks: [
-          {
-            type: "section",
-            text: {
-              type: "mrkdwn",
-              text: [
-                ":thread: *`!수정`은 변환 결과 스레드 안에서 써주세요.*",
-                parentTs
-                  ? "이 스레드의 검토 링크가 만료됐거나 변환 기록을 찾지 못했습니다."
-                  : "`!강의반영`으로 만든 결과 메시지에 답글로 달아주세요.",
-              ].join("\n"),
-            },
-          },
-        ],
-      });
-      return;
-    }
+    // 강의·생협 검수 스레드의 `!수정`은 그쪽 도메인이 처리한다. 여기서는 조용히 빠진다.
+    // stored가 있다는 건 token과 parentTs가 이미 있었다는 뜻이라, 아래부턴 단정 없이 쓴다.
+    if (!parentTs || !token || !stored) return;
 
     if (request === "") {
       await client.chat.postMessage({
@@ -231,7 +227,7 @@ messages.push({
               type: "mrkdwn",
               text: [
                 ":pencil: *무엇을 바꿀지 함께 적어주세요.*",
-                "예) `!수정 유체역학 03 담당교수를 우창규로 바꿔줘`",
+                "예) `!수정 천안역 1회 터미널 시간을 08:05로 바꿔줘`",
               ].join("\n"),
             },
           },
@@ -252,9 +248,9 @@ messages.push({
 
     try {
       const context = await readThreadContext(client, channel, parentTs, ts);
-      const plan = await planPatches(request, stored.lectures, stored.timeFormat, context);
+      const plan = await planBusPatches(request, stored.conversions, context);
 
-      if (plan.patches.length === 0 && plan.ambiguities.length === 0) {
+      if (plan.patches.length === 0) {
         await client.chat.update({
           channel,
           ts: messageTs,
@@ -266,7 +262,7 @@ messages.push({
                 type: "mrkdwn",
                 text: [
                   ":grey_question: *수정할 내용을 찾지 못했습니다.*",
-                  ...plan.problems.map((p) => `• ${p}`),
+                  ...plan.problems.map((problem) => `• ${problem}`),
                 ].join("\n"),
               },
             },
@@ -275,12 +271,16 @@ messages.push({
         return;
       }
 
-      const patchToken = await savePatchPlan(token, plan);
+      const patchToken = await saveBusPatchPlan(token, {
+        patches: plan.patches,
+        problems: plan.problems,
+        request,
+      });
       await client.chat.update({
         channel,
         ts: messageTs,
         text: `수정 ${plan.patches.length}건 확인`,
-        blocks: buildPatchBlocks(plan, patchToken, user),
+        blocks: buildBusPatchBlocks(plan, patchToken, user),
       });
     } catch (error) {
       await client.chat.update({

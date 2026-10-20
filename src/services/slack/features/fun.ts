@@ -1,70 +1,19 @@
-import type { MessageSetting } from "./type";
-
-import ICEBRAKING_QUESTIONS from "@/constant/ICEBRAKING_QUESTIONS.json";
-import CHANNEL_ID from "@/constant/CHANNEL_ID.json";
 import BASE_URL from "@/constant/BASE_URL.json";
-import { messages as googleMeetMessages } from "./domain/googleMeet";
-import { messages as lectureMessages } from "./domain/lecture";
-import { messages as coopMessages } from "./domain/coop";
-import { messages as busMessages } from "./domain/bus";
-import { answerStream, logQuery } from "~/services/rag";
-import { errorMessage } from "~/utils/errorMessage";
+import CHANNEL_ID from "@/constant/CHANNEL_ID.json";
+import ICEBRAKING_QUESTIONS from "@/constant/ICEBRAKING_QUESTIONS.json";
+import type { MessageSetting } from "~/services/slack/types";
 import { sendSlackBlock, sendSlackText } from "~/utils/slackFunction";
-
 
 /** `<@U123>` 또는 예전 형식 `<@U123|이름>`. 이름 부분은 `>` 앞에서 끊어야 멘션이 여럿일 때 하나로 뭉치지 않는다. */
 const USER_MENTION = /<@([A-Z0-9]+)(?:\|[^>]*)?>/g;
 
-export const messageFunctionList: MessageSetting[] = [
-  {
-    regex: /^!질문\s+/,
-    async handler({ client, channel, ts, text, user }) {
-      const question = text.replace(/^!질문\s+/, "").trim();
-      if (!question) return;
-      const placeholder = await client.chat.postMessage({
-        channel,
-        thread_ts: ts,
-        text: "🔍 문서를 찾아보는 중이에요…",
-      });
-      const msgTs = placeholder.ts as string;
-      let lastUpdate = 0;
-      const startedAt = Date.now();
-      try {
-        const { text: body, sources } = await answerStream(question, (partial) => {
-          const now = Date.now();
-          if (!partial || now - lastUpdate < 1500) return; // 슬랙 rate limit 고려(~1.5s)
-          lastUpdate = now;
-          client.chat.update({ channel, ts: msgTs, text: partial + " ▍" }).catch(() => {});
-        });
-        const sourceText = sources.length
-          ? "\n\n📎 출처:\n" +
-            sources
-              .map((s) => `• ${s.source_url.startsWith("http") ? `<${s.source_url}|${s.title}>` : s.title}`)
-              .join("\n")
-          : "";
-        await client.chat.update({ channel, ts: msgTs, text: `${body}${sourceText}` });
-        await logQuery({
-          channel, msgTs, user, question, answer: body,
-          found: sources.length > 0,
-          sourceUrls: sources.map((s) => s.source_url),
-          latencyMs: Date.now() - startedAt,
-        });
-        // 한 번 탭으로 피드백하도록 봇이 👍👎 선제공(reaction_added로 만족도 집계)
-        await client.reactions.add({ channel, timestamp: msgTs, name: "+1" }).catch(() => {});
-        await client.reactions.add({ channel, timestamp: msgTs, name: "-1" }).catch(() => {});
-      } catch (error) {
-        await client.chat.update({
-          channel,
-          ts: msgTs,
-          text: `검색 중 오류가 발생했어요: ${errorMessage(error, "알 수 없는 오류")}`,
-        });
-        await logQuery({
-          channel, msgTs, user, question, answer: "",
-          found: false, sourceUrls: [], latencyMs: Date.now() - startedAt,
-        });
-      }
-    },
-  },
+interface Shop {
+  name: string;
+  [key: string]: string;
+}
+
+/** 회칙·가위바위보·룰렛 같은 재미·편의 명령. */
+export const messages: MessageSetting[] = [
   {
     regex: /^!회칙/,
     async handler({
@@ -325,13 +274,4 @@ export const messageFunctionList: MessageSetting[] = [
       // TODO: 상태창(일주일 활동 기록) 복구. 이전 구현은 git 기록 참고.
     }
   },
-  ...googleMeetMessages,
-  ...lectureMessages,
-  ...coopMessages,
-  ...busMessages,
 ];
-
-interface Shop {
-  name: string;
-  [key: string]: string;
-}

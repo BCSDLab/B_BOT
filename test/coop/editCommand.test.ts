@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildRegularCoopResultBlocks } from "~/services/coop/pipeline";
-import { messages as coopMessages } from "~/services/slack/domain/coop";
+import { messages as coopMessages } from "~/services/slack/features/coop/messages";
 
 describe("생협 검수 스레드 수정 안내", () => {
   it("생협 메시지에서 !수정 명령을 받는다", () => {

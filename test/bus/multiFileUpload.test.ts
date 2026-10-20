@@ -46,7 +46,7 @@ beforeEach(() => {
 
 describe("!버스반영 여러 파일 첨부", () => {
   it("파일이 두 개면 어느 것도 변환하지 않고 안내만 한다", async () => {
-    const { messages } = await import("~/services/slack/domain/bus");
+    const { messages } = await import("~/services/slack/features/bus/messages");
     const busHandler = messages.find((m) => m.acceptsFiles)!;
     const mock = client();
 

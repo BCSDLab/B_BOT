@@ -12,7 +12,7 @@ import {
 } from "~/services/coop/reviewStore";
 import { readThreadContext } from "~/utils/slackThread";
 import { createCoopJob } from "~/services/coop/jobStore";
-import type { MessageSetting } from "../type";
+import type { MessageSetting } from "~/services/slack/types";
 import {
   dropPendingCoopVacation,
   loadPendingCoopVacation,
