@@ -20,6 +20,15 @@ export function adminFetch(
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     signal: AbortSignal.timeout(timeoutMs),
+  }).catch((error: unknown) => {
+    // 시한 초과는 영어 DOMException 문구로 오므로 Slack에 보일 말로 바꾼다.
+    if (error instanceof Error && error.name === "TimeoutError") {
+      throw new Error(
+        `코인 Admin API가 ${timeoutMs / 1000}초 안에 응답하지 않았습니다 — ${method} ${path}\n` +
+          "서버에는 반영됐을 수 있으니 코인 어드민에서 먼저 확인해주세요.",
+      );
+    }
+    throw error;
   });
 }
 

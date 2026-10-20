@@ -28,3 +28,16 @@ describe("코인 Admin API 호출", () => {
     expect(fetchMock.mock.calls[0][1]).not.toHaveProperty("body");
   });
 });
+
+describe("코인 Admin API 시한 초과", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("시한 초과는 무엇이 멈췄는지 한국어로 알린다", async () => {
+    const timeout = Object.assign(new Error("The operation was aborted due to timeout"), { name: "TimeoutError" });
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(timeout));
+
+    await expect(adminFetch(auth, "/admin/lectures", { method: "POST", timeoutMs: 120_000 })).rejects.toThrow(
+      /120초 안에 응답하지 않았습니다 — POST \/admin\/lectures/,
+    );
+  });
+});
