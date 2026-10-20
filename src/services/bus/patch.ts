@@ -284,80 +284,36 @@ function pickTrip<T extends { name: string }>(trips: T[], name: string | undefin
   return trips.length === 1 ? trips[0] : undefined;
 }
 
-export function resolvePatch(
+interface ResolvedRoute {
+  semester: SemesterType;
+  payload: BusPayload;
+  route: BusRoute;
+}
+
+/**
+ * 노선 단위 수정의 대상을 하나로 좁힌다. 못 좁히면 이유를 problems에 남긴다.
+ *
+ * LLM은 노선 목록({{ROUTES}})만 보고 학기 정보는 못 본다 — 원문에 학기 언급이
+ * 없으면 실제로 뭐가 있는지 모른 채 "정규학기"를 찍어내는 일이 흔하다. 그래서
+ * raw.semester가 실제 존재하는 학기와 맞아떨어질 때만 "사용자가 지정한 학기"로
+ * 믿고 그 안에서 찾는다. 아니면 전체 학기에서 찾는다 — 노선 검색 결과가 학기를
+ * 알려주지, 그 반대가 아니다.
+ */
+function resolveRoute(
   raw: RawPatch,
   conversions: BusConversion[],
   problems: string[],
-): BusPatch | null {
-  // LLM은 노선 목록({{ROUTES}})만 보고 학기 정보는 못 본다 — 원문에 학기 언급이
-  // 없으면 실제로 뭐가 있는지 모른 채 "정규학기"를 찍어내는 일이 흔하다. 그래서
-  // raw.semester가 실제 존재하는 학기와 맞아떨어질 때만 "사용자가 지정한 학기"로
-  // 믿고, 그렇지 않으면 hallucination으로 보고 무시한다 — 바로 실패시키지 않는다.
+): ResolvedRoute | undefined {
   const explicitSemester = semesterOfTitle(raw.semester);
   const explicitMatches = explicitSemester ? conversionsBySemester(conversions, explicitSemester) : [];
-
-  if (raw.field === "period") {
-    // period는 노선이 아니라 학기 전체(version_update)에 대한 수정이라, 노선
-    // 검색으로 학기를 되짚을 방법이 없다. 학기가 실제로 하나뿐이면 그걸로
-    // 강제하고, 그마저 아니면 명시적으로 받아야 한다.
-    let conversion = explicitMatches[0];
-    let resolvedSemester = explicitSemester;
-    if (!conversion) {
-      const distinct = distinctSemesterTypes(conversions);
-      if (distinct.length === 1) {
-        resolvedSemester = distinct[0];
-        conversion = conversionBySemester(conversions, resolvedSemester);
-      }
-    }
-    if (!conversion || !resolvedSemester) {
-      problems.push(
-        explicitSemester
-          ? `"${TITLE_OF[explicitSemester]}"의 변환 결과가 없습니다.`
-          : "어느 학기의 적용 기간을 바꿀지 확정할 수 없습니다. (정규학기/계절학기/방학기간을 지정해주세요)",
-      );
-      return null;
-    }
-    const before = conversion.version_update.content;
-    const after = clean(raw.value);
-    if (!PERIOD.test(after)) {
-      problems.push(`적용 기간 "${raw.value}"은 YYYY-MM-DD~YYYY-MM-DD 형태여야 합니다.`);
-      return null;
-    }
-    const [start, end] = after.split("~");
-    if (new Date(`${start}T00:00:00Z`) > new Date(`${end}T00:00:00Z`)) {
-      problems.push(`적용 기간 "${raw.value}"의 시작이 끝보다 늦습니다.`);
-      return null;
-    }
-    return {
-      semester: resolvedSemester,
-      target: "commuting",
-      region: "",
-      routeType: "",
-      routeName: "",
-      kind: "period",
-      before,
-      after,
-      rawValue: after,
-      value: after,
-    };
-  }
-
-  // 나머지 항목은 전부 노선 단위 수정이다. 학기를 먼저 확정하지 않고, 실제로
-  // 존재하는 학기(explicitMatches)로 좁혀지면 그 안에서만, 아니면 전체 학기에서
-  // 노선을 찾는다 — 노선 검색 결과가 학기를 알려주지, 그 반대가 아니다.
   const searchSpace = explicitMatches.length > 0 ? explicitMatches : conversions;
   const hints = { region: raw.region, direction: raw.direction, route: raw.route };
-  const matches = searchSpace.flatMap((conversion) =>
-    routeCandidates(conversion, hints).map((candidate) => ({ conversion, ...candidate })),
-  );
-
-  const label = clean(raw.route) || (clean(raw.region) || clean(raw.direction)
-    ? `${clean(raw.region)} ${clean(raw.direction)}`.trim()
-    : "지정한");
+  const matches = searchSpace.flatMap((conversion) => routeCandidates(conversion, hints));
+  const label = routeLabel(raw);
 
   if (matches.length === 0) {
     problems.push(`"${label}"에 해당하는 노선을 찾지 못했습니다.`);
-    return null;
+    return undefined;
   }
 
   const bySemester = new Map<SemesterType, typeof matches>();
@@ -370,176 +326,222 @@ export function resolvePatch(
       `"${label}"이 여러 학기에 걸쳐 있습니다: ${[...bySemester.keys()].map((s) => TITLE_OF[s]).join(", ")}. ` +
         `학기를 지정해주세요. (예: "계절학기 ${label} ...")`,
     );
-    return null;
+    return undefined;
   }
-  const [[resolvedSemester, candidates]] = bySemester;
 
+  const [[semester, candidates]] = bySemester;
   if (candidates.length > 1) {
     problems.push(
       `"${label}"는 여러 노선입니다: ${candidates.map((c) => describeRoute(c.route)).join(", ")}. 방향(등교/하교)까지 지정해주세요.`,
     );
+    return undefined;
+  }
+  return { semester, payload: candidates[0].payload, route: candidates[0].route };
+}
+
+/** 문제를 알릴 때 사용자가 부른 노선 이름. 이름 없이 지역·방향만 말했으면 그걸 쓴다. */
+function routeLabel(raw: RawPatch): string {
+  const name = clean(raw.route);
+  if (name) return name;
+  const regionAndDirection = `${clean(raw.region)} ${clean(raw.direction)}`.trim();
+  return regionAndDirection || "지정한";
+}
+
+/**
+ * period는 노선이 아니라 학기 전체(version_update)에 대한 수정이라, 노선 검색으로
+ * 학기를 되짚을 방법이 없다. 학기가 실제로 하나뿐이면 그걸로 강제하고, 그마저
+ * 아니면 명시적으로 받아야 한다.
+ */
+function resolvePeriodPatch(raw: RawPatch, conversions: BusConversion[], problems: string[]): BusPatch | null {
+  const explicitSemester = semesterOfTitle(raw.semester);
+  const distinct = distinctSemesterTypes(conversions);
+  // 지정한 학기가 실제로 있으면 그걸 쓰고, 없으면(LLM이 지어낸 학기일 수 있다)
+  // 학기가 하나뿐일 때만 그걸 쓴다.
+  const semester = [explicitSemester, distinct.length === 1 ? distinct[0] : undefined].find(
+    (candidate) => candidate && conversionBySemester(conversions, candidate),
+  );
+  const conversion = semester ? conversionBySemester(conversions, semester) : undefined;
+  if (!conversion || !semester) {
+    problems.push(
+      explicitSemester
+        ? `"${TITLE_OF[explicitSemester]}"의 변환 결과가 없습니다.`
+        : "어느 학기의 적용 기간을 바꿀지 확정할 수 없습니다. (정규학기/계절학기/방학기간을 지정해주세요)",
+    );
     return null;
   }
-  const { route } = candidates[0];
-  const where = describeRoute(route);
 
-  const trips = route.route_info;
-  const trip = pickTrip(trips, raw.trip);
+  const after = clean(raw.value);
+  if (!PERIOD.test(after)) {
+    problems.push(`적용 기간 "${raw.value}"은 YYYY-MM-DD~YYYY-MM-DD 형태여야 합니다.`);
+    return null;
+  }
+  const [start, end] = after.split("~");
+  if (new Date(`${start}T00:00:00Z`) > new Date(`${end}T00:00:00Z`)) {
+    problems.push(`적용 기간 "${raw.value}"의 시작이 끝보다 늦습니다.`);
+    return null;
+  }
+  return {
+    semester,
+    target: "commuting",
+    region: "",
+    routeType: "",
+    routeName: "",
+    kind: "period",
+    before: conversion.version_update.content,
+    after,
+    rawValue: after,
+    value: after,
+  };
+}
 
-  if (raw.field === "route_name") {
+/** 노선 단위 수정이 공통으로 받는 값. */
+interface RouteContext extends ResolvedRoute {
+  raw: RawPatch;
+  problems: string[];
+  /** 문제를 알릴 때 앞에 붙이는 노선 설명. */
+  where: string;
+  /** 패치마다 똑같이 들어가는 대상 노선 정보. */
+  base: Pick<BusPatch, "semester" | "target" | "region" | "routeType" | "routeName">;
+}
+
+interface TripContext extends RouteContext {
+  trip: BusRoute["route_info"][number];
+}
+
+type RouteResolver = (ctx: RouteContext) => BusPatch | null;
+
+/** 이미 있는 회차를 고치는 항목. 회차를 못 찾으면 여기서 거른다. */
+function withTrip(resolve: (ctx: TripContext) => BusPatch | null): RouteResolver {
+  return (ctx) => {
+    const trips = ctx.route.route_info;
+    const trip = pickTrip(trips, ctx.raw.trip);
+    if (!trip) {
+      const reason = ctx.raw.trip
+        ? `회차 "${clean(ctx.raw.trip)}"를 찾지 못했습니다.`
+        : `회차를 지정해주세요. (가능한 회차: ${trips.map((t) => t.name).join(", ")})`;
+      ctx.problems.push(`${ctx.where}: ${reason}`);
+      return null;
+    }
+    return resolve({ ...ctx, trip });
+  };
+}
+
+/** 정류장 하나를 찾는다. 없거나 여럿이면 problems에 남기고 undefined. */
+function requireStop(
+  { route, problems, where }: RouteContext,
+  name: string,
+  label = "정류장",
+): { index: number; name: string } | undefined {
+  const match = name ? findStop(route.node_info, name) : ({ kind: "none" } as const);
+  if (match.kind === "none") {
+    problems.push(`${where}: ${label} "${clean(name)}"를 찾지 못했습니다.`);
+    return undefined;
+  }
+  if (match.kind === "ambiguous") {
+    problems.push(`${where}: ${label} "${clean(name)}"가 여러 개 일치합니다: ${match.names.join(", ")}. 정확한 이름을 적어주세요.`);
+    return undefined;
+  }
+  return match;
+}
+
+/** kind마다 해석 방법 하나. `Record`라 kind가 늘면 여기를 채우기 전엔 컴파일되지 않는다. */
+const ROUTE_RESOLVERS: Record<Exclude<BusPatchKind, "period">, RouteResolver> = {
+  route_name: ({ raw, problems, where, base, route }) => {
     const after = clean(raw.value);
     if (!after) {
       problems.push(`${where}: 바꿀 노선명을 적어주세요.`);
       return null;
     }
-    return {
-      semester: resolvedSemester,
-      target: candidates[0].payload.target,
-      region: route.region,
-      routeType: route.route_type,
-      routeName: route.route_name,
-      kind: "route_name",
-      before: route.route_name,
-      after,
-      rawValue: after,
-      value: after,
-    };
-  }
+    return { ...base, kind: "route_name", before: route.route_name, after, rawValue: after, value: after };
+  },
 
-  if (raw.field === "remove_route") {
-    const routes = Object.values(candidates[0].payload.body)[0];
-    if (routes.length <= 1) {
+  remove_route: ({ raw, problems, where, base, payload }) => {
+    if (Object.values(payload.body)[0].length <= 1) {
       problems.push(`${where}: 마지막 남은 노선은 삭제할 수 없습니다.`);
       return null;
     }
-    return {
-      semester: resolvedSemester,
-      target: candidates[0].payload.target,
-      region: route.region,
-      routeType: route.route_type,
-      routeName: route.route_name,
-      kind: "remove_route",
-      before: where,
-      after: "삭제",
-      rawValue: clean(raw.route),
-    };
-  }
+    return { ...base, kind: "remove_route", before: where, after: "삭제", rawValue: clean(raw.route) };
+  },
 
-  if (!trip && raw.field !== "add_trip" && raw.field !== "add_stop" && raw.field !== "remove_stop") {
-    const msg = raw.trip
-      ? `회차 "${clean(raw.trip)}"를 찾지 못했습니다.`
-      : `회차를 지정해주세요. (가능한 회차: ${trips.map((t) => t.name).join(", ")})`;
-    problems.push(`${where}: ${msg}`);
-    return null;
-  }
-
-  if (raw.field === "arrival_time") {
-    const stopMatch = raw.stop ? findStop(route.node_info, raw.stop) : { kind: "none" } as const;
-    if (stopMatch.kind === "none") {
-      problems.push(`${where}: 정류장 "${clean(raw.stop)}"를 찾지 못했습니다.`);
-      return null;
-    }
-    if (stopMatch.kind === "ambiguous") {
-      problems.push(`${where}: 정류장 "${clean(raw.stop)}"가 여러 개 일치합니다: ${stopMatch.names.join(", ")}. 정확한 이름을 적어주세요.`);
-      return null;
-    }
+  arrival_time: withTrip((ctx) => {
+    const { raw, problems, where, base, trip } = ctx;
+    const stop = requireStop(ctx, raw.stop);
+    if (!stop) return null;
     const value = validateTime(raw.value);
     if (!value) {
-      problems.push(`${where} ${trip!.name} ${clean(raw.stop)}: "${raw.value}"은 시각(HH:MM)이나 마커가 아닙니다.`);
+      problems.push(`${where} ${trip.name} ${clean(raw.stop)}: "${raw.value}"은 시각(HH:MM)이나 마커가 아닙니다.`);
       return null;
     }
-    const before = trip!.arrival_time[stopMatch.index];
     return {
-      semester: resolvedSemester,
-      target: candidates[0].payload.target,
-      region: route.region,
-      routeType: route.route_type,
-      routeName: route.route_name,
+      ...base,
       kind: "arrival_time",
-      tripName: trip!.name,
-      stopName: stopMatch.name,
-      before: before ?? "(미운행)",
+      tripName: trip.name,
+      stopName: stop.name,
+      before: trip.arrival_time[stop.index] ?? "(미운행)",
       after: value,
       rawValue: value,
       value,
     };
-  }
+  }),
 
-  if (raw.field === "running_days") {
-    const days = sourceDays(raw.days || raw.value);
+  running_days: withTrip(({ raw, problems, where, base, trip }) => {
+    const text = raw.days || raw.value;
+    const days = sourceDays(text);
     if (!days) {
-      problems.push(`${where} ${trip!.name}: 요일 표기 "${raw.days || raw.value}"를 해석하지 못했습니다. (예: 월수금, 주중, 매일)`);
+      problems.push(`${where} ${trip.name}: 요일 표기 "${text}"를 해석하지 못했습니다. (예: 월수금, 주중, 매일)`);
       return null;
     }
     return {
-      semester: resolvedSemester,
-      target: candidates[0].payload.target,
-      region: route.region,
-      routeType: route.route_type,
-      routeName: route.route_name,
+      ...base,
       kind: "running_days",
-      tripName: trip!.name,
-      before: daysLabel(trip!.running_days),
+      tripName: trip.name,
+      before: daysLabel(trip.running_days),
       after: daysLabel(days),
-      rawValue: raw.days || raw.value,
+      rawValue: text,
       days,
     };
-  }
+  }),
 
-  if (raw.field === "remove_trip") {
-    if (trips.length <= 1) {
+  remove_trip: withTrip(({ raw, problems, where, base, route, trip }) => {
+    if (route.route_info.length <= 1) {
       problems.push(`${where}: 마지막 남은 회차는 삭제할 수 없습니다.`);
       return null;
     }
     return {
-      semester: resolvedSemester,
-      target: candidates[0].payload.target,
-      region: route.region,
-      routeType: route.route_type,
-      routeName: route.route_name,
+      ...base,
       kind: "remove_trip",
-      tripName: trip!.name,
-      before: `${where} ${trip!.name} 삭제`,
+      tripName: trip.name,
+      before: `${where} ${trip.name} 삭제`,
       after: "삭제",
       rawValue: clean(raw.trip),
     };
-  }
+  }),
 
-  if (raw.field === "remove_stop") {
+  remove_stop: (ctx) => {
+    const { raw, problems, where, base, route } = ctx;
     if (route.node_info.length <= 1) {
       problems.push(`${where}: 마지막 남은 정류장은 삭제할 수 없습니다.`);
       return null;
     }
-    const stopMatch = raw.stop ? findStop(route.node_info, raw.stop) : { kind: "none" } as const;
-    if (stopMatch.kind === "none") {
-      problems.push(`${where}: 정류장 "${clean(raw.stop)}"를 찾지 못했습니다.`);
-      return null;
-    }
-    if (stopMatch.kind === "ambiguous") {
-      problems.push(`${where}: 정류장 "${clean(raw.stop)}"가 여러 개 일치합니다: ${stopMatch.names.join(", ")}. 정확한 이름을 적어주세요.`);
-      return null;
-    }
+    const stop = requireStop(ctx, raw.stop);
+    if (!stop) return null;
     return {
-      semester: resolvedSemester,
-      target: candidates[0].payload.target,
-      region: route.region,
-      routeType: route.route_type,
-      routeName: route.route_name,
+      ...base,
       kind: "remove_stop",
-      stopName: stopMatch.name,
-      before: `${where} ${stopMatch.name} 삭제`,
+      stopName: stop.name,
+      before: `${where} ${stop.name} 삭제`,
       after: "삭제",
-      rawValue: stopMatch.name,
+      rawValue: stop.name,
     };
-  }
+  },
 
-  if (raw.field === "add_trip") {
+  add_trip: ({ raw, problems, where, base, route }) => {
     const name = clean(raw.trip);
     if (!name) {
       problems.push(`${where}: 추가할 회차 이름을 적어주세요. (예: 7회)`);
       return null;
     }
-    if (trips.some((t) => clean(t.name) === name)) {
+    if (route.route_info.some((t) => clean(t.name) === name)) {
       problems.push(`${where}: 회차 "${name}"이 이미 있습니다.`);
       return null;
     }
@@ -549,11 +551,7 @@ export function resolvePatch(
       return null;
     }
     return {
-      semester: resolvedSemester,
-      target: candidates[0].payload.target,
-      region: route.region,
-      routeType: route.route_type,
-      routeName: route.route_name,
+      ...base,
       kind: "add_trip",
       tripName: name,
       before: "-",
@@ -561,55 +559,79 @@ export function resolvePatch(
       rawValue: name,
       value,
     };
-  }
+  },
 
-  if (raw.field === "add_stop") {
+  add_stop: (ctx) => {
+    const { raw, problems, where, base, route } = ctx;
     const name = clean(raw.newStop);
     if (!name) {
       problems.push(`${where}: 추가할 정류장 이름을 적어주세요.`);
       return null;
     }
-    const dup = findStop(route.node_info, name);
-    if (dup.kind === "exact" || dup.kind === "partial") {
+    const duplicate = findStop(route.node_info, name);
+    if (duplicate.kind === "exact" || duplicate.kind === "partial") {
       problems.push(`${where}: 정류장 "${name}"이 이미 있습니다.`);
       return null;
     }
-    if (dup.kind === "ambiguous") {
-      problems.push(`${where}: 정류장 "${name}"와 유사한 정류장이 여러 개 있습니다: ${dup.names.join(", ")}.`);
+    if (duplicate.kind === "ambiguous") {
+      problems.push(`${where}: 정류장 "${name}"와 유사한 정류장이 여러 개 있습니다: ${duplicate.names.join(", ")}.`);
       return null;
     }
     const reference = clean(raw.referenceStop);
-    const ref = reference ? findStop(route.node_info, reference) : { kind: "none" } as const;
-    if (ref.kind === "none") {
+    if (!reference || findStop(route.node_info, reference).kind === "none") {
       problems.push(`${where}: 정류장 "${name}"을 어디에 추가할지 지정해주세요. (기준 정류장과 앞/뒤)`);
       return null;
     }
-    if (ref.kind === "ambiguous") {
-      problems.push(`${where}: 기준 정류장 "${reference}"가 여러 개 일치합니다: ${ref.names.join(", ")}. 정확한 이름을 적어주세요.`);
-      return null;
-    }
-    const beforeStop = raw.position === "before" ? ref.name : undefined;
-    const afterStop = raw.position === "after" ? ref.name : undefined;
+    const anchor = requireStop(ctx, reference, "기준 정류장");
+    if (!anchor) return null;
+    const beforeStop = raw.position === "before" ? anchor.name : undefined;
+    const afterStop = raw.position === "after" ? anchor.name : undefined;
     if (!beforeStop && !afterStop) {
       problems.push(`${where}: "${reference}" 기준으로 앞(before)인지 뒤(after)인지 지정해주세요.`);
       return null;
     }
     return {
-      semester: resolvedSemester,
-      target: candidates[0].payload.target,
-      region: route.region,
-      routeType: route.route_type,
-      routeName: route.route_name,
+      ...base,
       kind: "add_stop",
       before: "-",
       after: `${name} 추가 (${afterStop ? `${afterStop} 뒤` : `${beforeStop} 앞`})`,
       rawValue: name,
       addStop: { name, beforeStop, afterStop },
     };
-  }
+  },
+};
 
-  problems.push(`${where}: "${raw.field}"은 지원하지 않는 수정 항목입니다.`);
-  return null;
+const isRouteKind = (field: string): field is Exclude<BusPatchKind, "period"> => field in ROUTE_RESOLVERS;
+
+export function resolvePatch(
+  raw: RawPatch,
+  conversions: BusConversion[],
+  problems: string[],
+): BusPatch | null {
+  if (raw.field === "period") return resolvePeriodPatch(raw, conversions, problems);
+
+  const resolved = resolveRoute(raw, conversions, problems);
+  if (!resolved) return null;
+
+  const { semester, payload, route } = resolved;
+  const where = describeRoute(route);
+  if (!isRouteKind(raw.field)) {
+    problems.push(`${where}: "${raw.field}"은 지원하지 않는 수정 항목입니다.`);
+    return null;
+  }
+  return ROUTE_RESOLVERS[raw.field]({
+    ...resolved,
+    raw,
+    problems,
+    where,
+    base: {
+      semester,
+      target: payload.target,
+      region: route.region,
+      routeType: route.route_type,
+      routeName: route.route_name,
+    },
+  });
 }
 
 const TRIP_RANGE = /(\d+)\s*(?:회차?)?\s*(?:~|-|부터)\s*(\d+)\s*회차?/;
@@ -622,50 +644,6 @@ function parseTripRange(text: string): [number, number] | undefined {
   const to = Number(match[2]);
   if (!Number.isFinite(from) || !Number.isFinite(to) || from > to) return undefined;
   return [from, to];
-}
-
-/**
- * region+direction+route 힌트만으로 노선을 하나 찾는다. `resolvePatch`가 field별로
- * 하는 것과 같은 학기 판단·모호성 검사를 회차 범위 전개 전에 한 번 더 해야 해서
- * 뽑아뒀다 — route를 찾아야 그 노선에 실제로 있는 회차 목록을 알 수 있다.
- */
-function findSingleRoute(
-  raw: RawPatch,
-  conversions: BusConversion[],
-  problems: string[],
-): BusRoute | undefined {
-  const explicitSemester = semesterOfTitle(raw.semester);
-  const explicitMatches = explicitSemester ? conversionsBySemester(conversions, explicitSemester) : [];
-  const searchSpace = explicitMatches.length > 0 ? explicitMatches : conversions;
-  const hints = { region: raw.region, direction: raw.direction, route: raw.route };
-  const matches = searchSpace.flatMap((conversion) =>
-    routeCandidates(conversion, hints).map((candidate) => ({ conversion, ...candidate })),
-  );
-  const label = clean(raw.route) || `${clean(raw.region)} ${clean(raw.direction)}`.trim();
-
-  if (matches.length === 0) {
-    problems.push(`"${label}"에 해당하는 노선을 찾지 못했습니다.`);
-    return undefined;
-  }
-  const bySemester = new Map<SemesterType, typeof matches>();
-  for (const match of matches) {
-    const semesterType = match.payload.semester_type as SemesterType;
-    bySemester.set(semesterType, [...(bySemester.get(semesterType) ?? []), match]);
-  }
-  if (bySemester.size > 1) {
-    problems.push(
-      `"${label}"이 여러 학기에 걸쳐 있습니다: ${[...bySemester.keys()].map((s) => TITLE_OF[s]).join(", ")}. 학기를 지정해주세요.`,
-    );
-    return undefined;
-  }
-  const [[, candidates]] = bySemester;
-  if (candidates.length > 1) {
-    problems.push(
-      `"${label}"는 여러 노선입니다: ${candidates.map((c) => describeRoute(c.route)).join(", ")}. 방향(등교/하교)까지 지정해주세요.`,
-    );
-    return undefined;
-  }
-  return candidates[0].route;
 }
 
 /**
@@ -685,7 +663,7 @@ export function resolvePatches(
     return patch ? [patch] : [];
   }
 
-  const route = findSingleRoute(raw, conversions, problems);
+  const route = resolveRoute(raw, conversions, problems)?.route;
   if (!route) return [];
 
   const [from, to] = range;
