@@ -10,15 +10,3 @@ export function semesterFromSource(text: string): SemesterType | undefined {
   if (REGULAR_LABEL.test(text)) return "REGULAR";
   return undefined;
 }
-
-/** REGULAR conversion must ignore the workbook's reference vacation sheet. */
-export function sheetsForSemester(
-  sheetNames: string[],
-  semester: SemesterType,
-) {
-  if (semester === "REGULAR")
-    return sheetNames.filter((name) => REGULAR_LABEL.test(name));
-  return sheetNames.filter((name) =>
-    semester === "SEASONAL" ? /계절/.test(name) : /방학/.test(name),
-  );
-}

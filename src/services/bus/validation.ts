@@ -8,9 +8,6 @@ import {
 const time = /^([01]\d|2[0-3]):[0-5]\d$/;
 const period = /^(\d{4}-\d{2}-\d{2})~(\d{4}-\d{2}-\d{2})$/;
 const arrivalMarkers = new Set<string>(ARRIVAL_MARKERS);
-export function stableJson(value: unknown) {
-  return JSON.stringify(value);
-}
 export function normalizeTime(value: unknown): unknown {
   if (typeof value === "number" && value >= 0 && value < 1) {
     const minutes = Math.round(value * 24 * 60);

@@ -75,21 +75,6 @@ export async function extractCoopTimetable({
   return extracted;
 }
 
-export async function extractRegularTimetable(
-  input: Parameters<typeof extractCoopTimetable>[0],
-): Promise<RawRegularCoopTimetable> {
-  const extracted = await extractCoopTimetable(input);
-  const semesterLabel = resolveRegularSemesterLabel(extracted.semesterLabel, extracted.title);
-  if (!semesterLabel) {
-    throw new Error([
-      "정규학기(1학기 또는 2학기) 시간표가 아닙니다.",
-      `읽은 학기: ${extracted.semesterLabel || "(없음)"}`,
-      `읽은 제목: ${extracted.title || "(없음)"}`,
-    ].join("\n"));
-  }
-  return { ...extracted, semesterLabel };
-}
-
 export async function extractVacationTimetable(
   input: Parameters<typeof extractCoopTimetable>[0],
 ): Promise<RawRegularCoopTimetable> {
