@@ -9,13 +9,18 @@ import {
 } from "~/services/lecture/detected";
 import type { AttachmentFile } from "~/services/lecture/detected";
 import { createJob } from "~/services/lecture/jobStore";
-import { acquireDetectLock, releaseDetectLock } from "~/services/koin/detectLock";
-import { labelOf, resolveTarget } from "~/services/koin/target";
-import type { KoinEnv } from "~/services/koin/target";
+import { labelOf, type KoinEnv } from "~/services/koin/target";
 import { buildResultBlocks, convertToReview } from "~/services/lecture/pipeline";
 import { linkThread } from "~/services/lecture/reviewStore";
-import { MAX_CHOICES, notice, replaceOriginal, shorten } from "~/services/slack/blocks";
-import { koreatechArticleUrl } from "~/services/koin/article";
+import {
+  beginDetected,
+  chooseFileBlocks,
+  convertThenRelease,
+  ignoreDetected,
+  readArticle,
+  stopDetected,
+  takeChoice,
+} from "~/services/slack/detectedFlow";
 import type { BlockActionSetting } from "~/services/slack/types";
 import { updateSlack } from "~/utils/slackFunction";
 import { errorMessage } from "~/utils/errorMessage";
@@ -46,46 +51,45 @@ async function runConversion({
       text: `:hourglass_flowing_sand: *${year} ${term}* 변환 중…\n${labelOf(env)} · ${file.name}\n작업자: <@${actor}>` } }],
   });
 
-  // 이 게시글의 원본 버튼은 락을 잡은 직후 이미 갈아끼웠다(호출부의 replaceOriginal).
-  // 그러니 여기서부터는 성공하든 실패하든 다시 눌릴 방법이 없다 — 결과와 무관하게
-  // 항상 풀어준다. 안 풀면 취소하거나 실패해도 30분 동안 같은 게시글의 새 알림이 막힌다.
-  try {
-    const buffer = await downloadNoticeFile(file.url);
-    const outcome = await convertToReview(buffer, target);
+  await convertThenRelease("lecture", channel, articleId, async () => {
+    try {
+      const buffer = await downloadNoticeFile(file.url);
+      const outcome = await convertToReview(buffer, target);
 
-    // 이 메시지 스레드에 온 수정 요청이 어느 변환 건인지 찾을 수 있게 해둔다.
-    await linkThread(channel, ts ?? "", outcome.token);
-    await createJob({
-      token: outcome.token,
-      channelId: channel,
-      threadTs: ts ?? "",
-      year,
-      term,
-      sourceFile: file.name,
-      lectureCount: outcome.lectureCount,
-      targetEnv: env,
-    });
+      // 이 메시지 스레드에 온 수정 요청이 어느 변환 건인지 찾을 수 있게 해둔다.
+      await linkThread(channel, ts ?? "", outcome.token);
+      await createJob({
+        token: outcome.token,
+        channelId: channel,
+        threadTs: ts ?? "",
+        year,
+        term,
+        sourceFile: file.name,
+        lectureCount: outcome.lectureCount,
+        targetEnv: env,
+      });
 
-    await updateSlack({
-      client, channel, ts,
-      text: `${year} ${term} 변환 완료 · ${outcome.lectureCount}건`,
-      blocks: buildResultBlocks(outcome, target, actor),
-    });
-  } catch (error) {
-    await updateSlack({
-      client, channel, ts,
-      text: "변환 실패",
-      blocks: [
-        { type: "section", text: { type: "mrkdwn",
-          text: `:x: *변환 실패*\n${errorMessage(error)}` } },
-        { type: "context", elements: [{ type: "mrkdwn",
-          text: `${file.name} · 작업자: <@${actor}>` }] },
-      ],
-    });
-  } finally {
-    await releaseDetectLock("lecture", channel, articleId);
-  }
+      await updateSlack({
+        client, channel, ts,
+        text: `${year} ${term} 변환 완료 · ${outcome.lectureCount}건`,
+        blocks: buildResultBlocks(outcome, target, actor),
+      });
+    } catch (error) {
+      await updateSlack({
+        client, channel, ts,
+        text: "변환 실패",
+        blocks: [
+          { type: "section", text: { type: "mrkdwn",
+            text: `:x: *변환 실패*\n${errorMessage(error)}` } },
+          { type: "context", elements: [{ type: "mrkdwn",
+            text: `${file.name} · 작업자: <@${actor}>` }] },
+        ],
+      });
+    }
+  });
 }
+
+const store = { load: loadDetected, drop: dropDetected };
 
 /** 배치가 올린 감지 알림에서 시작하는 흐름. */
 export const lectureDetectedActions: BlockActionSetting[] = [
@@ -98,196 +102,104 @@ export const lectureDetectedActions: BlockActionSetting[] = [
      * 한쪽만 고쳤을 때 나머지 한쪽은 옛날 그대로 남는다.
      */
     actionId: "lecture:detected",
-    async handler({ client, body, action }) {
-      if (action.type !== "button" || !body.channel) return;
-
-      const { article_id: articleId } = JSON.parse(action.value ?? "{}") as {
-        article_id?: number;
-      };
-      const channel = body.channel.id;
-      const actor = body.user.id;
-      const responseUrl = body.response_url;
-      if (!articleId) return;
-
-      // 어느 코인에 반영할지는 채널로 정한다. 배치는 웹훅을 고르는 것으로 이미 답했다.
-      const resolved = resolveTarget(channel, "강의");
-      if (!resolved.ok || !resolved.target) {
-        await replaceOriginal(responseUrl, "대상 아님", notice(`:x: ${resolved.reason}`));
-        return;
-      }
-      const env = resolved.target.env;
-
-      // 버튼을 지우는 것만으로는 두 번 눌리는 걸 막지 못한다. 원본을 갈아끼우기 전에
-      // 잠근다 — 변환이 두 번 돌면 검토 링크와 [반영] 버튼이 둘씩 생기고,
-      // 그 둘은 토큰이 달라 반영 락에도 걸리지 않는다.
-      const lock = await acquireDetectLock("lecture", channel, articleId, actor);
-      if (!lock.ok) {
-        await client.chat.postEphemeral({
-          channel,
-          user: actor,
-          text: lock.actor
-            ? `<@${lock.actor}>님이 이미 이 공지를 진행 중입니다.`
-            : "이미 진행 중인 공지입니다.",
-        });
-        return;
-      }
-
-      // 배치 메시지는 여기서 역할이 끝난다. 이후 갱신은 봇이 올린 메시지에서 한다.
-      await replaceOriginal(responseUrl, "진행합니다", notice(
-        `:white_check_mark: *강의 업데이트를 진행합니다.* · ${labelOf(env)}\n<@${actor}>`,
-      ));
-
-      const posted = await client.chat.postMessage({
-        channel,
-        text: "게시글 확인 중",
-        blocks: notice(`:hourglass_flowing_sand: 게시글을 확인하고 있습니다…`),
+    async handler(press) {
+      const begun = await beginDetected("lecture", press, {
+        feature: "강의",
+        notTarget: "대상 아님",
+        started: "진행합니다",
+        startedTitle: "강의 업데이트를 진행합니다.",
+        checking: "게시글 확인 중",
+        checkingNotice: ":hourglass_flowing_sand: 게시글을 확인하고 있습니다…",
       });
-      const ts = posted.ts;
-      if (!ts) {
-        // ts가 없으면 이후 갱신도, 스레드 연결도 할 수 없다. 빈 문자열로 이어가면
-        // 다음 변환이 같은 스레드 키를 덮어써서 `!수정`이 엉뚱한 건에 붙는다.
-        await releaseDetectLock("lecture", channel, articleId);
-        throw new Error("메시지를 올리지 못해 진행할 수 없습니다.");
-      }
+      if (!begun) return;
+      const { target, articleId, channel, actor, ts } = begun;
 
-      const say = (text: string, mrkdwn: string) =>
-        updateSlack({ client, channel, ts, text, blocks: notice(mrkdwn) });
+      const article = await readArticle(begun, fetchArticle, "게시글 조회 실패");
+      if (!article) return;
 
-      let article: Awaited<ReturnType<typeof fetchArticle>>;
-      try {
-        article = await fetchArticle(articleId);
-      } catch (error) {
-        await releaseDetectLock("lecture", channel, articleId);
-        await say("게시글 조회 실패",
-          `:x: *게시글을 읽지 못했습니다.*\n${errorMessage(error, "")}`);
-        return;
-      }
-
-      const articleUrl = article.url || koreatechArticleUrl(articleId);
       const files = collectExcelAttachments(article.attachments);
       if (files.length === 0) {
-        await releaseDetectLock("lecture", channel, articleId);
-        await say("첨부 없음", [
+        await stopDetected(begun, "첨부 없음", [
           ":grey_question: *엑셀 첨부를 찾지 못했습니다.*",
-          `<${articleUrl}|${article.title ?? `게시글 ${articleId}`}>`,
+          `<${article.link}|${article.name}>`,
           "파일을 직접 올리고 `!강의반영 2026 여름학기`로 실행해주세요.",
-        ].join("\n"));
+        ]);
         return;
       }
 
       // 학기를 모르면 진행하지 않는다. 엉뚱한 학기에 넣으면 되돌릴 수 없다.
       const semester = guessSemester(article.title ?? "");
       if (!semester) {
-        await releaseDetectLock("lecture", channel, articleId);
-        await say("학기를 지정해주세요", [
+        await stopDetected(begun, "학기를 지정해주세요", [
           ":grey_question: *제목에서 학기를 읽지 못했습니다.*",
           "엑셀을 내려받아 `!강의반영 2026 여름학기`처럼 직접 올려주세요.",
           ...files.map((file) => `<${file.url}|${file.name}>`),
-        ].join("\n"));
+        ]);
         return;
       }
 
       // 엑셀이 여럿이면 사람이 고른다. 편람 외에 폐강강좌·시간표가 함께 붙는다.
       if (files.length > 1) {
         const token = await saveDetected({
-          target: env,
+          target: target.env,
           articleId,
-          articleTitle: article.title ?? `게시글 ${articleId}`,
-          articleUrl,
+          articleTitle: article.name,
+          articleUrl: article.link,
           files,
           ...semester,
         });
-
         await updateSlack({
-          client, channel, ts,
+          client: press.client, channel, ts,
           text: "변환할 파일을 골라주세요",
-          blocks: [
-            ...notice([
-              `:page_facing_up: *${semester.year} ${semester.term}* · ${labelOf(env)}`,
+          blocks: chooseFileBlocks({
+            heading: [
+              `:page_facing_up: *${semester.year} ${semester.term}* · ${target.label}`,
               `엑셀 첨부가 *${files.length}개* 입니다. 변환할 파일을 골라주세요.`,
-              "",
-              ...files.slice(0, MAX_CHOICES).map((file, i) => `${i + 1}. ${file.name}`),
-            ].join("\n")),
-            { type: "actions", elements: [
-              ...files.slice(0, MAX_CHOICES).map((file, index) => ({
-                type: "button" as const,
-                text: { type: "plain_text" as const, text: shorten(file.name), emoji: true },
-                style: index === 0 ? ("primary" as const) : undefined,
-                action_id: `lecture:detected_start${index === 0 ? "" : `_${index}`}`,
-                value: JSON.stringify({ token, fileIndex: index }),
-              })),
-              {
-                type: "button" as const,
-                text: { type: "plain_text" as const, text: "아니요", emoji: true },
-                action_id: "lecture:detected_ignore",
-                value: JSON.stringify({ token }),
-              },
-            ] },
-          ],
+            ],
+            files,
+            actionPrefix: "lecture:detected",
+            token,
+          }),
         });
         return;
       }
 
       await runConversion({
-        client, channel, ts, actor,
-        env, file: files[0], ...semester, articleId,
+        client: press.client, channel, ts, actor,
+        env: target.env, file: files[0], ...semester, articleId,
       });
     },
   },
   // 엑셀이 여럿일 때 고른 파일로 이어간다. 버튼마다 action_id가 달라야 해서 나눠 둔다.
-  ...[0, 1, 2, 3].map((slot) => ({
+  ...[0, 1, 2, 3].map((slot): BlockActionSetting => ({
     actionId: slot === 0 ? "lecture:detected_start" : `lecture:detected_start_${slot}`,
-    async handler({ client, body, action }: Parameters<BlockActionSetting["handler"]>[0]) {
-      if (action.type !== "button" || !body.channel) return;
-
-      const { token, fileIndex = 0 } = JSON.parse(action.value ?? "{}") as {
-        token?: string;
-        fileIndex?: number;
-      };
-      const channel = body.channel.id;
-      const ts = body.message?.ts;
-      const actor = body.user.id;
-      if (!token) return;
-
-      const notice = await loadDetected(token);
-      const file = notice?.files[fileIndex];
-      if (!notice || !file || !notice.year || !notice.term) {
-        await updateSlack({
-          client, channel, ts,
-          text: "만료됨",
-          blocks: [{ type: "section", text: { type: "mrkdwn",
-            text: ":x: 이미 처리했거나 만료된 알림입니다." } }],
-        });
-        return;
-      }
-
-      // 먼저 지운다. 두 명이 눌러 두 번 변환하면 검토 링크가 둘이 된다.
-      await dropDetected(token);
-
+    async handler(press) {
+      // 학기를 모르는 알림은 고르기 단계까지 오지 않지만, 저장값이 깨졌으면 만료로 본다.
+      const choice = await takeChoice(
+        store,
+        press,
+        (detected, index) => (detected.year && detected.term ? detected.files[index] : undefined),
+        ":x: 이미 처리했거나 만료된 알림입니다.",
+      );
+      if (!choice) return;
+      const { detected } = choice;
       await runConversion({
-        client, channel, ts, actor,
-        env: notice.target, file, year: notice.year, term: notice.term,
-        articleId: notice.articleId,
+        client: press.client,
+        channel: press.body.channel!.id,
+        ts: choice.ts,
+        actor: press.body.user.id,
+        env: detected.target,
+        file: choice.file,
+        year: detected.year,
+        term: detected.term,
+        articleId: detected.articleId,
       });
     },
   })),
   {
     actionId: "lecture:detected_ignore",
-    async handler({ client, body, action }) {
-      if (action.type !== "button" || !body.channel) return;
-
-      const { token } = JSON.parse(action.value ?? "{}") as { token?: string };
-      if (token) {
-        const notice = await loadDetected(token);
-        await dropDetected(token);
-        if (notice && body.channel) {
-          await releaseDetectLock("lecture", body.channel.id, notice.articleId);
-        }
-      }
-
-      // 배치가 웹훅으로 올린 메시지일 수 있어 response_url로 바꾼다.
-      await replaceOriginal(body.response_url, "무시함",
-        notice(`:no_entry_sign: *이 공지는 넘어갑니다.*\n<@${body.user.id}>`));
+    async handler(press) {
+      await ignoreDetected("lecture", store, press, { text: "무시함", title: "이 공지는 넘어갑니다." });
     },
   },
 ];
