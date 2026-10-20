@@ -1,4 +1,6 @@
 import { applyCoopPatches } from "~/services/coop/patch";
+import { findCoopJob } from "~/services/coop/jobStore";
+import { assertPatchable } from "~/services/koin/jobLock";
 import { buildCoopApplyButtons } from "~/services/coop/pipeline";
 import { renderRegularCoopReview, renderVacationCoopReview } from "~/services/coop/reviewHtml";
 import {
@@ -40,6 +42,7 @@ export const coopPatchActions: BlockActionSetting[] = [
       await dropCoopPatchPlan(patchToken);
 
       try {
+        assertPatchable(await findCoopJob(plan.reviewToken));
         const stored = await loadCoopReview(plan.reviewToken);
         if (!stored?.conversion) {
           await updateSlack({

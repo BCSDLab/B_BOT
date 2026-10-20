@@ -15,6 +15,16 @@ export type JobStatus = "PENDING" | "APPLYING" | "APPLIED" | "FAILED" | "CANCELL
 /** 반영을 다시 시도할 수 있는 상태. 실패는 원인을 고치고 다시 누를 수 있어야 한다. */
 export const CLAIMABLE: JobStatus[] = ["PENDING", "FAILED"];
 
+/**
+ * 반영됐거나 반영 중인 작업의 검토 데이터는 고치지 않는다. Admin API에는 이미 예전 값이
+ * 나갔는데 검토 화면만 바뀌면 둘이 갈라진다.
+ */
+export function assertPatchable(job: Pick<JobRow, "status"> | null): void {
+  if (job && !CLAIMABLE.includes(job.status)) {
+    throw new Error("이미 반영됐거나 반영 중인 작업이라 수정을 적용할 수 없습니다.");
+  }
+}
+
 export interface JobRow {
   token: string;
   status: JobStatus;
