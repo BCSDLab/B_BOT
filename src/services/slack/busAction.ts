@@ -9,6 +9,7 @@ import {
   setBusVersionSchedules,
 } from "~/services/bus/jobStore";
 import { getKoinAdminAuth } from "~/services/koin/adminAuth";
+import { assertPatchable } from "~/services/koin/jobLock";
 import { applyBusPatchesToConversions } from "~/services/bus/patch";
 import { buildStoredBusReview } from "~/services/bus/pipeline";
 import {
@@ -193,10 +194,7 @@ export async function handleBusPatchAction(
   try {
     // 이미 반영됐거나 반영 중인 작업의 검토 페이지를 고치면, 실제로 보낸 값과
     // 화면이 갈라진다. Admin API는 이미 예전 값으로 나갔으니 여기서 막는다.
-    const job = await findBusJob(plan.reviewToken);
-    if (job && job.status !== "PENDING" && job.status !== "FAILED") {
-      throw new Error("이미 반영됐거나 반영 중인 작업이라 수정을 적용할 수 없습니다.");
-    }
+    assertPatchable(await findBusJob(plan.reviewToken));
     const stored = await loadBusReview(plan.reviewToken);
     if (!stored) throw new Error("검토 링크가 만료됐습니다. 파일을 다시 올려주세요.");
     const next = applyBusPatchesToConversions(stored.conversions, plan.patches).map(

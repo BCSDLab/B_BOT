@@ -1,6 +1,7 @@
 import type { WebClient, Block, KnownBlock, ChatPostMessageArguments } from "@slack/web-api";
 
-interface SendSlackMessageBaseParams extends Omit<ChatPostMessageArguments, "thread_ts"> {
+// snake_case 옵션은 받지 않는다. 받아도 아래에서 넘기지 않아 조용히 사라진다.
+interface SendSlackMessageBaseParams extends Omit<ChatPostMessageArguments, "thread_ts" | "unfurl_links"> {
   client: WebClient;
   threadTs?: string;
   unfurlLinks?: boolean;

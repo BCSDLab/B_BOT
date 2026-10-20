@@ -36,7 +36,7 @@ export default defineEventHandler(async (event) => {
     const result =await sendSlackBlock({
       client: event.context.slackWebClient,
       channel,
-      unfurl_links: false,
+      unfurlLinks: false,
       threadTs,
       blocks: [
         {

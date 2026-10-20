@@ -16,7 +16,7 @@ export const messages: MessageSetting[] = [
         threadTs: ts,
         channel,
         text: `회의를 생성하였습니다. ${meetingInfo.meetingUri} 확인해주세요!`,
-        unfurl_links: true,
+        unfurlLinks: true,
       });
       await saveMeeting({
         meeting: meetingInfo.meetingCode,

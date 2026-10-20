@@ -22,7 +22,7 @@ export default defineEventHandler(async (event) => {
       client: event.context.slackWebClient,
       channel: CHANNEL_ID.트랙_front_end,
       text: `패키지가 배포되었지만, 패키지 이름을 찾을 수 없어요., ${detail}`,
-      unfurl_links: true,
+      unfurlLinks: true,
     });
 
     throw createError({
@@ -34,7 +34,7 @@ export default defineEventHandler(async (event) => {
   await sendSlackBlock({
     client: event.context.slackWebClient,
     channel: CHANNEL_ID.트랙_front_end,
-    unfurl_links: true,
+    unfurlLinks: true,
     blocks: [
       {
         type: "section",

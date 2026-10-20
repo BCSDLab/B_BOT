@@ -5,7 +5,8 @@ import {
   submitLectures,
   toAdminTerm,
 } from "~/services/lecture/adminApi";
-import { cancelJob, claimJob, finishJob } from "~/services/lecture/jobStore";
+import { cancelJob, claimJob, findJob, finishJob } from "~/services/lecture/jobStore";
+import { assertPatchable } from "~/services/koin/jobLock";
 import { getKoinAdminAuth } from "~/services/koin/adminAuth";
 import { labelOf, resolveTargetByEnv } from "~/services/koin/target";
 import { applyPatches, resolveAmbiguities } from "~/services/lecture/patch";
@@ -88,6 +89,7 @@ export const lectureActions: BlockActionSetting[] = [
       await dropPatchPlan(patchToken);
 
       try {
+        assertPatchable(await findJob(plan.reviewToken));
         const stored = await loadReview(plan.reviewToken);
         if (!stored) {
           await say("검토 만료", [{ type: "section", text: { type: "mrkdwn",

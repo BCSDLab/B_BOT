@@ -54,7 +54,11 @@ export default defineTask({
         date: now,
         result: normalizedResult
       } satisfies ClarityData);
-      const previousData = await storage.get<ClarityData | null>(`${CLARITY_DATA_PREFIX}${data[data.length -1]}`);
+      // 첫 실행이면 비교할 이전 기록이 없다.
+      const previousDate = data?.at(-1);
+      const previousData = previousDate === undefined
+        ? null
+        : await storage.get<ClarityData | null>(`${CLARITY_DATA_PREFIX}${previousDate}`);
       if (!previousData) {
         return {
           result: "success"
@@ -77,7 +81,7 @@ export default defineTask({
         client: slackWebClient,
         channel: CHANNEL_ID.코인_오류_front_end,
         blocks,
-        unfurl_links: false,
+        unfurlLinks: false,
       });
     } catch (e) {
       console.error(e);
