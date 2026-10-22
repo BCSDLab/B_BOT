@@ -4,12 +4,12 @@ BCSD Lab Slack 봇. 재미 명령, CI/CD 알림 웹훅, Google Meet 생성, 그�
 조직 지식 RAG·온보딩·운영 자동화로 고도화 중이다. (계획: [`docs/계획서.md`](./docs/계획서.md) · 기능: [`docs/기능명세서.md`](./docs/기능명세서.md))
 
 - **스택**: Nitro (TypeScript), Slack **HTTP 웹훅**, MySQL(→ 추후 PostgreSQL+pgvector)
-- **런타임**: Node `v22.23.4` (`.nvmrc`), 패키지 매니저 **pnpm**
+- **런타임**: Node `v24.22.1` (`.nvmrc`), 패키지 매니저 **pnpm**
 
 ## 시작하기
 
 ```bash
-nvm use                 # Node 22.23.4 (.nvmrc)
+nvm use                 # Node 24.22.1 (.nvmrc)
 pnpm install            # 의존성 설치
 cp .env.example .env    # .env 생성 후 값 채우기 (아래 환경 변수 참고)
 pnpm dev                # 개발 서버 (nitro dev)

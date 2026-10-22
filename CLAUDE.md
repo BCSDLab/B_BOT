@@ -11,7 +11,7 @@ B-BOT (삐봇) — BCSD Lab Slack 봇. 이 파일은 사람과 Claude Code가 �
 
 ## 셋업
 
-- Node `v22.23.4`(`.nvmrc`), **pnpm**.
+- Node `v24.22.1`(`.nvmrc`), **pnpm**.
 - `nvm use` → `pnpm install` → `cp .env.example .env`(값 채우기) → `pnpm dev`.
 - 필요한 env 키와 출처는 `.env.example` 참고.
 
