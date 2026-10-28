@@ -32,6 +32,11 @@ export interface DashboardPlan {
   }>;
 }
 
+// The Claude API rejects numeric/array/string constraints and `enum` on a multi-type field,
+// so limits are enforced only in validatePlan and nullable fields use `anyOf` branches.
+const nullable = (type: string, values?: string[]) => ({
+  anyOf: [values ? { type, enum: values } : { type }, { type: "null" }],
+});
 const filterSchema = {
   type: "object",
   additionalProperties: false,
@@ -39,7 +44,7 @@ const filterSchema = {
   properties: {
     column: { type: "string" },
     operator: { type: "string", enum: ["==", "!=", ">", ">=", "<", "<="] },
-    value: { type: ["string", "number"] },
+    value: { anyOf: [{ type: "string" }, { type: "number" }] },
   },
 };
 const orderSchema = {
@@ -56,15 +61,15 @@ const chartPlanSchema = {
     title: { type: "string" },
     datasetId: { type: "integer" },
     chartType: { type: "string", enum: ["table", "bar", "line"] },
-    columns: { type: "array", items: { type: "string" }, maxItems: 12 },
-    metrics: { type: "array", items: { type: "string" }, maxItems: 6 },
-    groupby: { type: "array", items: { type: "string" }, maxItems: 8 },
-    timeColumn: { type: "string" },
-    timeGrain: { type: "string", enum: ["PT1H", "P1D", "P1W", "P1M", "P1Y"] },
-    timeRange: { type: "string", maxLength: 100 },
-    orderBy: { type: "array", maxItems: 4, items: orderSchema },
-    rowLimit: { type: "integer", minimum: 1, maximum: 100 },
-    filters: { type: "array", maxItems: 8, items: filterSchema },
+    columns: { type: "array", items: { type: "string" } },
+    metrics: { type: "array", items: { type: "string" } },
+    groupby: { type: "array", items: { type: "string" } },
+    timeColumn: nullable("string"),
+    timeGrain: nullable("string", ["PT1H", "P1D", "P1W", "P1M", "P1Y"]),
+    timeRange: nullable("string"),
+    orderBy: { type: "array", items: orderSchema },
+    rowLimit: nullable("integer"),
+    filters: { type: "array", items: filterSchema },
   },
 };
 const planSchema = {
@@ -73,7 +78,7 @@ const planSchema = {
   required: ["title", "charts"],
   properties: {
     title: { type: "string" },
-    charts: { type: "array", minItems: 1, maxItems: 4, items: chartPlanSchema },
+    charts: { type: "array", items: chartPlanSchema },
   },
 };
 const routeSchema = { type: "object", additionalProperties: false, required: ["intent"], properties: { intent: { type: "string", enum: ["answer", "dashboard"] } } };
@@ -177,15 +182,15 @@ const querySchema = {
   required: ["datasetId", "columns", "metrics", "groupby", "timeRange", "timeColumn", "timeGrain", "orderBy", "rowLimit", "filters"],
   properties: {
     datasetId: { type: "integer" },
-    columns: { type: "array", items: { type: "string" }, maxItems: 12 },
-    metrics: { type: "array", items: { type: "string" }, maxItems: 6 },
-    groupby: { type: "array", items: { type: "string" }, maxItems: 8 },
-    timeRange: { type: ["string", "null"], maxLength: 100 },
-    timeColumn: { type: ["string", "null"] },
-    timeGrain: { type: ["string", "null"], enum: ["PT1H", "P1D", "P1W", "P1M", "P1Y", null] },
-    orderBy: { type: "array", maxItems: 4, items: orderSchema },
-    rowLimit: { type: ["integer", "null"], minimum: 1, maximum: 100 },
-    filters: { type: "array", maxItems: 8, items: filterSchema },
+    columns: { type: "array", items: { type: "string" } },
+    metrics: { type: "array", items: { type: "string" } },
+    groupby: { type: "array", items: { type: "string" } },
+    timeRange: nullable("string"),
+    timeColumn: nullable("string"),
+    timeGrain: nullable("string", ["PT1H", "P1D", "P1W", "P1M", "P1Y"]),
+    orderBy: { type: "array", items: orderSchema },
+    rowLimit: nullable("integer"),
+    filters: { type: "array", items: filterSchema },
   },
 };
 

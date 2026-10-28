@@ -3,7 +3,7 @@ const model = vi.hoisted(() => ({ generateStructured: vi.fn() }));
 const api = vi.hoisted(() => ({ createSupersetClient: vi.fn(), getAllowedDatasetIds: vi.fn(), getDatasetMetadata: vi.fn(), queryDataset: vi.fn(), createSupersetDashboard: vi.fn() }));
 vi.mock("~/infra/anthropic", () => model);
 vi.mock("~/infra/superset", () => api);
-import { planDashboard, createDashboard, answer } from "~/services/superset";
+import { planDashboard, createDashboard, answer, classifyRequest } from "~/services/superset";
 const chart = { title: "매출", datasetId: 1, chartType: "bar", columns: [], metrics: ["sales"], groupby: ["month"] };
 beforeEach(() => {
   vi.resetAllMocks();
@@ -121,5 +121,46 @@ describe("Registered SQL data boundaries", () => {
     expect(request.prompt).not.toContain("NEVER_SEND_RAW_SQL");
     expect(request.prompt).not.toContain("filter_values");
     expect(JSON.parse(request.prompt).datasets[0]).not.toHaveProperty("sql");
+  });
+});
+
+describe("Claude schema compatibility", () => {
+  const unsupported = /^(maxItems|minLength|maxLength|minimum|maximum|multipleOf|maxProperties|minProperties)$/;
+  /** Mirrors the API rules: no unsupported keywords and no enum on a multi-type field. */
+  function assertAcceptable(node: unknown, path = "$"): void {
+    if (Array.isArray(node)) {
+      node.forEach((child, index) => assertAcceptable(child, `${path}[${index}]`));
+      return;
+    }
+    if (!node || typeof node !== "object") return;
+    const schema = node as Record<string, unknown>;
+    expect(Object.keys(schema).filter((key) => unsupported.test(key))).toEqual([]);
+    if (Array.isArray(schema.type) && schema.type.length > 1) {
+      throw new Error(`${path} must use anyOf instead of a union type`);
+    }
+    for (const [key, value] of Object.entries(schema)) {
+      if (key === "enum" || key === "required" || key === "type") continue;
+      assertAcceptable(value, `${path}.${key}`);
+    }
+  }
+
+  it("sends schemas the Claude API accepts for every structured request", async () => {
+    api.getDatasetMetadata.mockResolvedValue({
+      id: 1, datasource_type: "table",
+      columns: [{ column_name: "month", type: "VARCHAR" }, { column_name: "created_at", type: "TIMESTAMP", is_dttm: true }],
+      metrics: [{ metric_name: "sales" }],
+    });
+    api.queryDataset.mockResolvedValue({ rows: [], limit: 100, truncated: false });
+    model.generateStructured
+      .mockResolvedValueOnce({ title: "매출", charts: [chart] })
+      .mockResolvedValueOnce({ datasetId: 1, columns: ["month"], metrics: [], groupby: [], timeRange: null, timeColumn: null, timeGrain: null, orderBy: [], rowLimit: null, filters: [] })
+      .mockResolvedValueOnce({ answer: "ok" })
+      .mockResolvedValueOnce({ intent: "answer" });
+    await planDashboard("매출 대시보드");
+    await answer("지난달 매출");
+    await classifyRequest("질문");
+    const schemas = model.generateStructured.mock.calls.map(([request]) => request.schema);
+    expect(schemas).toHaveLength(4);
+    schemas.forEach((schema) => assertAcceptable(schema));
   });
 });
