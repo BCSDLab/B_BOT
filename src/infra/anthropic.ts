@@ -26,10 +26,38 @@ export function sanitizeSchema(schema: Record<string, unknown>): Record<string, 
   return sanitizeSchemaNode(schema) as Record<string, unknown>;
 }
 
+/** JSON type of a schema literal, for splitting union types without losing their `enum`. */
+function literalType(value: unknown): string | null {
+  if (value === null) return "null";
+  if (Array.isArray(value)) return "array";
+  return typeof value === "object" ? "object" : typeof value;
+}
+
+/**
+ * Claude rejects `enum` on a multi-type field ("Enum value 'PT1H' does not match declared
+ * type '['string', 'null']'"), so a union becomes one `anyOf` branch per type.
+ */
+function splitUnionTypes(source: Record<string, unknown>, types: unknown[]): Record<string, unknown> {
+  const variants = types.map((type) => {
+    const variant: Record<string, unknown> = { ...source, type };
+    if (Array.isArray(source.enum)) {
+      const allowed = source.enum.filter((value) => literalType(value) === type);
+      // A null-only enum adds nothing to a `null` branch.
+      if (allowed.length && type !== "null") variant.enum = allowed;
+      else delete variant.enum;
+    }
+    return variant;
+  });
+  return { anyOf: variants };
+}
+
 function sanitizeSchemaNode(node: unknown): unknown {
   if (Array.isArray(node)) return node.map(sanitizeSchemaNode);
   if (!node || typeof node !== "object") return node;
   const source = node as Record<string, unknown>;
+  if (Array.isArray(source.type) && source.type.length > 1) {
+    return sanitizeSchemaNode(splitUnionTypes(source, source.type));
+  }
   const sanitized: Record<string, unknown> = {};
   const constraints: string[] = [];
   for (const [key, value] of Object.entries(source)) {

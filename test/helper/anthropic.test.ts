@@ -61,4 +61,21 @@ describe("Structured output request contract", () => {
     create.mockResolvedValue({ stop_reason: "max_tokens", content: [{ type: "text", text: '{"title":"t"' }] });
     await expect(generateStructured({ system: "s", prompt: "p", schema })).rejects.toThrow("잘렸습니다");
   });
+
+  it("splits nullable enums into branches the API accepts", () => {
+    const sanitized = sanitizeSchema({
+      type: "object",
+      additionalProperties: false,
+      required: ["timeGrain"],
+      properties: {
+        timeGrain: { type: ["string", "null"], enum: ["PT1H", "P1D", null] },
+        value: { type: ["string", "number"] },
+      },
+    }) as { properties: Record<string, { anyOf: Array<Record<string, unknown>> }> };
+    expect(sanitized.properties.timeGrain.anyOf).toEqual([
+      { type: "string", enum: ["PT1H", "P1D"] },
+      { type: "null" },
+    ]);
+    expect(sanitized.properties.value.anyOf).toEqual([{ type: "string" }, { type: "number" }]);
+  });
 });
