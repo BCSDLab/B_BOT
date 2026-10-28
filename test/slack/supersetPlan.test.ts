@@ -42,7 +42,7 @@ describe("Superset model output boundaries", () => {
       .mockResolvedValueOnce({ datasetId: 1, columns: [], metrics: ["sales"], groupby: ["month"], timeRange: null, timeColumn: null, timeGrain: null, orderBy: [{ field: "sales", ascending: false }], rowLimit: 1, filters: [] })
       .mockResolvedValueOnce({ answer: "Top result" });
     api.queryDataset.mockResolvedValue({ rows: [{ month: "May", sales: 99 }], limit: 1, truncated: true });
-    await expect(answer("매출 상위")).resolves.toContain("상위 1개로 제한되어 전체 결과가 아닙니다 (정렬: sales 내림차순).");
+    await expect(answer("매출 상위")).resolves.toContain("⚠️ 상위 1행만 반영한 값입니다.");
   });
   it("revalidates saved plans against current dataset metadata before creating", async () => {
     api.getDatasetMetadata.mockResolvedValue({ id: 1, datasource_type: "table", columns: [{ column_name: "month", type: "VARCHAR" }], metrics: [] });
