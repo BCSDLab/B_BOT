@@ -15,6 +15,15 @@ import type { BlockActionSetting, MessageSetting } from "~/services/slack/types"
 import { updateSlack } from "~/utils/slackFunction";
 
 const safeFailure = "요청을 처리하지 못했어요. 권한과 데이터 설정을 확인한 뒤 다시 시도해주세요.";
+/** Keeps the operational cause visible instead of collapsing every failure into one line. */
+const failureDetail = (error: unknown): string => {
+  const message = error instanceof Error ? error.message : String(error);
+  return message
+    .replace(/\b(sk-[A-Za-z0-9_-]{8,}|xox[baprs]-[A-Za-z0-9-]+|Bearer\s+\S+)\b/g, "[redacted]")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 300);
+};
 const tokenFrom = (value: string | undefined): string | null => {
   try {
     const token = JSON.parse(value ?? "")?.token;
@@ -58,9 +67,10 @@ export const messages: MessageSetting[] = [
       const msgTs = pending.ts as string;
       const token = await saveDashboardConfirmation({ userId: user, channelId: channel, messageTs: msgTs, plan });
       await client.chat.update({ channel, ts: msgTs, text: "대시보드 생성안을 확인해주세요.", blocks: preview(plan, token) });
-    } catch {
+    } catch (error) {
+      console.error("superset command failed:", error);
       if (planning) await recordDashboardAudit(user, "dashboard_plan", "failed").catch(() => {});
-      await client.chat.update({ channel, ts: pending.ts as string, text: safeFailure, blocks: [] });
+      await client.chat.update({ channel, ts: pending.ts as string, text: `${safeFailure}\n원인: ${failureDetail(error)}`, blocks: [] });
     }
   } },
 ];
@@ -137,9 +147,10 @@ export const blockActions: BlockActionSetting[] = [
       progress[0] = { type: "section", text: { type: "plain_text", text: "대시보드를 생성하는 중이에요. 생성이 완료되면 결과 링크를 안내합니다." } };
       await updateSlack({ client, channel: channel.id, ts: message.ts, text: "대시보드를 생성하는 중이에요…", blocks: progress });
       url = await createDashboard(plan);
-    } catch {
+    } catch (error) {
+      console.error("superset dashboard creation failed:", failureDetail(error));
       await finishDashboardConfirmation(token, user.id, false).catch(() => {});
-      await updateSlack({ client, channel: channel.id, ts: message.ts, text: "생성을 완료하지 못했습니다. Superset에 일부 항목이 남았을 수 있으니 확인 후 다시 요청해주세요.", blocks: [] });
+      await updateSlack({ client, channel: channel.id, ts: message.ts, text: `생성을 완료하지 못했습니다. Superset에 일부 항목이 남았을 수 있으니 확인 후 다시 요청해주세요.\n원인: ${failureDetail(error)}`, blocks: [] });
       return;
     }
     // The URL is stored durably inside finish before its status/audit transaction, so a

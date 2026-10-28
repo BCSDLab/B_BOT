@@ -27,6 +27,7 @@ beforeEach(() => {
   domain.planDashboard.mockResolvedValue(plan);
   domain.createDashboard.mockResolvedValue("https://superset.example/superset/dashboard/1/");
   store.saveDashboardConfirmation.mockResolvedValue(token);
+  store.recordDashboardAudit.mockResolvedValue(undefined);
   store.loadDashboardConfirmation.mockResolvedValue({ userId: "U1", channelId: "C1", messageTs: "2", plan });
   store.claimDashboardConfirmation.mockResolvedValue(plan);
   store.finishDashboardConfirmation.mockResolvedValue(undefined);
@@ -180,5 +181,22 @@ describe("Superset Slack authorization and confirmation", () => {
     expect(client.chat.update.mock.calls[0][0].text).toBe("매출 100원 &lt;!channel&gt;");
     expect(store.saveDashboardConfirmation).not.toHaveBeenCalled();
     expect(domain.createDashboard).not.toHaveBeenCalled();
+  });
+  it("keeps the underlying cause of a failed request visible", async () => {
+    domain.planDashboard.mockRejectedValue(new Error("Superset GET /api/v1/dataset/29 failed (403)."));
+    const { args, client } = scenario();
+    await messages[0].handler(args as never);
+    const text = client.chat.update.mock.calls.at(-1)![0].text;
+    expect(text).toContain("요청을 처리하지 못했어요");
+    expect(text).toContain("Superset GET /api/v1/dataset/29 failed (403).");
+  });
+  it("redacts credentials from a surfaced failure cause", async () => {
+    domain.planDashboard.mockRejectedValue(new Error("login rejected for xoxb-1234-secret and sk-ant-abcdefghijkl"));
+    const { args, client } = scenario();
+    await messages[0].handler(args as never);
+    const text = client.chat.update.mock.calls.at(-1)![0].text;
+    expect(text).not.toContain("xoxb-1234-secret");
+    expect(text).not.toContain("sk-ant-abcdefghijkl");
+    expect(text).toContain("[redacted]");
   });
 });

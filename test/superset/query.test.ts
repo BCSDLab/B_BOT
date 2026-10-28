@@ -132,4 +132,15 @@ describe("Superset registered datasets", () => {
     stubSuperset([{ access_token: "fixture" }, { result: "csrf" }, { result: dataset }]);
     await expect(getDatasetMetadata(createSupersetClient(), 16)).rejects.toThrow("Unsupported Superset dataset.");
   });
+
+  it("reports which Superset call failed and why", async () => {
+    let calls = 0;
+    vi.stubGlobal("fetch", vi.fn(async () => {
+      calls += 1;
+      if (calls === 1) return Response.json({ access_token: "fixture" });
+      if (calls === 2) return Response.json({ result: "csrf" });
+      return new Response('{"message":"Forbidden"}', { status: 403 });
+    }));
+    await expect(getDatasetMetadata(createSupersetClient(), 16)).rejects.toThrow("Superset GET /api/v1/dataset/16 failed (403). {\"message\":\"Forbidden\"}");
+  });
 });

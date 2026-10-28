@@ -51,7 +51,10 @@ class SupersetClient {
     if (this.csrf && init.method && init.method !== "GET") headers.set("X-CSRFToken", this.csrf);
     const response = await fetch(`${config()}${path}`, { ...init, headers, redirect: "error", signal: AbortSignal.timeout(TIMEOUT_MS) });
     this.rememberCookies(response);
-    if (!response.ok) throw new Error("Superset request failed.");
+    if (!response.ok) {
+      const detail = await response.text().catch(() => "");
+      throw new Error(`Superset ${init.method ?? "GET"} ${path} failed (${response.status}). ${detail.slice(0, 200)}`.trim());
+    }
     try { return await response.json() as JsonObject; } catch { throw new Error("Superset returned an invalid response."); }
   }
 
@@ -65,7 +68,10 @@ class SupersetClient {
       if (typeof csrf.result !== "string") throw new Error("Superset authentication failed.");
       this.csrf = csrf.result;
     })();
-    try { await this.loginPromise; } catch { this.loginPromise = undefined; throw new Error("Superset authentication failed."); }
+    try { await this.loginPromise; } catch (error) {
+      this.loginPromise = undefined;
+      throw new Error(`Superset authentication failed: ${error instanceof Error ? error.message : "unknown error"}`);
+    }
   }
   async get(path: string) { await this.authenticate(); return this.request(path); }
   async post(path: string, body: unknown) { await this.authenticate(); return this.request(path, { method: "POST", body: JSON.stringify(body) }); }
