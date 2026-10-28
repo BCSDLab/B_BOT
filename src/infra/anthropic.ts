@@ -4,7 +4,7 @@ import {
   type StructuredGenerationRequest,
 } from "./structured";
 
-// 강의 편람처럼 학기마다 형식이 바뀌는 입력을 읽어낼 때만 쓴다.
+// 운영 입력 해석과 Superset 자연어 질의·대시보드 구성에 쓰는 구조화 생성.
 // RAG 응답 생성은 계속 로컬 모델(ollama.ts) 담당이다.
 const MODEL = "claude-opus-5";
 

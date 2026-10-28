@@ -17,6 +17,21 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: bbot_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d bbot_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -31,6 +46,27 @@ jobs:
         with:
           node-version-file: ".nvmrc"
           cache: "pnpm"
+
+      - name: Create credentials.json
+        env:
+          CREDENTIALS_JSON: ${{ secrets.CREDENTIALS_JSON }}
+        run: echo "$CREDENTIALS_JSON" > credentials.json
+
+      - name: Create token.json
+        env:
+          TOKEN_JSON: ${{ secrets.TOKEN_JSON }}
+        run: echo "$TOKEN_JSON" > token.json
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Prepare Nitro types
+        run: pnpm exec nitro prepare
+
+      - name: Test
+        env:
+          SUPERSET_TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/bbot_test
+        run: pnpm test
 
       - name: Create .env
         env:
@@ -62,9 +98,24 @@ jobs:
           KOIN_PROD_SERVICE_TOKEN: ${{ secrets.KOIN_PROD_SERVICE_TOKEN }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           OPENAI_MODEL: ${{ secrets.OPENAI_MODEL }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          SUPERSET_BASE_URL: ${{ secrets.SUPERSET_BASE_URL }}
+          SUPERSET_USERNAME: ${{ secrets.SUPERSET_USERNAME }}
+          SUPERSET_PASSWORD: ${{ secrets.SUPERSET_PASSWORD }}
+          SUPERSET_DATASET_IDS: ${{ secrets.SUPERSET_DATASET_IDS }}
           INTERNAL_API_BASE_URL: ${{ secrets.INTERNAL_API_BASE_URL }}
           INTERNAL_SERVICE_TOKEN: ${{ secrets.INTERNAL_SERVICE_TOKEN }}
         run: |
+          missing=0
+          for name in ANTHROPIC_API_KEY SUPERSET_BASE_URL SUPERSET_USERNAME SUPERSET_PASSWORD SUPERSET_DATASET_IDS; do
+            if [[ -z "${!name}" ]]; then
+              echo "::error::Required GitHub Actions secret is missing: $name"
+              missing=1
+            fi
+          done
+          if [[ "$missing" -ne 0 ]]; then
+            exit 1
+          fi
           cat <<EOF > .env
           SLACK_BOT_TOKEN=$SLACK_BOT_TOKEN
           SLACK_BOT_SIGNING_SECRET=$SLACK_BOT_SIGNING_SECRET
@@ -95,23 +146,15 @@ jobs:
           DINING_WORKER_ENVS=stage,prod
           OPENAI_API_KEY=$OPENAI_API_KEY
           OPENAI_MODEL=$OPENAI_MODEL
+          ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY
+          SUPERSET_BASE_URL=$SUPERSET_BASE_URL
+          SUPERSET_USERNAME=$SUPERSET_USERNAME
+          SUPERSET_PASSWORD=$SUPERSET_PASSWORD
+          SUPERSET_DATASET_IDS=$SUPERSET_DATASET_IDS
           INTERNAL_API_BASE_URL=$INTERNAL_API_BASE_URL
           INTERNAL_SERVICE_TOKEN=$INTERNAL_SERVICE_TOKEN
           GDRIVE_FOLDER_IDS=1fMJGkRIuGWBCHnN0pI5Teab9dKtnkw4s,1cxrf10solU3-qPk_1gWmQOSe1KmMM7dA,1XHBKifEhBQdM4DJAOm44YkNxZpMdGAzF,1eKuZ-lzwpxlJu4-9KciF3XYj3GN-lu28,1X2wch3Av6DMYHYufWy6ybol2saRaVdOq,10c1R4a9-HgNrV4t-Vzj6crGhHK1s06HP,1y0yv2oItH3a_Obo5Jvw_ifH3DlbbHbLp,1iEUpsaoquhwCNBLI7hIDznhAuO33YMGo,1dEVWkUaxKpubTdfawzTtE4km-a7LPsRo,1UAAUK7yqHcyCVZI6Xou3u9Eh4YqyAYYc,1XYia9-0r_F-JGU-wLQdmLB8WFllT3ssa,1_HZB6ztDxOloF9Va-Qw2X38iYFiMMPIW,1-aBgwPhmDeSO327VdvR3NFnYqoNu6Anj,1fyrohFc92yjzZ_FuGAs0yssQcxzSgz4t,1J0y8zCdN9-P_ASkZuO3g30_SUKSVRb7r,1MBMf16gw-XPzv9SRrAPq8L-UqWSf7QV9
           EOF
-
-      - name: Create credentials.json
-        env:
-          CREDENTIALS_JSON: ${{ secrets.CREDENTIALS_JSON }}
-        run: echo "$CREDENTIALS_JSON" > credentials.json
-
-      - name: Create token.json
-        env:
-          TOKEN_JSON: ${{ secrets.TOKEN_JSON }}
-        run: echo "$TOKEN_JSON" > token.json
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
 
       - name: Build
         run: pnpm run build

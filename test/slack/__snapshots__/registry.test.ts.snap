@@ -18,6 +18,7 @@ exports[`Slack 핸들러 등록표 > 메시지 핸들러 순서 1`] = `
   "/^!학기구분/",
   "/^!버스반영/",
   "/^!수정/",
+  "/^!대시보드\\s+/",
 ]
 `;
 
@@ -57,6 +58,8 @@ exports[`Slack 핸들러 등록표 > 버튼 action_id 1`] = `
   "lecture:patch_cancel",
   "lecture:apply",
   "lecture:cancel",
+  "superset:confirm",
+  "superset:cancel",
 ]
 `;
 

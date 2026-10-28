@@ -5,6 +5,7 @@ import { messages as funMessages } from "~/services/slack/features/fun";
 import { messages as googleMeetMessages } from "~/services/slack/features/googleMeet";
 import { messages as lectureMessages } from "~/services/slack/features/lecture/messages";
 import { messages as ragMessages } from "~/services/slack/features/rag";
+import { messages as supersetMessages } from "~/services/slack/features/superset";
 import type { MessageSetting } from "~/services/slack/types";
 
 /**
@@ -21,4 +22,5 @@ export const messageFunctionList: MessageSetting[] = [
   ...coopMessages,
   ...busMessages,
   ...editMessages,
+  ...supersetMessages,
 ];

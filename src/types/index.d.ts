@@ -37,6 +37,10 @@ interface ImportMetaEnv {
   readonly OPENAI_MODEL?: string;
   readonly LECTURE_LLM_PROVIDER?: "openai" | "anthropic";
   readonly COOP_LLM_PROVIDER?: "openai" | "anthropic";
+  readonly SUPERSET_BASE_URL?: string;
+  readonly SUPERSET_USERNAME?: string;
+  readonly SUPERSET_PASSWORD?: string;
+  readonly SUPERSET_DATASET_IDS?: string;
   readonly NOTION_TOKEN?: string;
   readonly GDRIVE_FOLDER_IDS?: string;
   /** 멤버 명단 원본(인터널). 예: https://internal.bcsdlab.com */

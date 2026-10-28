@@ -6,6 +6,7 @@ import { coopPatchActions } from "~/services/slack/features/coop/patchActions";
 import { diningActions } from "~/services/slack/features/dining";
 import { lectureActions } from "~/services/slack/features/lecture/actions";
 import { lectureDetectedActions } from "~/services/slack/features/lecture/detectedActions";
+import { blockActions as supersetActions } from "~/services/slack/features/superset";
 import type { BlockActionSetting } from "~/services/slack/types";
 
 /**
@@ -31,4 +32,5 @@ export const blockActions: BlockActionSetting[] = [
   ...diningActions,
   ...lectureDetectedActions,
   ...lectureActions,
+  ...supersetActions,
 ];
