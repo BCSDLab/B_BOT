@@ -37,12 +37,17 @@ describe("Superset model output boundaries", () => {
     model.generateStructured.mockResolvedValue({ title: "매출", charts: [{ ...chart, groupby: [], timeColumn: "created_at", timeGrain: "P1M" }] });
     await expect(planDashboard("월별 매출 대시보드")).resolves.toMatchObject({ charts: [{ timeColumn: "created_at", timeGrain: "P1M" }] });
   });
-  it("adds a deterministic warning when the requested result is truncated", async () => {
+  it("states the query scope and truncation without relying on the model", async () => {
     model.generateStructured
-      .mockResolvedValueOnce({ datasetId: 1, columns: [], metrics: ["sales"], groupby: ["month"], timeRange: null, timeColumn: null, timeGrain: null, orderBy: [{ field: "sales", ascending: false }], rowLimit: 1, filters: [] })
-      .mockResolvedValueOnce({ answer: "Top result" });
-    api.queryDataset.mockResolvedValue({ rows: [{ month: "May", sales: 99 }], limit: 1, truncated: true });
-    await expect(answer("매출 상위")).resolves.toContain("⚠️ 상위 1행만 반영한 값입니다.");
+      .mockResolvedValueOnce({ datasetId: 1, columns: [], metrics: ["sales"], groupby: [], timeRange: "2026-05-01 : 2026-06-01", timeColumn: "created_at", timeGrain: null, orderBy: [{ field: "sales", ascending: false }], rowLimit: 1, filters: [{ column: "month", operator: "==", value: "May" }] })
+      .mockResolvedValueOnce({ answer: "요청하신 5월 매출은 99입니다." });
+    api.getDatasetMetadata.mockResolvedValue({
+      id: 1, datasource_type: "table", table_name: "ab_test",
+      columns: [{ column_name: "month", type: "VARCHAR" }, { column_name: "created_at", type: "TIMESTAMP", is_dttm: true }], metrics: [{ metric_name: "sales" }],
+    });
+    api.queryDataset.mockResolvedValue({ rows: [{ sales: 99 }], limit: 1, truncated: true });
+    const text = await answer("5월 매출");
+    expect(text).toBe("요청하신 5월 매출은 99입니다.\n\n기간: 2026-05-01 : 2026-06-01\n조건: month == May\n데이터: ab_test · sales\n⚠️ 상위 1행만 반영했습니다.");
   });
   it("revalidates saved plans against current dataset metadata before creating", async () => {
     api.getDatasetMetadata.mockResolvedValue({ id: 1, datasource_type: "table", columns: [{ column_name: "month", type: "VARCHAR" }], metrics: [] });

@@ -4,6 +4,8 @@ type JsonObject = Record<string, unknown>;
 export interface DatasetMetadata {
   id: number;
   datasource_type: string;
+  table_name?: string | null;
+  name?: string | null;
   sql?: string | null;
   is_sqllab_view?: boolean;
   main_dttm_col?: string | null;
