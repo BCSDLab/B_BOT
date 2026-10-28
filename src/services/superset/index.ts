@@ -208,7 +208,7 @@ function describeQuery(dataset: DatasetMetadata, query: { metrics: string[]; col
   const selected = [...new Set([...query.metrics, ...query.groupby, ...query.columns])];
   lines.push(`데이터: ${source}${selected.length ? ` · ${selected.join(", ")}` : ""}`);
   if (result.truncated) lines.push(`⚠️ 상위 ${result.limit}행만 반영했습니다.`);
-  return `\n\n${lines.join("\n")}`;
+  return `\n\n\`\`\`\n${lines.join("\n")}\n\`\`\``;
 }
 
 export async function answer(question: string): Promise<string> {

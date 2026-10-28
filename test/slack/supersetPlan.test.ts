@@ -47,7 +47,7 @@ describe("Superset model output boundaries", () => {
     });
     api.queryDataset.mockResolvedValue({ rows: [{ sales: 99 }], limit: 1, truncated: true });
     const text = await answer("5월 매출");
-    expect(text).toBe("요청하신 5월 매출은 99입니다.\n\n기간: 2026-05-01 : 2026-06-01\n조건: month == May\n데이터: ab_test · sales\n⚠️ 상위 1행만 반영했습니다.");
+    expect(text).toBe("요청하신 5월 매출은 99입니다.\n\n```\n기간: 2026-05-01 : 2026-06-01\n조건: month == May\n데이터: ab_test · sales\n⚠️ 상위 1행만 반영했습니다.\n```");
   });
   it("revalidates saved plans against current dataset metadata before creating", async () => {
     api.getDatasetMetadata.mockResolvedValue({ id: 1, datasource_type: "table", columns: [{ column_name: "month", type: "VARCHAR" }], metrics: [] });
